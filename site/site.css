@@ -18,6 +18,30 @@ h1, h2, h3 { margin: 0; font-family: var(--disp); font-weight: 700; color: var(-
 p { margin: 0; }
 section { padding-inline: var(--gut); }
 
+/* light theme (theme.js sets data-theme on <html>) */
+:root[data-theme="light"] { --bg: #fff; --tile: #f5f5f7; --tile-2: #ececf0; --line: rgba(0, 0, 0, .08); --text: #1d1d1f; --soft: #515154; --mute: #86868b; --pip-2: #6a4dff; }
+:root[data-theme="light"] .nav { background: rgba(255, 255, 255, .72); }
+:root[data-theme="light"] .nav nav { color: rgba(0, 0, 0, .8); } :root[data-theme="light"] .nav nav a:hover { color: #000; }
+:root[data-theme="light"] .pill-btn, :root[data-theme="light"] .btn { background: #1d1d1f; color: #fff; }
+:root[data-theme="light"] .pill-btn:hover, :root[data-theme="light"] .btn:hover { background: #3a3a3c; }
+:root[data-theme="light"] .grad { background-image: linear-gradient(90deg, #1d1d1f 0%, #6a4dff 55%, #8f74ff 100%); }
+:root[data-theme="light"] .desk { background: linear-gradient(#e8e8ed, #d2d2d7); box-shadow: 0 60px 120px -40px rgba(124, 92, 255, .3), 0 30px 60px -30px rgba(0, 0, 0, .25); }
+:root[data-theme="light"] .tile > img, :root[data-theme="light"] .tile.wide > img { box-shadow: 0 24px 50px -24px rgba(0, 0, 0, .45); }
+:root[data-theme="light"] .tile-pill { background: radial-gradient(80% 90% at 50% 0%, rgba(124, 92, 255, .18), transparent 70%); }
+:root[data-theme="light"] .privacy { background: radial-gradient(70% 80% at 50% 0%, rgba(124, 92, 255, .14), transparent 70%), var(--tile); }
+:root[data-theme="light"] .trio div, :root[data-theme="light"] details, :root[data-theme="light"] details:first-of-type { border-color: rgba(0, 0, 0, .12); }
+:root[data-theme="light"] .start li span { background: #1d1d1f; color: #fff; }
+:root[data-theme="light"] .foot { background: #f5f5f7; }
+:root[data-theme="light"] .video-frame { background: #e8e8ed; }
+html { transition: background-color .3s; }
+
+/* the sun/moon switch in the top bar */
+.theme { display: grid; place-items: center; width: 32px; height: 32px; margin-left: -10px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; transition: background .2s; }
+.theme:hover { background: var(--line); } .theme:focus-visible { outline: 2px solid var(--pip-2); outline-offset: 2px; }
+.theme svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.theme .i-sun { display: none; } :root[data-theme="light"] .theme .i-sun { display: block; } :root[data-theme="light"] .theme .i-moon { display: none; }
+@media (max-width: 734px) { .theme { margin-left: auto; margin-right: 8px; } }
+
 /* Pip, drawn in CSS */
 .pip { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex: none; width: 24px; height: 21px; border-radius: 7.5px; background: var(--pip); }
 .pip i { width: 4px; height: 7px; border-radius: 2px; background: #fff; animation: blink 7s infinite; }
@@ -153,3 +177,9 @@ details p { padding: 0 4px 26px; color: var(--soft); font-size: 17px; max-width:
 .group-head h2 { font-size: clamp(36px, 5.4vw, 64px); line-height: 1.05; letter-spacing: -.04em; }
 .group-head p { max-width: 640px; margin: 16px auto 0; font-size: clamp(18px, 2vw, 22px); line-height: 1.4; color: var(--soft); }
 @media (max-width: 734px) { .group-head { padding: 90px var(--gut) 32px; } }
+
+/* the island opening, right under the statement */
+.video-frame { max-width: var(--col); margin: 56px auto 0; padding: 0; border-radius: 30px; overflow: hidden; background: #0c0c0f; border: 1px solid var(--line); box-shadow: 0 50px 110px -40px rgba(124, 92, 255, .45), 0 30px 70px -30px rgba(0, 0, 0, .8); }
+.video-frame video { display: block; width: 100%; height: auto; aspect-ratio: 1400 / 780; }
+.statement { max-width: var(--col); }
+@media (max-width: 734px) { .video-frame { margin-top: 36px; border-radius: 18px; } }

@@ -1,57 +1,80 @@
 # Pip
 
-A free, open-source status island for Windows. A small pill at the top of your screen shows what your AI coding
-agents (Claude Code and Codex) are doing. The interface is in Tanzanian Swahili by default; English is in Settings.
+**One Island to Rule All Agents.** A free, open-source status island for Windows. A small notch at the top of your
+screen shows what your AI coding agents (Claude Code and Codex) are doing, and opens on hover into a panel of tools.
+The interface is in Tanzanian Swahili by default; English is in Settings.
+
+![Pip open: clock, an agent at work, music and focus](site/img/pip-home.png)
 
 MIT licence. No account, no paywall, no telemetry.
 
-Download: [Releases](https://github.com/mkumbwajr/pip/releases). The installer is unsigned, so Windows SmartScreen warns;
-choose "More info", then "Run anyway". There is no auto-update yet.
+**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · version 0.5.0
+
+The installer is not code-signed yet, so Windows SmartScreen warns: choose "More info", then "Run anyway". Inside
+Pip, the `•••` menu → **Updates** tells you when a newer version is out.
 
 ## Features
 
 | Feature | State |
 | --- | --- |
-| Claude Code live status, activity feed, history | Tested with simulated hook events |
-| Allow / Deny a Claude Code permission request from the island | Tested with simulated hook events |
-| Answer Claude Code from the island (background Stop hook, needs Node.js) | Tested with the real script against the hub |
-| Usage bars for the 5-hour and weekly limits (status line, needs Node.js) | Tested with the real script |
-| Agents told to answer in Tanzanian Swahili at session start | Hub response tested; not seen in a real session |
-| Codex live status (hooks via `curl.exe`) | Installer tested; not run against a real Codex |
-| Island, tabs, tray icon, shortcut, Swahili and English | UI tested on Linux; not run on Windows |
-| File tray, clipboard history, quick note, focus timer | UI tested on Linux |
-| Phone transfer over your own Wi-Fi (QR code, both ways) | Server tested; not tried from a phone |
-| Weather, next calendar event, lyrics | Parsers tested |
-| Ask about your screen or one window | Written, not run; the Codex flags are a best guess |
-| Now playing, media keys, volume, Wi-Fi and Bluetooth switches, focus guard | Written, **not run on Windows** |
+| Claude Code live status, activity feed, history | Tested end to end on Windows (smoke test with the real hook scripts) |
+| Allow / Deny a permission request, right in the folded island | Tested end to end on Windows |
+| Answer Claude Code from the island (background Stop hook, needs Node.js) | Tested end to end on Windows |
+| Usage chip for the 5-hour limit with a live countdown (status line, needs Node.js) | Tested end to end on Windows |
+| Agents told to answer in Tanzanian Swahili at session start | Tested against the hub; not seen in a real session |
+| Codex live status (hooks via `curl.exe`) | Hook install tested; not run against a real Codex |
+| Pip agent: ask, or explain / check / translate what you copied, in a new Claude or ChatGPT chat | Tab tested on Windows; opening the chat not clicked yet |
+| Music: now playing, cover art (fetched when missing), release year, controls, synced lyrics view | Tested on Windows with Media Player; the seek bar and fetched cover art not yet seen on a live song |
+| Focus timer, Modes (Work, Study, Sleep, Game) and the focus guard | Tested on Windows |
+| Calendar (day and month) and unread email count with Google sign-in | Tested end to end with a real Google account |
+| File tray (drop in, drag out), phone transfer by QR code on the same Wi-Fi | Tested on Windows from a second device |
+| Notes with tick circles, clipboard history, Wi-Fi and Bluetooth state, volume | Tested on Windows (radio switching not clicked) |
+| Weather | Written; the owner saw an empty card, cause not found yet |
+| Island brightness, size (80–140 %), transparency, Pip's colour and hat, hide tabs | Tested on Windows |
 | Spotify device switching (your own client ID, PKCE) | Token refresh and device list tested with a fake server; login not run |
-| Installer and uninstaller (plain NSIS, `build/pip.nsi`) | Built on Linux, **not run on Windows** |
-
-The `build` workflow runs the tests, the PowerShell helper and the installer build on a real Windows machine on
-every push.
+| Installer and uninstaller (plain NSIS, `build/pip.nsi`) | Built and opened on Windows |
 
 ## Run it
 
 ```
 npm install
-npm start        # Ctrl+Alt+Space toggles the island
-npm test
-npm run dist     # Windows installer in dist/ (run on Windows)
+npm start           # Ctrl+Alt+Space toggles the island
+npm test            # 32 Node tests, any OS
+npm run dist:win    # on Windows: Pip.exe and the installer in dist/ (needs makensis on PATH)
+PIP_HUB_PORT=48699 npx electron --no-sandbox tools/smoke.js out/   # full smoke test, next to a running Pip
+node tools/deploy-site.js [--site]                                 # publish pip.bang.co.tz (BANG DIGITAL's server)
 ```
+
+## Coming from Peep
+
+Pip used to be called **Peep**. The Pip installer removes Peep and takes its place: settings, Google and Spotify
+logins, history, tray files and connected agents move over by themselves. Peep's hook entries keep working until Pip
+replaces them with its own on its first start.
 
 ## How it works
 
 - `src/main/hooks-hub.js`: an HTTP server on `127.0.0.1:48611` guarded by a random token. Agents post hook events to
   it. A permission request is held open until you click Allow or Deny, or answer in the terminal.
 - `src/main/hook-install.js`: adds and removes Pip's entries in `~/.claude/settings.json` and `~/.codex/hooks.json`.
-  It touches only its own entries, keeps a one-time `.pip-backup`, never replaces a status line you already have, and
-  refuses to write a file it cannot parse.
+  It touches only its own entries (and Peep's, from before the rename), keeps a one-time `.pip-backup`, never replaces
+  a status line you already have, and refuses to write a file it cannot parse.
 - `src/hooks/pip-reply.cjs`: a background Stop hook (`asyncRewake`). It waits for an answer typed in the island and
   exits with code 2 to wake Claude with it.
 - `src/hooks/pip-status.cjs`: a status line that forwards Claude Code's usage figures to the island.
-- `src/helpers/win-helper.ps1`: one hidden PowerShell for the media session, volume, front window and radios. It is
-  started with `-ExecutionPolicy Bypass` for that one process, because Windows blocks unsigned scripts by default.
-- `src/main/share.js`: phone transfer on your own network behind a random link; plain HTTP, stops after an hour.
+- `src/helpers/win-helper.ps1`: one hidden PowerShell for the media session, volume, front window and radios, started
+  with `-ExecutionPolicy Bypass` for that one process because Windows blocks unsigned scripts by default.
+- `src/main/share.js`, `firewall.js`: phone transfer on your own network behind a random link (plain HTTP, one hour),
+  and Pip's own Windows Firewall rule, added only after you approve it.
+- `src/main/google.js`: optional Google sign-in (PKCE, loopback), read-only calendar and the unread count only.
 - `src/locales/sw.json`: every interface text, English to Swahili. A test fails if a text is missing.
+- `site/`: the website at pip.bang.co.tz, with its privacy policy.
+
+## What leaves your PC
+
+Only what you switch on: the town you type (Open-Meteo), song title and artist (lrclib.net for lyrics, iTunes Search
+for the year and cover art), your private calendar link, a screenshot and question to the agent you chose (through
+your own login), the Claude or ChatGPT page the Pip agent opens in your browser, Spotify if you connect it, Google if
+you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz when you check
+for updates. Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 
 Code comments are in English so contributors outside Tanzania can read them.

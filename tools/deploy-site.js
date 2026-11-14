@@ -47,10 +47,10 @@ const siteOnly = process.argv.includes('--site'); // pages, styles, scripts and 
 if (!siteOnly && !fs.existsSync(installer)) { console.error('missing ' + installer + ': run npm run dist:win first'); process.exit(1); }
 // pack the site
 const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-site-'));
-for (const f of ['index.html', 'privacy.html', 'site.css', 'site.js']) fs.copyFileSync(path.join(root, 'site', f), path.join(out, f));
+for (const f of ['index.html', 'privacy.html', 'site.css', 'site.js', 'theme.js']) fs.copyFileSync(path.join(root, 'site', f), path.join(out, f));
 // a version stamp on the stylesheet and script links, so no browser keeps an old copy after a deploy
-const stamp = require('node:crypto').createHash('sha1').update(fs.readFileSync(path.join(out, 'site.css')) + fs.readFileSync(path.join(out, 'site.js'))).digest('hex').slice(0, 8);
-for (const f of ['index.html', 'privacy.html']) { const p = path.join(out, f); fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/\/site\.(css|js)"/g, `/site.$1?v=${stamp}"`)); }
+const stamp = require('node:crypto').createHash('sha1').update(['site.css', 'site.js', 'theme.js'].map(f => fs.readFileSync(path.join(out, f), 'utf8')).join('')).digest('hex').slice(0, 8);
+for (const f of ['index.html', 'privacy.html']) { const p = path.join(out, f); fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/\/(site\.css|site\.js|theme\.js)"/g, `/$1?v=${stamp}"`)); }
 fs.copyFileSync(path.join(root, 'assets', 'icon.png'), path.join(out, 'icon.png'));
 fs.copyFileSync(path.join(root, 'assets', 'icon.ico'), path.join(out, 'favicon.ico')); // Pip in the browser tab
 fs.cpSync(path.join(root, 'site', 'img'), path.join(out, 'img'), { recursive: true }); // screenshots of Pip

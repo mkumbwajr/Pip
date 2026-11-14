@@ -7,7 +7,8 @@ const fs = require('node:fs');
 const { EventEmitter } = require('node:events');
 const { timingSafeEqual } = require('node:crypto');
 
-const PORT = 48611;
+// PIP_HUB_PORT only for test runs (the smoke test next to a running Pip); real installs always use 48611
+const PORT = Number(process.env.PIP_HUB_PORT) || 48611;
 const PREFIX = '/pip';
 // Pip was called Peep before 0.5: its hooks call /peep/... with an X-Peep-Token header. They keep working until
 // Pip rewrites them on its first start, so an agent never goes quiet during the update.

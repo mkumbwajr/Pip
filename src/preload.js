@@ -5,7 +5,9 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 const call = channel => (...args) => ipcRenderer.invoke(channel, ...args);
 const on = channel => fn => { const h = (_e, payload) => fn(payload); ipcRenderer.on(channel, h); return () => ipcRenderer.removeListener(channel, h); };
 
-contextBridge.exposeInMainWorld('pip', {
+// named pipApp, not pip: the island already has a variable called pip (the mascot), and a page script cannot declare a
+// name the bridge has already put on window, so the whole island script would fail to load
+contextBridge.exposeInMainWorld('pipApp', {
   init: call('app:init'), hubError: call('hub:error'), strings: call('app:strings'),
   setSettings: call('settings:set'), openSettings: call('settings:open'), setAutostart: call('autostart:set'),
   connectAgent: call('agents:connect'), decide: call('ai:decide'), reply: call('ai:reply'), setRadio: call('radio:set'),

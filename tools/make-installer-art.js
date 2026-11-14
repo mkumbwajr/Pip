@@ -1,42 +1,51 @@
 'use strict';
-// Draws the picture on the left of the installer's welcome and finish pages (Pip in a soft glow on Pip's dark
-// background) into build/installer-side.bmp, with no dependencies: node tools/make-installer-art.js
-// Drawn at twice NSIS's 164 x 314 so it stays sharp when Windows scales the installer up.
+// Draws the picture on the left of the installer's welcome and finish pages: the line "One Island to Rule All
+// Agents" over real screenshots of Pip (site/img), at twice NSIS's 164 x 314 so it stays sharp when Windows scales
+// the installer up. Rendered by Electron, saved as a 24-bit BMP (the format NSIS needs):
+//   npx electron tools/make-installer-art.js        ->  build/installer-side.bmp
+const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs'), path = require('node:path');
-const W = 328, H = 628, SS = 3; // SS x SS samples per pixel smooth the edges
-const PIP = [124, 92, 255];
-const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
-const inRound = (x, y, x0, y0, w, h, r) => { if (x < x0 || y < y0 || x > x0 + w || y > y0 + h) return false; const cx = Math.max(x0 + r, Math.min(x0 + w - r, x)), cy = Math.max(y0 + r, Math.min(y0 + h - r, y)); return (x - cx) ** 2 + (y - cy) ** 2 <= r * r; };
+const W = 328, H = 628, root = path.join(__dirname, '..');
+const img = name => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'site', 'img', name)).toString('base64');
 
-const FACE = { w: 172, h: 156, r: 52 }; FACE.x = (W - FACE.w) / 2; FACE.y = 236;
-const EYE = { w: 26, h: 46, r: 13, gap: 30, y: FACE.y + 52 };
-function sample(x, y) {
-  // background: deep violet at the top fading to Pip's near-black, with a glow of Pip's colour behind the face
-  let c = mix([30, 20, 62], [8, 8, 11], Math.min(1, y / (H * 0.85)));
-  const d = Math.hypot(x - W / 2, (y - (FACE.y + FACE.h / 2)) * 0.9);
-  c = mix(c, PIP, 0.55 * Math.exp(-((d / 150) ** 2)));
-  // a faint reflection of the face on the floor
-  if (inRound(x, 2 * (FACE.y + FACE.h + 26) - y, FACE.x, FACE.y, FACE.w, FACE.h, FACE.r)) c = mix(c, PIP, 0.12 * Math.max(0, 1 - (y - FACE.y - FACE.h - 26) / 90));
-  if (inRound(x, y, FACE.x, FACE.y, FACE.w, FACE.h, FACE.r)) {
-    c = mix(PIP, [160, 135, 255], Math.max(0, 1 - (y - FACE.y) / FACE.h) * 0.35); // a little lighter at the top
-    const l = W / 2 - EYE.gap / 2 - EYE.w, r = W / 2 + EYE.gap / 2;
-    if (inRound(x, y, l, EYE.y, EYE.w, EYE.h, EYE.r) || inRound(x, y, r, EYE.y, EYE.w, EYE.h, EYE.r)) c = [255, 255, 255];
+const page = `<!doctype html><meta charset="utf-8"><style>
+* { box-sizing: border-box; margin: 0; }
+html, body { width: ${W}px; height: ${H}px; overflow: hidden; }
+body { position: relative; background: radial-gradient(90% 55% at 50% 100%, rgba(124, 92, 255, .55), transparent 70%), linear-gradient(180deg, #121019 0%, #0a0a0d 55%, #140f24 100%);
+  font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif; color: #f5f5f7; -webkit-font-smoothing: antialiased; }
+.pip { position: absolute; left: 28px; top: 34px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 40px; height: 36px; border-radius: 12px; background: #7c5cff; }
+.pip i { width: 6px; height: 11px; border-radius: 3px; background: #fff; }
+h1 { position: absolute; left: 26px; right: 22px; top: 92px; font-size: 38px; line-height: 1.04; font-weight: 700; letter-spacing: -.035em; }
+h1 span { background: linear-gradient(90deg, #ffffff, #c9bfff 60%, #9b84ff); -webkit-background-clip: text; color: transparent; }
+.shot { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 14px; box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .85), 0 0 0 1px rgba(255, 255, 255, .06); }
+.pill { top: 290px; width: 300px; border-radius: 0; box-shadow: none; filter: drop-shadow(0 10px 22px rgba(0, 0, 0, .7)); }
+.a { top: 346px; width: 296px; transform: translateX(-50%) rotate(-3deg); opacity: .96; }
+.b { top: 462px; width: 300px; transform: translateX(-50%) rotate(2deg); }
+</style>
+<span class="pip"><i></i><i></i></span>
+<h1>One Island<br>to Rule<br><span>All Agents</span></h1>
+<img class="shot pill" src="${img('pip-ruhusa.png')}">
+<img class="shot a" src="${img('pip-ai.png')}">
+<img class="shot b" src="${img('pip-lyrics.png')}">`;
+
+app.commandLine.appendSwitch('force-device-scale-factor', '1');
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({ width: W, height: H, show: false, useContentSize: true, webPreferences: { offscreen: true } });
+  await win.loadURL('data:text/html;base64,' + Buffer.from(page).toString('base64'));
+  await new Promise(r => setTimeout(r, 800));
+  const shot = (await win.webContents.capturePage({ x: 0, y: 0, width: W, height: H })).resize({ width: W, height: H });
+  const { width, height } = shot.getSize(), bgra = shot.toBitmap(); // top-down BGRA
+  const row = Math.ceil(width * 3 / 4) * 4, data = Buffer.alloc(row * height);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const s = (y * width + x) * 4, d = (height - 1 - y) * row + x * 3; // BMP rows run bottom-up
+    data[d] = bgra[s]; data[d + 1] = bgra[s + 1]; data[d + 2] = bgra[s + 2];
   }
-  return c;
-}
-
-// 24-bit bottom-up BMP, rows padded to 4 bytes
-const row = Math.ceil(W * 3 / 4) * 4, data = Buffer.alloc(row * H);
-for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-  let acc = [0, 0, 0];
-  for (let sy = 0; sy < SS; sy++) for (let sx = 0; sx < SS; sx++) { const s = sample(x + (sx + 0.5) / SS, y + (sy + 0.5) / SS); acc = acc.map((v, i) => v + s[i]); }
-  const [r, g, b] = acc.map(v => Math.round(v / (SS * SS))), o = (H - 1 - y) * row + x * 3;
-  data[o] = b; data[o + 1] = g; data[o + 2] = r;
-}
-const head = Buffer.alloc(54);
-head.write('BM', 0); head.writeUInt32LE(54 + data.length, 2); head.writeUInt32LE(54, 10);
-head.writeUInt32LE(40, 14); head.writeInt32LE(W, 18); head.writeInt32LE(H, 22); head.writeUInt16LE(1, 26); head.writeUInt16LE(24, 28);
-head.writeUInt32LE(data.length, 34); head.writeInt32LE(2835, 38); head.writeInt32LE(2835, 42);
-const out = path.join(__dirname, '..', 'build', 'installer-side.bmp');
-fs.writeFileSync(out, Buffer.concat([head, data]));
-console.log('wrote', out);
+  const head = Buffer.alloc(54);
+  head.write('BM', 0); head.writeUInt32LE(54 + data.length, 2); head.writeUInt32LE(54, 10);
+  head.writeUInt32LE(40, 14); head.writeInt32LE(width, 18); head.writeInt32LE(height, 22); head.writeUInt16LE(1, 26); head.writeUInt16LE(24, 28);
+  head.writeUInt32LE(data.length, 34); head.writeInt32LE(2835, 38); head.writeInt32LE(2835, 42);
+  fs.writeFileSync(path.join(root, 'build', 'installer-side.bmp'), Buffer.concat([head, data]));
+  fs.writeFileSync(path.join(root, 'build', 'installer-side-preview.png'), shot.toPNG());
+  console.log('wrote build/installer-side.bmp', width + 'x' + height);
+  app.exit(0);
+});

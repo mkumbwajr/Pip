@@ -15,3 +15,7 @@ fetch('/latest.json', { cache: 'no-store' }).then(r => r.json()).then(j => {
   const v2 = document.getElementById('ver2'); if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Bure';
   if (j.url) for (const a of document.querySelectorAll('[data-download]')) a.href = j.url;
 }).catch(() => {});
+
+// people who ask for less motion see the still image instead of the looping video
+const vid = document.getElementById('open-video');
+if (vid && matchMedia('(prefers-reduced-motion: reduce)').matches) { vid.removeAttribute('autoplay'); vid.pause(); }

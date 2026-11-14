@@ -16,14 +16,17 @@ app.whenReady().then(async () => {
   fs.mkdirSync(out, { recursive: true });
   await wait(2500);
   const find = name => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().endsWith(name));
-  const win = find('island.html'), js = code => win.webContents.executeJavaScript(code);
-  const settings = find('settings.html'), sjs = code => settings.webContents.executeJavaScript(code);
+  // every scripted step says which one failed, instead of an anonymous rejection
+  const run = (w, where) => code => w.webContents.executeJavaScript(`(async () => { try { return await (${code.trim().startsWith('(') ? code : '(() => ' + (code.includes(';') ? '{ ' + code + ' }' : code) + ')()'}); } catch (e) { throw new Error(e.message) } })()`).catch(e => { console.error(`smoke step failed in ${where}: ${code.slice(0, 120)} -> ${e.message}`); throw e; });
+  const win = find('island.html'), js = run(win, 'island');
+  const settings = find('settings.html'), sjs = run(settings, 'settings');
   const errors = []; win.webContents.on('console-message', (_e, level, message) => { if (level >= 2) errors.push(message); });
   const shot = async name => { await wait(400); fs.writeFileSync(path.join(out, name + '.png'), (await win.webContents.capturePage()).toPNG()); };
   const token = fs.readFileSync(path.join(tmp, 'profile', 'hook-token'), 'utf8');
-  const post = body => fetch('http://127.0.0.1:48611/pip/event', { method: 'POST', headers: { 'X-Pip-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: 's1', cwd: 'C:\\code\\duka', ...body }) });
+  const HUB = process.env.PIP_HUB_PORT || '48611';
+  const post = body => fetch(`http://127.0.0.1:${HUB}/pip/event`, { method: 'POST', headers: { 'X-Pip-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: 's1', cwd: 'C:\\code\\duka', ...body }) });
   const script = (name, input) => new Promise(resolve => {
-    const child = spawn('node', [path.join(__dirname, '..', 'src', 'hooks', name), token, '48611']); let err = '', so = '';
+    const child = spawn('node', [path.join(__dirname, '..', 'src', 'hooks', name), token, HUB]); let err = '', so = '';
     child.stderr.on('data', d => { err += d; }); child.stdout.on('data', d => { so += d; }); child.on('close', code => resolve({ code, err, out: so })); child.stdin.end(JSON.stringify(input));
   });
 
@@ -55,10 +58,27 @@ app.whenReady().then(async () => {
   const woke = await reply;
   require('electron').clipboard.writeText('src\locales'); await wait(1700); // something for the Copied page
   for (const tab of ['home', 'focus', 'modes', 'tray', 'clips', 'note', 'calendar', 'ask', 'music']) { await js(`document.querySelector('[data-tab=${tab}]').click()`); await wait(tab === 'ask' ? 800 : 0); await shot('5-' + tab); }
-  await js(`(() => { const n = document.querySelector('[data-tab=note]'); n.click(); const a = document.querySelector('#note'); a.value = 'Shopping\n[ ] Maziwa\n[x] Mkate'; a.dispatchEvent(new Event('input', { bubbles: true })); })()`); await shot('5-note-list');
+  await js(`(() => { const n = document.querySelector('[data-tab=note]'); n.click(); const a = document.querySelector('#note'); a.value = ['Shopping', '[ ] Maziwa', '[x] Mkate'].join(String.fromCharCode(10)); a.dispatchEvent(new Event('input', { bubbles: true })); })()`); await shot('5-note-list');
   await js(`(() => { const b = document.querySelector('[data-tab=modes]'); b.click(); const r = b.getBoundingClientRect(), t = document.querySelector('[data-tab=tray]'); t.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); })()`); await shot('5-modes-tooltip');
   await js(`document.querySelector('#pill-more').click()`); await shot('5-menu'); await js(`document.querySelector('#pill-more').click()`);
   await js(`document.querySelector('#pill').click()`); await wait(700); await shot('6-pill-in-use');
+  // the rename: Peep's old hook calls still land, nothing on screen or in the hooks says Peep, sharing and updates answer
+  const legacy = (await fetch(`http://127.0.0.1:${HUB}/peep/event`, { method: 'POST', headers: { 'X-Peep-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'old', prompt: 'x' }) })).status;
+  const hooksText = fs.readFileSync(path.join(process.env.HOME, '.claude', 'settings.json'), 'utf8');
+  await js(`setOpen(true)`); const peepOnScreen = [];
+  for (const tab of ['home', 'pip', 'ai', 'ask', 'music', 'focus', 'modes', 'tray', 'note', 'clips', 'calendar', 'mail']) {
+    await js(`go('${tab}')`); await wait(250);
+    if (await js(`/peep/i.test(document.body.innerText + document.title)`)) peepOnScreen.push(tab);
+  }
+  const settingsSays = await sjs(`[...document.querySelectorAll('[data-go]')].map(b => (b.click(), document.body.innerText)).join(' ')`);
+  if (/peep/i.test(settingsSays + await sjs('document.title'))) peepOnScreen.push('settings window');
+  const share = await js(`window.pipApp.shareStart()`);
+  const sharePage = share?.ok ? await (await fetch(share.url)).text() : '';
+  await js(`window.pipApp.shareStop()`);
+  const update = await js(`window.pipApp.checkUpdate()`);
+  console.log(JSON.stringify({ legacyHookCall: legacy, hooksMentionPeep: /peep/i.test(hooksText.split(path.join(__dirname, '..').replace(/\/g, '/')).join('')), hooksUsePipScripts: hooksText.includes('pip-reply.cjs') && hooksText.includes('pip-status.cjs'),
+    peepOnScreen, windowTitles: BrowserWindow.getAllWindows().map(w => w.getTitle()), sharePage: share?.ok ? { port: new URL(share.url).port, saysPip: /<title>Pip<\/title>/.test(sharePage), saysPeep: /peep/i.test(sharePage) } : share,
+    update: update?.ok ? { latest: update.latest, url: update.url } : update }, null, 1));
   console.log(JSON.stringify({ claudeHookEvents: Object.keys(config.hooks).length, stopHooks: config.hooks.Stop.length, statusLine: config.statusLine?.command.includes('pip-status.cjs') || false,
     sessionStartContext: (start.hookSpecificOutput?.additionalContext || '').slice(0, 60), statusLineText: status.out, decision, replyExit: woke.code, replyText: woke.err.trim().split('\n').pop(), rendererErrors: errors }, null, 1));
   app.exit(0);

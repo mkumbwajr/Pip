@@ -102,6 +102,9 @@ function registerAppId() {
   } catch {}
 }
 
+// Downloads, or <home>\Downloads when Windows cannot say where it is (an unusual profile)
+const downloadsDir = () => { try { return app.getPath('downloads'); } catch { return path.join(os.homedir(), 'Downloads'); } };
+
 // ---------- the island window ----------
 function displayFor() { const all = screen.getAllDisplays(); return all[store.get('island.display')] || screen.getPrimaryDisplay(); }
 // Island size (Settings, 80 to 140%): the page is zoomed and the window grows or shrinks with it, so nothing is cut off
@@ -348,7 +351,7 @@ function wireIpc() {
     try { e.sender.startDrag({ file: p, icon }); } catch {}
   });
   handle('share:start', async () => {
-    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(app.getPath('downloads'), 'Pip'), onReceive: p => { addToTray([p]); new Notification({ title: 'Pip', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
+    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(downloadsDir(), 'Pip'), onReceive: p => { addToTray([p]); new Notification({ title: 'Pip', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
     // margin 4 is the quiet zone the QR standard asks for: phone cameras need it to find the code
     try { const s = await share.start(); return { ok: true, ...s, firewall: firewall.hasRule(), qr: await require('qrcode').toDataURL(s.url, { margin: 4, width: 264, errorCorrectionLevel: 'M' }) }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }

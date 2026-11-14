@@ -1,6 +1,6 @@
 'use strict';
 // Pip's settings window. Every change is saved at once; the main process tells the island to pick it up.
-const api = window.pip;
+const api = window.pipApp;
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const page = $('#page');

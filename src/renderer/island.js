@@ -1,7 +1,7 @@
 'use strict';
 // The island: one page, drawn from the state the main process sends. No framework: small render functions per tab.
 // Every text the user sees goes through t(): English here, translated by src/locales/<language>.json.
-const api = window.pip;
+const api = window.pipApp;
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const island = $('#island'), shell = $('#shell'), pill = $('#pill'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip'), bar = $('#bar'), tip = $('#tip'), menu = $('#menu'), volPop = $('#vol-pop');

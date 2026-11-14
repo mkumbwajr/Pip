@@ -4,3 +4,4 @@ dist/
 
 # Pip's Google OAuth client (has the client secret): stays on the build PC, goes into the installer, never into git
 src/main/google-client.json
+build/installer-side-preview.png
