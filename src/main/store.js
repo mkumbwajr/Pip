@@ -11,7 +11,10 @@ const DEFAULTS = {
   google: { clientId: '', secret: '' }, // your own Google "Desktop app" OAuth client, for calendar and the unread count
   hiddenTabs: [],        // tabs taken off the bar with Customize (Home always stays)
   agents: { claude: false, codex: false },
-  island: { display: 0, mode: 'attach', opacity: 1, brightness: 0.1, scale: 1 }, // attach: joined to the top edge; detach: floating just below it. brightness: the tab colour behind the pages
+  island: { display: 0, mode: 'attach', opacity: 1, brightness: 0.1, scale: 1, openOn: 'hover', clock: 'auto', radios: true, artGlow: true }, // attach: joined to the top edge; detach: floating just below it. brightness: the tab colour behind the pages
+  // openOn: 'hover' or 'click'. clock: 'auto' (the language's own), '12' or '24'. radios: Wi-Fi and Bluetooth in the strip. artGlow: the music tab takes the cover's colour
+  homeStyle: 'clock',    // Home's layout: 'clock', 'dials', 'colours' or 'apps' (picked in the welcome or in Settings)
+  country: '',           // from the welcome; only used to suggest the language
   mascot: { name: 'Pip', color: '#7c5cff', hat: 'none' },
   sounds: true,
   lyrics: true,
@@ -44,6 +47,8 @@ class Store {
   read() { try { const v = JSON.parse(fs.readFileSync(this.file, 'utf8')); return isObj(v) ? v : {}; } catch { return {}; } }
   get(key) { return key.split('.').reduce((o, k) => (o == null ? o : o[k]), this.data); }
   all() { return JSON.parse(JSON.stringify(this.data)); }
+  /** Back to the defaults, keeping only what is listed (e.g. which agents are connected, so their hooks stay in step). */
+  reset(keep = []) { const k = {}; for (const key of keep) k[key] = this.data[key]; this.data = merge(DEFAULTS, {}); return this.set(k); }
   set(patch) {
     this.data = merge(this.data, patch);
     fs.mkdirSync(path.dirname(this.file), { recursive: true });

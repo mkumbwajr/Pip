@@ -11,6 +11,7 @@ const { Store } = require('./store.js');
 const { Hub } = require('./hooks-hub.js');
 const hooks = require('./hook-install.js');
 const { WinHelper } = require('./win-helper.js');
+const { MacHelper } = require('./mac-helper.js');
 const { Share } = require('./share.js');
 const firewall = require('./firewall.js');
 const { nextEvent } = require('./ics.js');
@@ -77,7 +78,14 @@ let nodeOk = null;
 function hasNode() { if (nodeOk === null) { try { nodeOk = spawnSync('node', ['-v'], { shell: process.platform === 'win32', windowsHide: true, timeout: 5000 }).status === 0; } catch { nodeOk = false; } } return nodeOk; }
 const hookScript = name => path.join(__dirname, '..', 'hooks', name).replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
 const claudeScripts = () => (hasNode() ? { reply: hookScript(hooks.REPLY_SCRIPT), status: hookScript(hooks.STATUS_SCRIPT) } : {});
-const helper = new WinHelper();
+const helper = process.platform === 'darwin' ? new MacHelper() : new WinHelper(); // the same events and commands on both
+// A Mac app opened from the Dock gets a bare PATH (/usr/bin:/bin...), without Homebrew or npm's folders, so node,
+// claude and codex would not be found. Ask the login shell once for the PATH a terminal would have.
+if (process.platform === 'darwin') try {
+  const r = spawnSync(process.env.SHELL || '/bin/zsh', ['-ilc', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: 4000 });
+  const extra = String(r.stdout || '').trim().split(':').filter(p => p.startsWith('/'));
+  process.env.PATH = [...new Set([...extra, ...String(process.env.PATH || '').split(':'), '/opt/homebrew/bin', '/usr/local/bin'])].filter(Boolean).join(':');
+} catch {}
 
 function token() {
   const file = data('hook-token');
@@ -119,9 +127,12 @@ function placeIsland() {
 // Windows lets a newly opened topmost window (a browser pop-up, a full-screen video, another overlay) sit above Pip.
 // Pip puts itself back in front whenever the window in front changes, and every few seconds as a safety net.
 // moveTop does not take the keyboard focus, so typing in the other window is not interrupted.
+// Only when another window has come to the front (and on blur), never on a timer: moving a transparent window to the
+// top makes Windows repaint it, which showed as a flicker every few seconds.
 function keepOnTop() {
   if (!island || island.isDestroyed() || !island.isVisible() || guardWin) return; // the focus guard's pause screen stays above
-  island.setAlwaysOnTop(true, 'screen-saver'); island.moveTop();
+  if (!island.isAlwaysOnTop()) island.setAlwaysOnTop(true, 'screen-saver');
+  island.moveTop();
 }
 function createIsland() {
   island = new BrowserWindow({
@@ -141,10 +152,23 @@ function createIsland() {
   island.on('close', e => { if (!quitting) e.preventDefault(); });
 }
 
+// ---------- the welcome: six short steps the first time Pip starts ----------
+let welcomeWin = null;
+function openWelcome() {
+  if (welcomeWin && !welcomeWin.isDestroyed()) { welcomeWin.show(); welcomeWin.focus(); return; }
+  welcomeWin = new BrowserWindow({ width: 560, height: 660, resizable: false, maximizable: false, fullscreenable: false, title: 'Pip', backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: WIN_ICON,
+    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  welcomeWin.setMenu(null);
+  welcomeWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  welcomeWin.webContents.on('will-navigate', e => e.preventDefault());
+  welcomeWin.loadFile(path.join(RENDERER, 'welcome.html'));
+  welcomeWin.on('closed', () => { welcomeWin = null; });
+}
+
 // ---------- the settings window ----------
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
-  settingsWin = new BrowserWindow({ width: 1000, height: 700, minWidth: 760, minHeight: 520, title: t('Pip settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: WIN_ICON,
+  settingsWin = new BrowserWindow({ width: 1060, height: 740, minWidth: 820, minHeight: 560, title: t('Pip settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: WIN_ICON,
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   settingsWin.setMenu(null);
   // The taskbar button takes its picture from these details, not from the cache Windows keeps per app ID (which can
@@ -162,13 +186,14 @@ const changed = () => send('app:changed');
 // ---------- tray ----------
 function buildTray() {
   // the .ico carries a hand-drawn 16 and 20 px Pip; Windows picks the one that fits the tray
-  const image = nativeImage.createFromPath(WIN_ICON);
+  let image = nativeImage.createFromPath(WIN_ICON);
+  if (process.platform === 'darwin') { image = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'trayTemplate.png')); image.setTemplateImage(true); } // the Mac menu bar wants a black template it tints itself
   tray = new Tray(image); tray.setToolTip('Pip');
   const menu = () => Menu.buildFromTemplate([
     { label: t('Open island'), click: () => send('island:toggle', true) },
     { label: t('Settings'), click: openSettings },
     { type: 'separator' },
-    { label: t('Start with Windows'), type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: item => app.setLoginItemSettings({ openAtLogin: item.checked }) },
+    { label: process.platform === 'darwin' ? t('Open at login') : t('Start with Windows'), type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: item => app.setLoginItemSettings({ openAtLogin: item.checked }) },
     { type: 'separator' },
     { label: t('Quit Pip'), click: () => { quitting = true; app.quit(); } }
   ]);
@@ -242,7 +267,7 @@ function stats() {
 }
 
 // ---------- cover art for songs whose player gives none: from iTunes Search (the same switch as the release year) ----------
-async function fillArtwork(key) {
+async function fillArtwork(key, replaceTiny = false) {
   if (!store.get('songInfo') || !key) return;
   const [title, artist] = key.split('|'), song = splitTitle(title, artist);
   const file = data('artwork', require('node:crypto').createHash('sha1').update(key.toLowerCase()).digest('hex') + '.jpg');
@@ -255,8 +280,15 @@ async function fillArtwork(key) {
     try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, buf); } catch {}
     b64 = buf.toString('base64');
   }
-  if (helper.art?.key !== key || helper.art.data) return; // the song changed meanwhile, or the player sent its own
+  if (helper.art?.key !== key || (helper.art.data && !(replaceTiny && helper.art.data.length <= 3000))) return; // the song changed meanwhile, or the player sent a real cover
   helper.art = { key, data: b64 }; send('win:art', helper.art);
+}
+
+// The moment a new song starts, its lyrics and its release details are looked up (both cached on disk), so the island
+// finds them ready instead of starting the lookups only when it asks.
+function prefetchSong(m) {
+  if (store.get('lyrics')) fetchLyrics({ title: m.title, artist: m.artist, durationSec: Math.round((m.durationMs || 0) / 1000) }, { cacheDir: data('lyrics'), fetchImpl: webFetch }).catch(() => {});
+  if (store.get('songInfo')) fetchSongInfo(splitTitle(m.title, m.artist), { cacheDir: data('songinfo'), fetchImpl: webFetch }).catch(() => {});
 }
 
 // ---------- focus guard: a pause before a distracting window ----------
@@ -321,10 +353,23 @@ function wireIpc() {
     const url = which === 'chatgpt' ? 'https://chatgpt.com/?q=' + q : which === 'claude' ? 'https://claude.ai/new?q=' + q : null;
     return url ? shell.openExternal(url) : null;
   });
+  handle('pip:chat', async messages => {
+    const list = (Array.isArray(messages) ? messages : []).filter(m => m && (m.role === 'me' || m.role === 'pip')).map(m => ({ role: m.role, text: String(m.text || '').slice(0, 4000) }));
+    if (!list.length || list[list.length - 1].role !== 'me') return { ok: false, error: t('Ask something first.') };
+    try { return { ok: true, text: await buddy.chat({ agent: store.get('buddyAgent'), messages: list, name: store.get('mascot').name || 'Pip', language: agentContext(), t: (...a) => t(...a) }) }; }
+    catch (e) { return { ok: false, error: String(e.message || e) }; }
+  });
+  handle('art:fill', key => { if (helper.art?.key === String(key) && !(helper.art.data && helper.art.data.length > 3000)) fillArtwork(String(key), true); });
   handle('google:openInbox', () => shell.openExternal('https://mail.google.com/mail/u/0/#inbox'));
   // Updates: asks GitHub (only when you press the button) for the newest release, and opens its page to download it
   handle('app:update', async () => { try { return { ok: true, ...(await latestRelease({ current: app.getVersion(), fetchImpl: webFetch })) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('app:release', url => (isReleaseUrl(url) ? shell.openExternal(String(url)) : null));
+  // links in Settings and the welcome: only Pip's own website and its GitHub page
+  handle('app:link', url => (/^https:\/\/(pip\.bang\.co\.tz|github\.com\/mkumbwajr\/Pip)(\/|$)/.test(String(url)) ? shell.openExternal(String(url)) : null));
+  handle('app:restart', () => { quitting = true; app.relaunch(); app.exit(0); });
+  handle('settings:reset', () => { store.reset(['agents', 'firstRunDone', 'google', 'spotifyClientId', 'note']); placeIsland(); bindShortcut(); changed(); return store.all(); });
+  handle('welcome:open', () => openWelcome());
+  handle('welcome:done', () => { if (welcomeWin && !welcomeWin.isDestroyed()) welcomeWin.close(); send('island:toggle', true); });
   handle('buddy:windows', async () => {
     const list = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 240, height: 150 } });
     return list.filter(s => s.name && s.name !== 'Pip' && !s.thumbnail.isEmpty()).slice(0, 12).map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail.toDataURL() }));
@@ -351,7 +396,8 @@ function wireIpc() {
     try { e.sender.startDrag({ file: p, icon }); } catch {}
   });
   handle('share:start', async () => {
-    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(downloadsDir(), 'Pip'), onReceive: p => { addToTray([p]); new Notification({ title: 'Pip', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
+    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(downloadsDir(), 'Pip'), onProgress: p => send('share:progress', p),
+      onReceive: p => { addToTray([p]); send('share:progress', { name: path.basename(p), done: true }); new Notification({ title: 'Pip', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
     // margin 4 is the quiet zone the QR standard asks for: phone cameras need it to find the code
     try { const s = await share.start(); return { ok: true, ...s, firewall: firewall.hasRule(), qr: await require('qrcode').toDataURL(s.url, { margin: 4, width: 264, errorCorrectionLevel: 'M' }) }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
@@ -424,10 +470,11 @@ app.whenReady().then(async () => {
 
   wireIpc(); handle('hub:error', () => hubError);
   createIsland(); buildTray(); bindShortcut(); watchClipboard();
-  if (!store.get('firstRunDone')) { store.set({ firstRunDone: true }); openSettings(); } // first start: connect an agent
+  if (!store.get('firstRunDone')) { store.set({ firstRunDone: true }); openWelcome(); } // first start: the welcome, which also connects an agent
   let lastFront = null;
-  helper.on('state', s => { send('win:state', s); checkGuard(s.front); if (s.front?.hwnd !== lastFront) { lastFront = s.front?.hwnd; keepOnTop(); } });
-  setInterval(keepOnTop, 3000);
+  let lastSong = '';
+  helper.on('state', s => { const k = s.media ? s.media.title + '|' + s.media.artist : ''; if (k && k !== lastSong) { lastSong = k; prefetchSong(s.media); }
+    send('win:state', s); checkGuard(s.front); if (s.front?.hwnd !== lastFront) { lastFront = s.front?.hwnd; keepOnTop(); } });
   helper.on('art', art => { send('win:art', art); if (!art.data) fillArtwork(art.key); });
   // Pip's eyes follow the pointer wherever it is on the screen, so its position is sent while it moves (30 times a second at most)
   let lastPoint = '';

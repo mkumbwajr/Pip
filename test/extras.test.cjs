@@ -27,7 +27,7 @@ test('lyrics: parse, current line, cache', async () => {
   const fake = async () => { calls++; return { ok: true, json: async () => [{ duration: 200, syncedLyrics: '[00:01.00]la' }] }; };
   const song = { title: 'Song', artist: 'A', durationSec: 201 };
   assert.equal((await fetchLyrics(song, { cacheDir: dir, fetchImpl: fake }))[0].text, 'la');
-  await fetchLyrics(song, { cacheDir: dir, fetchImpl: fake }); assert.equal(calls, 1);
+  await fetchLyrics(song, { cacheDir: dir, fetchImpl: fake }); assert.equal(calls, 2); // the two searches of the first lookup; the second comes from the cache
 });
 
 test('share: secret link, download, upload with a safe name', async () => {
@@ -72,7 +72,7 @@ test('lyrics: "Artist - Title" with no artist is split; a free-text search runs 
   const fake = async url => { const p = new URL(url).searchParams; asked.push(Object.fromEntries(p)); return { ok: true, json: async () => (p.get('q') ? [{ duration: 100, syncedLyrics: '[00:02.00]hi' }] : []) }; };
   const lines = await fetchLyrics({ title: 'Cass - Jidai', artist: '' }, { fetchImpl: fake });
   assert.equal(lines[0].text, 'hi');
-  assert.deepEqual(asked, [{ track_name: 'Jidai', artist_name: 'Cass' }, { q: 'Cass Jidai' }]);
+  assert.deepEqual(asked.sort((a, b) => Object.keys(a)[0].localeCompare(Object.keys(b)[0])), [{ q: 'Cass Jidai' }, { track_name: 'Jidai', artist_name: 'Cass' }]); // both searches go out together
 });
 
 test('song info: picks the first release of the same song, never a remix; caches the answer', async () => {
@@ -152,4 +152,20 @@ test('lyrics: a song without timed lyrics is an empty list (cached); a network f
   assert.equal(calls, 2); // exact search + free-text search, then served from the cache
   await assert.rejects(fetchLyrics({ title: 'Other', artist: 'B' }, { cacheDir: dir, fetchImpl: async () => ({ ok: false, status: 503 }) }));
   assert.deepEqual(await fetchLyrics({ title: 'Other', artist: 'B' }, { cacheDir: dir, fetchImpl: none }), []); // not cached after the failure
+});
+
+test('pip chat: the whole conversation goes in the prompt, newest last, and asks for no tools', () => {
+  const { chatPrompt } = require('../src/main/buddy.js');
+  const p = chatPrompt([{ role: 'me', text: 'habari' }, { role: 'pip', text: 'poa' }, { role: 'me', text: 'nisaidie' }], 'Pip');
+  assert.match(p, /Do not use any tools/);
+  assert.ok(p.indexOf('User: habari') < p.indexOf('Pip: poa') && p.indexOf('Pip: poa') < p.indexOf('User: nisaidie'));
+  assert.ok(p.endsWith('Pip:'));
+});
+
+test('mac helper: the AppleScript it runs is valid JavaScript, and unknown commands are refused', () => {
+  const { MacHelper, READ } = require('../src/main/mac-helper.js');
+  assert.doesNotThrow(() => new Function(READ + '\nreturn run;'));
+  const h = new MacHelper();
+  assert.equal(h.send({ cmd: 'media', action: 'explode' }), false); assert.equal(h.send({ cmd: 'radio' }), false);
+  h.start(); assert.equal(h.timer, null); // does nothing off the Mac
 });
