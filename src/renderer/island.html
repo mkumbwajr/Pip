@@ -9,20 +9,31 @@
 <body>
 <div id="island" class="idle attach">
   <div id="shell">
-    <button id="pill" type="button" aria-label="Peep">
+    <div id="pill" role="button" tabindex="0" aria-label="Peep">
       <span id="pill-inner">
+        <span id="pill-date"></span>
         <span class="pip" id="pip"><span class="hat"></span><span class="eye"></span><span class="eye"></span><span class="mouth"></span></span>
         <span id="pill-text"></span>
+        <span id="pill-chip"></span>
         <span id="pill-side"></span>
+        <button id="pill-more" type="button"></button>
       </span>
-    </button>
+    </div>
     <div id="panel">
-      <nav id="tabs"></nav>
       <main id="page"></main>
+      <nav id="bar">
+        <button type="button" class="side" id="bar-settings" data-settings></button>
+        <div id="tabs"></div>
+        <button type="button" class="side" id="bar-vol"></button>
+        <div id="tip"></div>
+        <div id="vol-pop" hidden><span id="vol-ico"></span><input type="range" id="qvol" min="0" max="100"><span id="qvol-n"></span></div>
+      </nav>
+      <div id="menu" hidden></div>
     </div>
   </div>
 </div>
 <script src="../shared/i18n.js"></script>
+<script src="icons.js"></script>
 <script src="island.js"></script>
 </body>
 </html>

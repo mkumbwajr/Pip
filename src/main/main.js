@@ -26,7 +26,7 @@ app.setAppUserModelId('dev.peep.app');
 const data = (...p) => path.join(app.getPath('userData'), ...p);
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
-const ISLAND = { width: 620, height: 470 };
+const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
 let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, quitting = false;
 let strings = {}, t = makeT(strings);
@@ -141,8 +141,8 @@ function watchClipboard() {
   setInterval(async () => {
     let text = ''; try { text = await clipboard.readText(); } catch {} // a string, or a promise in newer Electron
     if (typeof text !== 'string' || !text || text === lastClip || text.length > 20000) return;
-    lastClip = text; const i = clips.indexOf(text); if (i >= 0) clips.splice(i, 1);
-    clips.unshift(text); clips.length = Math.min(clips.length, 10); // memory only: never written to disk
+    lastClip = text; const i = clips.findIndex(c => c.text === text); if (i >= 0) clips.splice(i, 1);
+    clips.unshift({ text, at: Date.now() }); clips.length = Math.min(clips.length, 10); // memory only: never written to disk
     send('clips:changed', clips);
   }, 1500);
 }
@@ -237,6 +237,14 @@ function wireIpc() {
   handle('tray:remove', p => { trayFiles = trayFiles.filter(f => f !== p); saveTray(); return trayView(); });
   handle('tray:open', p => (trayFiles.includes(p) ? shell.showItemInFolder(p) : null));
   handle('clips:copy', text => { lastClip = String(text); clipboard.writeText(lastClip); return true; });
+  handle('clips:clear', () => { clips.length = 0; send('clips:changed', clips); return clips; }); // lastClip stays, so the text still on the clipboard does not come straight back
+  handle('app:quit', () => { quitting = true; app.quit(); });
+  // a file from the tray dragged out of the island into another app (only files that are in the tray)
+  ipcMain.on('tray:drag', (e, p) => {
+    if (!ours(e) || !trayFiles.includes(p)) return;
+    let icon = nativeImage.createFromPath(ICON); if (!icon.isEmpty()) icon = icon.resize({ width: 32, height: 32 });
+    try { e.sender.startDrag({ file: p, icon }); } catch {}
+  });
   handle('share:start', async () => {
     share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(app.getPath('downloads'), 'Peep'), onReceive: p => { addToTray([p]); new Notification({ title: 'Peep', body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
     try { const s = await share.start(); return { ok: true, ...s, qr: await require('qrcode').toDataURL(s.url, { margin: 1, width: 220 }) }; }

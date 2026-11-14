@@ -17,6 +17,14 @@ const DEFAULTS = {
   calendarUrl: '',
   note: '',
   guard: { on: false, sites: ['youtube', 'tiktok', 'instagram', 'x.com', 'reddit'], snoozeMin: 5 },
+  // Modes: a timer with three switches. block turns the focus guard on; music off pauses what is playing.
+  modes: {
+    work: { min: 50, block: true, only: true, music: true },
+    study: { min: 45, block: true, only: true, music: false },
+    sleep: { min: 30, block: true, only: true, music: false },
+    game: { min: 60, block: false, only: true, music: true }
+  },
+  modeRestore: null,     // while a mode runs: what to put back when it stops ({ guardOn })
   buddyAgent: 'claude',
   shortcut: 'Control+Alt+Space'
 };

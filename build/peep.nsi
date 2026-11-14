@@ -3,7 +3,7 @@
 ; Installs for the current user only, no admin rights. The uninstaller removes Peep's hooks from the agents' configs.
 Unicode true
 SetCompressor /SOLID lzma
-!define VERSION "0.3.0"
+!define VERSION "0.4.0"
 !define UNINST "Software\Microsoft\Windows\CurrentVersion\Uninstall\Peep"
 
 Name "Peep"

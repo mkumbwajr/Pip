@@ -51,3 +51,16 @@ test('store: defaults, deep merge, persistence', () => {
   s.set({ mascot: { color: '#fff' } });
   const again = new Store(file); assert.equal(again.get('mascot.color'), '#fff'); assert.equal(again.get('mascot.name'), 'Pip');
 });
+
+test('store: modes keep their other switches when one changes; the restore point can be cleared', () => {
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'peep-modes-')), 'settings.json');
+  const s = new Store(file);
+  assert.deepEqual(s.get('modes.work'), { min: 50, block: true, only: true, music: true });
+  s.set({ modes: { work: { music: false } }, modeRestore: { guardOn: false }, guard: { on: true } });
+  const again = new Store(file);
+  assert.deepEqual(again.get('modes.work'), { min: 50, block: true, only: true, music: false });
+  assert.deepEqual(again.get('modeRestore'), { guardOn: false });
+  again.set({ modeRestore: null, guard: { on: false } });
+  assert.equal(new Store(file).get('modeRestore'), null); assert.equal(new Store(file).get('guard.on'), false);
+  assert.equal(new Store(file).get('guard.sites').length, 5);
+});

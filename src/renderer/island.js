@@ -4,14 +4,16 @@
 const api = window.peep;
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const island = $('#island'), shell = $('#shell'), pill = $('#pill'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip');
+const island = $('#island'), shell = $('#shell'), pill = $('#pill'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip'), bar = $('#bar'), tip = $('#tip'), menu = $('#menu'), volPop = $('#vol-pop');
 let t = window.makeT({});
 
-const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips']); // redrawn when data changes; the others hold what you are typing
+const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips', 'calendar']); // redrawn when data changes; the others hold what you are typing
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#e8e8ee'];
 const AGENT = { claude: 'Claude Code', codex: 'Codex' };
 // Lists of words are built by functions so they follow the chosen language.
-const tabList = () => [['home', t('Home')], ['ai', t('Agents')], ['music', t('Music')], ['tray', t('Files')], ['clips', t('Copied')], ['note', t('Note')], ['focus', t('Focus')], ['ask', t('Ask')]];
+const tabList = () => [['home', t('Home')], ['ai', t('Agents')], ['ask', t('Ask')], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')]];
+const MODES = () => [['work', t('Work')], ['study', t('Study')], ['sleep', t('Sleep')], ['game', t('Game')]];
+const SITE_NAMES = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', reddit: 'Reddit', 'x.com': 'X', facebook: 'Facebook', netflix: 'Netflix' };
 const stateName = s => ({ idle: t('Idle'), working: t('Working'), asking: t('Needs you'), done: t('Done'), error: t('Error') }[s] || s);
 const verb = v => ({ Reading: t('Reading'), Writing: t('Writing'), Editing: t('Editing'), Running: t('Running'), Searching: t('Searching'), Fetching: t('Fetching'),
   'Searching the web': t('Searching the web'), Delegating: t('Delegating'), Using: t('Using'), Thinking: t('Thinking'), Failed: t('Failed'), 'Needs you': t('Needs you') }[v] || v);
@@ -20,15 +22,18 @@ const weatherName = c => (c === 0 ? t('Clear') : c <= 3 ? t('Cloudy') : c <= 48 
 const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: 'idle', history: [], usage: null }, agents: {}, win: { media: null, volume: null, net: null }, tray: [], clips: [],
   weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
-  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false };
+  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false,
+  mode: null, modePick: '', menu: false, vol: false, calLoaded: false };
 
 // ---------- small helpers ----------
 const locale = () => (S.settings?.lang === 'sw' ? 'sw-TZ' : undefined);
-const clock = () => new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+const clock = (d = new Date()) => d.toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
+const dateLabel = (d = new Date()) => [d.toLocaleDateString(locale(), { weekday: 'short' }), d.getDate(), d.toLocaleDateString(locale(), { month: 'short' })].join(' ').replace(/[.,]/g, '');
+const hms = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(n => String(n).padStart(2, '0')).join(':'); };
+const age = at => { const m = Math.floor((Date.now() - at) / 60000); return m < 1 ? t('just now') : m < 60 ? t('{n} min', { n: m }) : t('{n} h', { n: Math.floor(m / 60) }); };
 const time = ms => { const s = Math.max(0, Math.round(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 const ago = at => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? t('just now') : m < 60 ? t('{n} min ago', { n: m }) : t('{n} h ago', { n: Math.round(m / 60) }); };
 const size = b => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
-const until = at => { const m = Math.max(0, Math.round((at - Date.now()) / 60000)); return m < 60 ? t('{n} min', { n: m }) : t('{n} h', { n: Math.round(m / 60) }); };
 const typing = () => { const a = document.activeElement; return page.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'range'; };
 function chime(ok) {
   if (!S.settings?.sounds) return;
@@ -56,7 +61,14 @@ function drawPill() {
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist ? `${m.title} · ${m.artist}` : m.title;
   if (top?.state === 'working' && top.startedAt) side = time(Date.now() - top.startedAt);
-  $('#pill-text').textContent = text; $('#pill-side').textContent = side;
+  $('#pill-text').textContent = text; $('#pill-side').textContent = S.open ? clock() : side;
+  if (S.open) {
+    $('#pill-date').textContent = dateLabel();
+    const u = S.ai.usage?.fiveHour; // the five-hour window is the one that runs out during a working day
+    $('#pill-chip').textContent = u ? `${u.pct}%${u.resetsAt > Date.now() ? ' · ' + hms(u.resetsAt - Date.now()) : ''}` : '';
+    const w = S.ai.usage?.sevenDay; // both windows on hover; the chip itself shows the one that runs out first
+    $('#pill-chip').title = u ? `${t('Claude usage')}: ${t('5 hours')} ${u.pct}%${w ? ` · ${t('Week')} ${w.pct}%` : ''}` : '';
+  }
   island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
   island.classList.toggle('bare', !S.open && !text && S.settings?.island.mode !== 'detach'); // attached and idle: only Pip in the notch
   // the shell's width is set in pixels so the change between sizes can be animated
@@ -65,23 +77,23 @@ function drawPill() {
 }
 
 // ---------- pages ----------
-const usageBar = (label, u) => (u ? `<span>${label} ${u.pct}%</span><div class="bar grow"><i data-w="${u.pct}" class="${u.pct >= 85 ? 'hot' : ''}"></i></div>${u.resetsAt > Date.now() ? `<span>${esc(t('resets in {time}', { time: until(u.resetsAt) }))}</span>` : ''}` : '');
 const pages = {
   home() {
-    const top = S.ai.sessions[0], m = S.win.media, now = new Date(), u = S.ai.usage, net = S.win.net;
-    const agentLine = top ? `<span class="badge ${top.state}">${esc(stateName(top.state))}</span> <b>${esc(AGENT[top.agent])}</b> <span class="dim">${esc(top.project)}</span>` : `<span class="dim">${esc(t('No agent session yet.'))}</span>`;
-    return `${S.hubError ? `<div class="card" data-kind="error">${esc(S.hubError)}</div>` : ''}
-      ${S.agents.claude || S.agents.codex ? '' : `<div class="card row"><div class="grow">${esc(t('Connect Claude Code or Codex to see what they are doing.'))}</div><button class="btn primary" data-settings>${esc(t('Connect'))}</button></div>`}
-      <div class="card"><div class="row">${agentLine}</div>${top?.activity ? `<div class="cut mono dim">${esc(verb(top.activity.verb))} ${esc(top.activity.detail)}</div>` : ''}</div>
-      ${u ? `<div class="card"><h2>${esc(t('Claude usage'))}</h2><div class="row small dim">${usageBar(esc(t('5 hours')), u.fiveHour)}</div><div class="row small dim">${usageBar(esc(t('Week')), u.sevenDay)}</div></div>` : ''}
-      <div class="grid">
-        <div class="card"><div class="big" id="clock">${clock()}</div><div class="dim">${esc(now.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' }))}</div></div>
-        <div class="card">${S.weather ? `<div class="big">${S.weather.temp}${esc(S.weather.unit)}</div><div class="dim">${esc(weatherName(S.weather.code))} · ${esc(S.weather.place)}</div>` : `<div class="dim">${esc(t('Add your town in Settings for the weather.'))}</div>`}</div>
-        <div class="card"><h2>${esc(t('Next'))}</h2>${S.event ? `<div class="cut">${esc(S.event.title)}</div><div class="dim small">${esc(new Date(S.event.start).toLocaleString(locale(), S.event.allDay ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'short', hour: '2-digit', minute: '2-digit' }))}</div>` : `<div class="dim">${esc(t('No calendar linked.'))}</div>`}</div>
-        <div class="card"><h2>${esc(t('Playing'))}</h2>${m ? `<div class="cut">${esc(m.title)}</div><div class="dim small cut">${esc(m.artist)}</div>` : `<div class="dim">${esc(t('Nothing is playing.'))}</div>`}</div>
-      </div>
-      ${net ? `<div class="card row">${net.wifi ? `<label class="check" data-flat><input type="checkbox" data-radio="WiFi" ${net.wifi.on ? 'checked' : ''}>Wi-Fi${net.wifi.ssid ? ` <span class="dim small cut">${esc(net.wifi.ssid)}</span>` : ''}</label>` : ''}<span class="grow"></span>${net.bt ? `<label class="check" data-flat><input type="checkbox" data-radio="Bluetooth" ${net.bt.on ? 'checked' : ''}>Bluetooth</label>` : ''}</div>` : ''}
-      ${S.stats ? `<div class="card row small dim"><span>CPU ${S.stats.cpu}%</span><div class="bar grow"><i data-w="${S.stats.cpu}"></i></div><span>${esc(t('Memory'))} ${S.stats.mem}%</span><div class="bar grow"><i data-w="${S.stats.mem}"></i></div></div>` : ''}`;
+    const top = S.ai.sessions[0], m = S.win.media, f = S.focus, connected = S.agents.claude || S.agents.codex;
+    const art = m && S.art?.key === m.title + '|' + m.artist ? S.art.data : '';
+    const w = S.weather, e = S.event;
+    const agent = top
+      ? `<span class="dotst ${top.state}"></span><div class="grow"><span class="label">${esc(AGENT[top.agent])} · ${esc(stateName(top.state))}</span><div class="sub">${esc(top.activity ? `${verb(top.activity.verb)} ${top.activity.detail}` : top.project)}</div></div>${top.state === 'asking' ? `<button class="wbtn sm" data-tab-go="ai">${esc(t('Open'))}</button>` : ''}`
+      : connected ? `<span class="dotst"></span><div class="grow"><span class="label">${esc(t('Agents'))}</span><div class="sub">${esc(t('No agent session yet.'))}</div></div>`
+        : `<div class="grow"><span class="label">${esc(t('Agents'))}</span><div class="sub" title="${esc(t('Connect Claude Code or Codex to see what they are doing.'))}">${esc(t('Not connected'))}</div></div><button class="wbtn sm" data-connect>${esc(t('Connect'))}</button>`;
+    return `<div class="hm"><div class="hm-left"><div class="hm-clock" id="hm-clock"></div>
+        <div class="hm-sub">${w ? `${w.temp}${esc(w.unit)} · ${esc(weatherName(w.code))} · ${esc(w.place)}` : esc(t('Add your town in Settings for the weather.'))}</div>
+        ${S.hubError ? `<div class="hm-err">${esc(S.hubError)}</div>` : ''}
+        <div class="hm-next"><span class="label">${esc(t('Next'))}</span>${e ? `<b class="cut">${esc(e.title)}</b><span>${esc(new Date(e.start).toLocaleString(locale(), e.allDay ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}</span>` : `<b>${esc(/^https:\/\//.test(S.settings.calendarUrl || '') ? t('Nothing planned') : t('No calendar linked.'))}</b>`}</div></div>
+      <div class="hm-tiles"><div class="tile">${agent}</div>
+        <div class="tile">${art ? `<img class="tile-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="tile-art">${icon('music')}</span>`}<div class="grow"><b>${esc(m ? m.title : t('Nothing is playing.'))}</b>${m?.artist ? `<div class="sub">${esc(m.artist)}</div>` : ''}</div>
+          ${m ? `<button class="round" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${m.playing ? '❚❚' : '▶'}</button>` : ''}</div>
+        <div class="tile"><span class="tile-art">${icon('focus')}</span><div class="grow"><span class="label">${esc(t('Focus'))}</span><b class="mono" id="hm-focus">${time(f.left * 1000)}</b></div><button class="wbtn sm" data-focus="toggle">${esc(f.running ? t('Pause') : t('Start'))}</button></div></div></div>`;
   },
   ai() {
     const cards = S.ai.sessions.map(s => `<div class="card">
@@ -109,19 +121,48 @@ const pages = {
       ${sp.on ? `<h2>${esc(t('Play on'))}</h2>${sp.devices.map(d => `<div class="item" data-device="${esc(d.id)}"><span class="grow cut">${esc(d.name)}</span>${d.active ? `<span class="badge done">${esc(t('Playing'))}</span>` : ''}</div>`).join('') || `<div class="dim">${esc(sp.error || t('Open Spotify on a device to see it here.'))}</div>`}` : ''}`;
   },
   tray() {
-    const files = S.tray.map(f => `<div class="item" data-open="${esc(f.path)}"><span class="grow cut">${esc(f.name)}</span><span class="dim small">${size(f.size)}</span><button class="x" data-remove="${esc(f.path)}" aria-label="${esc(t('Remove'))}">✕</button></div>`).join('');
     const sh = S.share;
-    return `<div class="drop" id="drop">${esc(t('Drop files here to keep them close'))}</div>${files}
-      <h2>${esc(t('Phone'))}</h2>${sh?.on ? `<div class="card row"><img class="qr" alt="QR" src="${esc(sh.qr)}"><div class="grow"><div>${esc(t('Scan with your phone on the same Wi-Fi.'))}</div><div class="mono dim small">${esc(sh.url)}</div><div class="dim small">${esc(t('Stops by itself after an hour.'))}</div><br><button class="btn" data-share="stop">${esc(t('Stop sharing'))}</button></div></div>`
-        : `<div class="card row"><div class="grow">${esc(t('Send these files to your phone, or files from your phone to this PC, over your own Wi-Fi.'))}${sh?.error ? `<div class="small" data-kind="error">${esc(sh.error)}</div>` : ''}</div><button class="btn primary" data-share="start">${esc(t('Share'))}</button></div>`}`;
+    if (sh?.on) return `<div class="tr"><img class="tr-qr" alt="QR" src="${esc(sh.qr)}"><div class="tr-side"><p>${esc(t('Scan with your phone on the same Wi-Fi.'))}<br><span class="mono">${esc(sh.url)}</span><br>${esc(t('Stops by itself after an hour.'))}</p>
+      <button class="wbtn wide" data-share="stop">${esc(t('Stop sharing'))}</button></div></div>`;
+    const left = S.tray.length
+      ? `<div class="tr-files" id="drop">${S.tray.map(f => `<div class="tr-file item" draggable="true" data-drag="${esc(f.path)}" data-open="${esc(f.path)}"><span class="grow cut">${esc(f.name)}</span><span class="dim">${size(f.size)}</span><button class="x" data-remove="${esc(f.path)}" aria-label="${esc(t('Remove'))}">✕</button></div>`).join('')}</div>`
+      : `<div class="tr-drop" id="drop">${esc(t('Drop here'))}</div>`;
+    return `<div class="tr">${left}<div class="tr-side"><h3>${esc(t('Drop files here'))}</h3><p>${esc(t('They wait here until you drag them out. Click to open.'))}</p>
+      ${sh?.error ? `<p data-kind="error">${esc(sh.error)}</p>` : ''}<button class="wbtn wide" data-share="start">${icon('phone')}${esc(t('Get from your phone'))}</button></div></div>`;
   },
-  clips() { return `<h2>${esc(t('Recently copied'))}</h2>${S.clips.map((c, i) => `<div class="item" data-clip="${i}"><span class="grow cut mono">${esc(c.slice(0, 200))}</span></div>`).join('') || `<div class="dim">${esc(t('Text you copy shows up here. It is kept in memory only.'))}</div>`}`; },
-  note() { return `<h2>${esc(t('Quick note'))}</h2><textarea id="note" rows="17" placeholder="${esc(t('Type anything. It saves by itself.'))}">${esc(S.settings.note)}</textarea>`; },
+  clips() {
+    if (!S.clips.length) return `<div class="cl-empty">${esc(t('Text you copy shows up here. It is kept in memory only.'))}</div>`;
+    return S.clips.map((c, i) => `<button class="cl-row" data-clip="${i}"><span class="label">${esc(/^https?:\/\/\S+$/.test(c.text.trim()) ? t('Link') : t('Text'))}</span>
+      <span class="cl-text">${esc(c.text.replace(/\s+/g, ' ').slice(0, 200))}</span><span class="label cl-age">${esc(age(c.at))}</span></button>`).join('')
+      + `<button class="cl-clear" data-clips-clear>${esc(t('Clear history'))}</button>`;
+  },
+  note() {
+    return `<div class="nt"><div class="nt-main"><div class="label">${esc(t('Note'))}</div><textarea id="note" placeholder="${esc(t('Click to type'))}">${esc(S.settings.note)}</textarea></div><div class="nt-side" id="note-side">${noteSide()}</div></div>`;
+  },
   focus() {
-    const f = S.focus;
-    return `<div class="card" data-center><div class="big" id="focus-left">${time(f.left * 1000)}</div><div class="bar"><i id="focus-bar"></i></div><br>
-      <div class="row" data-center><button class="btn primary" data-focus="toggle">${esc(f.running ? t('Pause') : t('Start'))}</button><button class="btn" data-focus="reset">${esc(t('Reset'))}</button></div></div>
-      <div class="row" data-center>${[15, 25, 50].map(n => `<button class="btn" data-focus-min="${n}">${esc(t('{n} min', { n }))}</button>`).join('')}</div>`;
+    const f = S.focus, ticks = [];
+    for (let m = 0; m <= 60; m++) ticks.push(`<i class="${m % 10 ? '' : 'major'}" data-left="${(m / 60) * 100}"></i>${m % 10 ? '' : `<span data-left="${(m / 60) * 100}">${m}</span>`}`);
+    return `<div class="fz"><div class="fz-time" id="focus-left">${time(f.left * 1000)}</div><div class="fz-done" id="focus-done"></div>
+      <button class="wbtn" data-focus="toggle">${esc(f.running ? t('Pause') : t('Start'))}</button>
+      <div class="ruler${f.running ? ' busy' : ''}" id="ruler">${ticks.join('')}<i class="mark" id="ruler-mark"></i></div></div>`;
+  },
+  modes() {
+    const pick = S.modePick || S.mode?.id || 'work', m = S.settings.modes[pick], live = S.mode?.id === pick;
+    const sites = S.settings.guard.sites.slice(0, 3).map(s => SITE_NAMES[String(s).toLowerCase()] || String(s).replace(/^./, c => c.toUpperCase())).join(', ');
+    const agent = S.agents.claude || !S.agents.codex ? 'Claude' : 'Codex';
+    const row = (key, ico, text) => `<div class="md-row">${icon(ico)}<span>${esc(text)}</span><button class="sw ${m[key] ? 'on' : ''}" data-mswitch="${key}" aria-label="${esc(text)}"></button></div>`;
+    return `<div class="md"><div class="md-list">${MODES().map(([id, name]) => `<button class="${id === pick ? 'on' : ''}" data-mode-pick="${id}">${icon(id)}${esc(name)}</button>`).join('')}</div>
+      <div><div class="md-head"><span class="md-time" id="${live ? 'mode-left' : ''}" title="${esc(t('Scroll to change the time'))}">${time((live ? S.focus.left : m.min * 60) * 1000)}</span>
+        <button class="wbtn sm" data-mode-go="${pick}">${esc(live ? t('Stop') : t('Start'))}</button></div>
+        ${row('block', 'shield', t('Block {sites}', { sites }))}${row('only', 'bell', t('Only {agent} can reach you', { agent }))}${row('music', 'music', t('Keep my music on'))}</div></div>`;
+  },
+  calendar() {
+    const now = new Date(), e = S.event, linked = /^https:\/\//.test(S.settings.calendarUrl || '');
+    const when = e && new Date(e.start).toLocaleString(locale(), e.allDay ? { weekday: 'long', day: 'numeric', month: 'short' } : { weekday: 'long', hour: 'numeric', minute: '2-digit' });
+    return `<div class="cal"><div class="cal-day"><div class="label">${esc(now.toLocaleDateString(locale(), { weekday: 'long' }))}</div><div class="cal-big">${now.getDate()}</div>
+      <div class="cal-month">${esc(now.toLocaleDateString(locale(), { month: 'long', year: 'numeric' }))}</div></div>
+      <div class="cal-next"><div class="label">${esc(t('Next'))}</div>${!linked ? `<h3>${esc(t('No calendar linked.'))}</h3><div><button class="wbtn sm" data-settings>${esc(t('Settings'))}</button></div>`
+        : e ? `<h3 class="cut">${esc(e.title)}</h3><p>${esc(when)}</p>` : `<h3>${esc(S.calLoaded ? t('Nothing planned') : '')}</h3>`}</div></div>`;
   },
   ask() {
     const a = S.ask;
@@ -132,25 +173,34 @@ const pages = {
   }
 };
 
+const FILL = new Set(['home', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
 function draw(force) {
   drawPill();
   if (!S.open || S.dragging || (!force && (!LIVE.has(S.tab) || typing()))) return;
+  page.classList.toggle('fill', FILL.has(S.tab));
   page.innerHTML = pages[S.tab]();
   for (const el of page.querySelectorAll('[data-w]')) el.style.width = el.dataset.w + '%';
+  for (const el of page.querySelectorAll('[data-left]')) el.style.left = el.dataset.left + '%';
   for (const el of page.querySelectorAll('[data-color]')) el.style.background = el.dataset.color;
   for (const el of page.querySelectorAll('[data-center]')) { el.style.justifyContent = 'center'; el.style.textAlign = 'center'; el.style.margin = '10px 0'; }
   for (const el of page.querySelectorAll('[data-kind=error]')) el.style.color = 'var(--error)';
   for (const el of page.querySelectorAll('[data-flat]')) el.style.margin = '0';
+  if (S.tab === 'note') drawNoteSide();
   tick();
 }
 function drawTabs() {
-  tabs.innerHTML = tabList().map(([id, name]) => `<button type="button" data-tab="${id}" class="${id === S.tab ? 'on' : ''}">${esc(name)}</button>`).join('')
-    + `<button type="button" class="gear" data-settings aria-label="${esc(t('Settings'))}" title="${esc(t('Settings'))}">⚙</button>`;
+  tabs.innerHTML = tabList().map(([id, name]) => `<button type="button" data-tab="${id}" data-tip="${esc(name)}" aria-label="${esc(name)}" class="${id === S.tab ? 'on' : ''}">${icon(id)}<b>${esc(name)}</b></button>`).join('');
+  const gear = $('#bar-settings'), vol = $('#bar-vol');
+  gear.innerHTML = icon('gear'); gear.dataset.tip = t('Settings'); gear.setAttribute('aria-label', t('Settings'));
+  vol.innerHTML = icon('volume'); vol.dataset.tip = t('Volume'); vol.setAttribute('aria-label', t('Volume'));
+  $('#vol-ico').innerHTML = icon('volume'); $('#pill-more').innerHTML = icon('dots'); $('#pill-more').setAttribute('aria-label', t('Menu'));
+  drawPill();
 }
 function go(tab) {
-  S.tab = tab; drawTabs(); draw(true);
+  S.tab = tab; showMenu(false); drawTabs(); draw(true); hideTip();
   page.classList.remove('in'); void page.offsetWidth; page.classList.add('in'); // replay the short entrance of the page
   if (tab === 'home') refreshHome();
+  if (tab === 'calendar') api.calendar().then(e => { S.event = e; S.calLoaded = true; draw(); });
   if (tab === 'ask') api.windows().then(list => { S.ask.windows = list || []; if (S.tab === 'ask' && !typing()) draw(true); });
   if (tab === 'music' && S.spotify.on) refreshDevices();
 }
@@ -160,9 +210,28 @@ function setOpen(open) {
   if (open === S.open) return;
   S.open = open;
   if (open) go(S.tab);
-  else { S.pinned = false; S.auto = false; if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
+  else { S.pinned = false; S.auto = false; showMenu(false); showVolume(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
 }
 function openSettings() { api.openSettings(); setOpen(false); }
+
+// ---------- the menu behind the dots, the volume pop-up and the tooltips over the bar ----------
+function showMenu(on) {
+  S.menu = on; menu.hidden = !on;
+  if (on) menu.innerHTML = `<button data-menu="settings">${icon('gear')}${esc(t('Settings'))}</button>
+    <button data-menu="pin">${icon('tray')}${esc(S.pinned ? t('Fold') : t('Keep open'))}</button><hr><button class="quit" data-menu="quit">${esc(t('Quit Peep'))}</button>`;
+}
+function showVolume(on) {
+  const v = S.win.volume; S.vol = on && Boolean(v); volPop.hidden = !S.vol; $('#bar-vol').classList.toggle('on', S.vol);
+  if (S.vol) { $('#qvol').value = v.level; $('#qvol-n').textContent = v.level; }
+}
+function hideTip() { tip.classList.remove('show'); }
+bar.addEventListener('mouseover', e => {
+  const b = e.target.closest('[data-tip]');
+  if (!b || b.classList.contains('on')) return hideTip();
+  const r = b.getBoundingClientRect(), base = bar.getBoundingClientRect();
+  tip.textContent = b.dataset.tip; tip.style.left = (r.left + r.width / 2 - base.left) + 'px'; tip.classList.add('show');
+});
+bar.addEventListener('mouseleave', hideTip);
 
 // ---------- hover: the island opens under the pointer and folds away when it leaves ----------
 let openTimer = 0, closeTimer = 0;
@@ -173,16 +242,25 @@ function pointer(inside) {
   if (inside) { if (!S.open) openTimer = setTimeout(() => setOpen(true), 70); }
   else closeTimer = setTimeout(maybeClose, 280);
 }
-function maybeClose() { if (S.open && !S.hover && !S.pinned && !S.dragging && !typing() && !(S.auto && S.ai.top === 'asking')) setOpen(false); }
+function maybeClose() { if (S.open && !S.hover && !S.pinned && !S.dragging && !S.menu && !typing() && !(S.auto && S.ai.top === 'asking')) setOpen(false); }
 
 function second() {
-  if (S.focus.running) { S.focus.left--; if (S.focus.left <= 0) { S.focus.running = false; S.focus.left = S.focus.total; chime(true); if (S.tab === 'focus') draw(true); } }
+  if (S.focus.running) {
+    S.focus.left--;
+    if (S.focus.left <= 0) {
+      S.focus.running = false; S.focus.left = S.focus.total; chime(true);
+      if (S.mode) stopMode(); else if (S.tab === 'focus') draw(true);
+    }
+  }
   drawPill(); tick();
 }
-/** The parts that move every second (clock, song progress, lyric line, focus timer), patched in place. */
+/** The parts that move every second (clock, song progress, lyric line, timers), patched in place. */
 function tick() {
   if (!S.open) return;
   const c = $('#clock'); if (c) c.textContent = clock();
+  const hc = $('#hm-clock');
+  if (hc) { const [hm, ...rest] = clock().split(/\s+/); hc.textContent = hm; if (rest.length) { const s = document.createElement('small'); s.textContent = rest.join(' '); hc.append(s); } }
+  const hf = $('#hm-focus'); if (hf) hf.textContent = time(S.focus.left * 1000);
   const m = S.win.media;
   if (m && S.tab === 'music') {
     const pos = mediaPosition(), p = $('#progress'), n = $('#pos');
@@ -195,10 +273,60 @@ function tick() {
       now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? '' : t('No lyrics for this song.'));
     }
   }
-  const fl = $('#focus-left'), fb = $('#focus-bar');
-  if (fl) fl.textContent = time(S.focus.left * 1000); if (fb) fb.style.width = (100 * (1 - S.focus.left / S.focus.total)) + '%';
+  const fl = $('#focus-left'), fd = $('#focus-done'), mark = $('#ruler-mark'), ml = $('#mode-left');
+  if (fl) fl.textContent = time(S.focus.left * 1000);
+  if (fd) fd.textContent = t('Done at {time}', { time: clock(new Date(Date.now() + S.focus.left * 1000)) });
+  if (mark) mark.style.left = Math.min(100, S.focus.left / 36) + '%'; // 60 minutes = 3600 s = 100%
+  if (ml) ml.textContent = time(S.focus.left * 1000);
 }
-async function refreshHome() { const [w, e, st] = await Promise.all([api.weather(), api.calendar(), api.stats()]); S.weather = w && !w.error ? w : null; S.event = e; S.stats = st; draw(); }
+
+// ---------- modes: a timer plus three switches; stopping puts the focus guard back the way it was ----------
+async function startMode(id) {
+  if (S.mode) await stopMode();
+  const m = S.settings.modes[id], restore = { guardOn: Boolean(S.settings.guard.on) };
+  S.mode = { id }; S.focus = { running: true, total: m.min * 60, left: m.min * 60 };
+  await save({ modeRestore: restore, guard: { on: m.block ? true : restore.guardOn } });
+  if (!m.music && S.win.media?.playing) api.media('toggle');
+  draw(true);
+}
+async function stopMode() {
+  const r = S.settings.modeRestore;
+  S.mode = null; S.focus.running = false; S.focus.left = S.focus.total;
+  if (r) await save({ modeRestore: null, guard: { on: r.guardOn } });
+  if (S.tab === 'modes' || S.tab === 'focus') draw(true);
+}
+async function setModeMinutes(id, step) {
+  if (S.mode?.id === id) return;
+  const min = Math.max(5, Math.min(180, S.settings.modes[id].min + step));
+  await save({ modes: { [id]: { min } } }); draw(true);
+}
+
+// ---------- note: lines that start with [ ] become tick circles on the right ----------
+const TODO = /^\s*\[( |x|X)\]\s?(.*)$/;
+function noteSide() {
+  const items = (S.settings.note || '').split('\n').map((line, i) => ({ i, m: line.match(TODO) })).filter(x => x.m);
+  if (!items.length) return esc(t('Start a line with [ ] and you get a check circle. Everything saves by itself.'));
+  return items.map(({ i, m }) => `<button class="ck ${m[1] === ' ' ? '' : 'done'}" data-todo="${i}"><i></i><span class="cut">${esc(m[2] || ' ')}</span></button>`).join('');
+}
+function drawNoteSide() {
+  const side = $('#note-side'); if (!side) return;
+  side.innerHTML = noteSide(); side.classList.toggle('list', (S.settings.note || '').split('\n').some(l => TODO.test(l)));
+}
+
+// ---------- focus ruler: press and drag to choose 1 to 60 minutes ----------
+function rulerAt(e) {
+  const r = $('#ruler').getBoundingClientRect(), min = Math.max(1, Math.min(60, Math.round(60 * (e.clientX - r.left) / r.width)));
+  if (min * 60 !== S.focus.total || S.focus.left !== S.focus.total) { S.focus = { running: false, total: min * 60, left: min * 60 }; tick(); }
+}
+page.addEventListener('pointerdown', e => {
+  const ruler = e.target.closest('#ruler'); if (!ruler || S.focus.running) return;
+  ruler.setPointerCapture(e.pointerId); rulerAt(e);
+  const move = ev => rulerAt(ev), up = () => { ruler.removeEventListener('pointermove', move); ruler.removeEventListener('pointerup', up); };
+  ruler.addEventListener('pointermove', move); ruler.addEventListener('pointerup', up);
+});
+page.addEventListener('wheel', e => { const el = e.target.closest('.md-time'); if (el) { e.preventDefault(); setModeMinutes(S.modePick || S.mode?.id || 'work', e.deltaY < 0 ? 5 : -5); } }, { passive: false });
+
+async function refreshHome() { const [w, e] = await Promise.all([api.weather(), api.calendar()]); S.weather = w && !w.error ? w : null; S.event = e; draw(); }
 async function refreshDevices() { const r = await api.spotifyDevices(); S.spotify = { on: r.ok || r.connected !== false, devices: r.devices || [], error: r.ok ? '' : r.error }; draw(); }
 async function refreshLyrics() {
   const m = S.win.media, key = m ? m.title + '|' + m.artist : '';
@@ -213,11 +341,31 @@ async function sendReply(id) {
 }
 
 // ---------- events ----------
-// a click on the pill pins the island open; another click (or Esc) lets it fold away again
-pill.addEventListener('click', () => { if (S.open && S.pinned) setOpen(false); else { S.pinned = true; if (S.open) drawPill(); else setOpen(true); } });
-tabs.addEventListener('click', e => { if (e.target.closest('[data-settings]')) return openSettings(); const b = e.target.closest('[data-tab]'); if (b) go(b.dataset.tab); });
+// a click on the strip pins the island open; another click (or Esc) lets it fold away again
+pill.addEventListener('click', e => {
+  if (e.target.closest('#pill-more')) { e.stopPropagation(); showVolume(false); return showMenu(!S.menu); }
+  if (S.open && S.pinned) setOpen(false); else { S.pinned = true; if (S.open) drawPill(); else setOpen(true); }
+});
+pill.addEventListener('keydown', e => { if (e.target === pill && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pill.click(); } });
+bar.addEventListener('click', e => {
+  if (e.target.closest('[data-settings]')) return openSettings();
+  if (e.target.closest('#bar-vol')) { showMenu(false); return showVolume(!S.vol); }
+  const b = e.target.closest('[data-tab]'); if (b) { showVolume(false); go(b.dataset.tab); }
+});
+$('#qvol').addEventListener('input', e => { $('#qvol-n').textContent = e.target.value; api.setVolume(e.target.value); });
+menu.addEventListener('click', e => {
+  const b = e.target.closest('[data-menu]'); if (!b) return;
+  showMenu(false);
+  if (b.dataset.menu === 'settings') openSettings();
+  else if (b.dataset.menu === 'pin') { if (S.pinned) setOpen(false); else { S.pinned = true; drawPill(); } }
+  else if (b.dataset.menu === 'quit') api.quit();
+});
+document.addEventListener('click', e => {
+  if (S.menu && !e.target.closest('#menu, #pill-more')) showMenu(false);
+  if (S.vol && !e.target.closest('#vol-pop, #bar-vol')) showVolume(false);
+});
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') setOpen(false);
+  if (e.key === 'Escape') { if (S.menu || S.vol) { showMenu(false); showVolume(false); } else setOpen(false); }
   else if (e.key === 'Enter' && e.target.dataset?.replyFor) sendReply(e.target.dataset.replyFor);
 });
 document.addEventListener('mousemove', e => pointer(Boolean(e.target.closest && e.target.closest('#shell'))));
@@ -239,12 +387,26 @@ page.addEventListener('click', async e => {
   else if (d.device) { await api.spotifyTransfer(d.device); setTimeout(refreshDevices, 1200); }
   else if (d.remove) { e.stopPropagation(); S.tray = await api.trayRemove(d.remove); draw(); }
   else if (d.open) api.trayOpen(d.open);
-  else if (d.clip !== undefined) { await api.copyClip(S.clips[+d.clip]); b.querySelector('span').textContent = t('Copied!'); }
+  else if (d.clip !== undefined) { await api.copyClip(S.clips[+d.clip].text); b.querySelector('.cl-text').textContent = t('Copied!'); }
+  else if (d.clipsClear !== undefined) { S.clips = await api.clearClips(); draw(true); }
   else if (d.share === 'start') { S.share = await api.shareStart(); draw(); }
   else if (d.share === 'stop') { await api.shareStop(); S.share = null; draw(); }
   else if (d.focus === 'toggle') { S.focus.running = !S.focus.running; draw(true); }
-  else if (d.focus === 'reset') { S.focus.running = false; S.focus.left = S.focus.total; draw(true); }
-  else if (d.focusMin) { S.focus = { running: false, total: d.focusMin * 60, left: d.focusMin * 60 }; draw(true); }
+  else if (d.tabGo) go(d.tabGo);
+  else if (d.connect !== undefined) { const r = await api.connectAgent('claude', true); if (r?.agents) S.agents = r.agents; if (!r?.ok) openSettings(); else draw(true); }
+  else if (d.modePick) { S.modePick = d.modePick; draw(true); }
+  else if (d.modeGo) { if (S.mode?.id === d.modeGo) await stopMode(); else await startMode(d.modeGo); }
+  else if (d.mswitch) {
+    const id = S.modePick || S.mode?.id || 'work', on = !S.settings.modes[id][d.mswitch];
+    await save({ modes: { [id]: { [d.mswitch]: on } } });
+    if (S.mode?.id === id && d.mswitch === 'block') await save({ guard: { on: on || Boolean(S.settings.modeRestore?.guardOn) } }); // a running mode follows its switch at once
+    draw(true);
+  }
+  else if (d.todo !== undefined) {
+    const lines = S.settings.note.split('\n'), i = +d.todo;
+    lines[i] = lines[i].replace(/\[( |x|X)\]/, m => (m === '[ ]' ? '[x]' : '[ ]'));
+    await save({ note: lines.join('\n') }); const box = $('#note'); if (box) box.value = S.settings.note; drawNoteSide();
+  }
   else if (d.pick !== undefined) { const q = $('#question').value; S.ask.pick = d.pick; draw(true); $('#question').value = q; }
   else if (b.id === 'ask-go') {
     const question = $('#question').value; Object.assign(S.ask, { busy: true, text: '', error: '' }); draw(true); $('#question').value = question;
@@ -255,18 +417,24 @@ page.addEventListener('click', async e => {
 page.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'volume') { S.dragging = true; $('#vol-n').textContent = el.value; api.setVolume(el.value); }
-  else if (el.id === 'note') { clearTimeout(page._note); page._note = setTimeout(() => save({ note: el.value }), 500); }
+  else if (el.id === 'note') { S.settings.note = el.value; drawNoteSide(); clearTimeout(page._note); page._note = setTimeout(() => save({ note: el.value }), 500); }
 });
 page.addEventListener('change', async e => {
   const el = e.target;
   if (el.id === 'volume') S.dragging = false;
   else if (el.dataset.radio) api.setRadio(el.dataset.radio, el.checked);
 });
+// a file in the tray can be dragged out into any other app; Electron's own drag carries the real file
+let draggingOut = false;
+page.addEventListener('dragstart', e => {
+  const f = e.target.closest?.('[data-drag]'); if (!f) return;
+  e.preventDefault(); draggingOut = true; api.dragOut(f.dataset.drag); setTimeout(() => { draggingOut = false; }, 800);
+});
 // files dropped anywhere on the island go to the files tab
-island.addEventListener('dragover', e => { e.preventDefault(); if (!S.open) setOpen(true); if (S.tab !== 'tray') go('tray'); $('#drop')?.classList.add('over'); });
+island.addEventListener('dragover', e => { e.preventDefault(); if (draggingOut) return; if (!S.open) setOpen(true); if (S.tab !== 'tray') go('tray'); $('#drop')?.classList.add('over'); });
 island.addEventListener('dragleave', () => $('#drop')?.classList.remove('over'));
 island.addEventListener('drop', async e => {
-  e.preventDefault();
+  e.preventDefault(); $('#drop')?.classList.remove('over'); if (draggingOut) return;
   const paths = [...e.dataTransfer.files].map(f => api.pathFor(f)).filter(Boolean);
   if (paths.length) { S.tray = await api.trayAdd(paths); draw(); }
 });
@@ -283,7 +451,7 @@ api.onArt(art => { S.art = art; if (S.tab === 'music') draw(); });
 // Pip looks at the pointer: the eyes shift a few pixels towards it, less when it is close
 api.onCursor(p => {
   const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);
-  pip.style.setProperty('--ex', (S.open ? 0 : dx / d * 3.2 * pull).toFixed(2) + 'px'); pip.style.setProperty('--ey', (S.open ? 0 : dy / d * 2.4 * pull).toFixed(2) + 'px');
+  pip.style.setProperty('--ex', (dx / d * (S.open ? 1.6 : 3.2) * pull).toFixed(2) + 'px'); pip.style.setProperty('--ey', (dy / d * (S.open ? 1.2 : 2.4) * pull).toFixed(2) + 'px');
 });
 api.onTray(list => { S.tray = list; draw(); });
 api.onClips(list => { S.clips = list; draw(); });
@@ -301,5 +469,7 @@ api.onChanged(async () => {
   t = window.makeT(init.strings); document.documentElement.lang = init.settings.lang;
   Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art });
   S.spotify.on = init.spotify; S.hubError = await api.hubError();
+  // Peep was closed while a mode was running: put the focus guard back the way it was before the mode
+  if (S.settings.modeRestore) await save({ modeRestore: null, guard: { on: Boolean(S.settings.modeRestore.guardOn) } });
   applyMascot(); drawTabs(); drawPill(); setInterval(second, 1000);
 })();

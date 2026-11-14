@@ -12,10 +12,11 @@ contextBridge.exposeInMainWorld('peep', {
   spotifyLogin: call('spotify:login'), spotifyLogout: call('spotify:logout'), spotifyDevices: call('spotify:devices'), spotifyTransfer: call('spotify:transfer'),
   media: call('media:cmd'), setVolume: call('volume:set'), lyrics: call('lyrics:get'),
   weather: call('weather:get'), calendar: call('calendar:get'), stats: call('stats:get'),
-  trayAdd: call('tray:add'), trayRemove: call('tray:remove'), trayOpen: call('tray:open'), copyClip: call('clips:copy'),
+  trayAdd: call('tray:add'), trayRemove: call('tray:remove'), trayOpen: call('tray:open'), copyClip: call('clips:copy'), clearClips: call('clips:clear'), quit: call('app:quit'),
   shareStart: call('share:start'), shareStop: call('share:stop'),
   ask: call('buddy:ask'), windows: call('buddy:windows'), guardChoice: call('guard:choice'),
   mouse: inside => ipcRenderer.send('island:mouse', Boolean(inside)), focus: onOff => ipcRenderer.send('island:focus', Boolean(onOff)),
+  dragOut: file => ipcRenderer.send('tray:drag', String(file)),
   pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
   onAi: on('ai:state'), onFinish: on('ai:finish'), onWin: on('win:state'), onTray: on('tray:changed'), onClips: on('clips:changed'),
   onToggle: on('island:toggle'), onArt: on('win:art'), onCursor: on('cursor'), onChanged: on('app:changed')

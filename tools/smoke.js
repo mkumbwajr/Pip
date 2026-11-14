@@ -53,7 +53,11 @@ app.whenReady().then(async () => {
   await wait(700); await shot('4-jibu-hapa');
   await js(`(() => { const i = document.querySelector('[data-reply-for]'); i.value = 'Iweke juu ya total'; document.querySelector('[data-reply]').click(); })()`);
   const woke = await reply;
-  for (const tab of ['home', 'tray', 'focus', 'ask', 'music']) { await js(`document.querySelector('[data-tab=${tab}]').click()`); await wait(tab === 'ask' ? 800 : 0); await shot('5-' + tab); }
+  require('electron').clipboard.writeText('src\locales'); await wait(1700); // something for the Copied page
+  for (const tab of ['home', 'focus', 'modes', 'tray', 'clips', 'note', 'calendar', 'ask', 'music']) { await js(`document.querySelector('[data-tab=${tab}]').click()`); await wait(tab === 'ask' ? 800 : 0); await shot('5-' + tab); }
+  await js(`(() => { const n = document.querySelector('[data-tab=note]'); n.click(); const a = document.querySelector('#note'); a.value = 'Shopping\n[ ] Maziwa\n[x] Mkate'; a.dispatchEvent(new Event('input', { bubbles: true })); })()`); await shot('5-note-list');
+  await js(`(() => { const b = document.querySelector('[data-tab=modes]'); b.click(); const r = b.getBoundingClientRect(), t = document.querySelector('[data-tab=tray]'); t.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); })()`); await shot('5-modes-tooltip');
+  await js(`document.querySelector('#pill-more').click()`); await shot('5-menu'); await js(`document.querySelector('#pill-more').click()`);
   await js(`document.querySelector('#pill').click()`); await wait(700); await shot('6-pill-in-use');
   console.log(JSON.stringify({ claudeHookEvents: Object.keys(config.hooks).length, stopHooks: config.hooks.Stop.length, statusLine: config.statusLine?.command.includes('peep-status.cjs') || false,
     sessionStartContext: (start.hookSpecificOutput?.additionalContext || '').slice(0, 60), statusLineText: status.out, decision, replyExit: woke.code, replyText: woke.err.trim().split('\n').pop(), rendererErrors: errors }, null, 1));
