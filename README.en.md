@@ -1,6 +1,6 @@
 # Pip
 
-**One Island to Rule All Agents.** A free, open-source status island for Windows. A small notch at the top of your
+**One island to Rule All Agents.** A free, open-source status island for Windows. A small notch at the top of your
 screen shows what your AI coding agents (Claude Code and Codex) are doing, and opens on hover into a panel of tools.
 The interface is in Tanzanian Swahili by default; English is in Settings.
 
@@ -8,7 +8,7 @@ The interface is in Tanzanian Swahili by default; English is in Settings.
 
 MIT licence. No account, no paywall, no telemetry.
 
-**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · version 0.5.0
+**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · version 0.6.0
 
 The installer is not code-signed yet, so Windows SmartScreen warns: choose "More info", then "Run anyway". Inside
 Pip, the `•••` menu → **Updates** tells you when a newer version is out.
@@ -23,7 +23,11 @@ Pip, the `•••` menu → **Updates** tells you when a newer version is out.
 | Usage chip for the 5-hour limit with a live countdown (status line, needs Node.js) | Tested end to end on Windows |
 | Agents told to answer in Tanzanian Swahili at session start | Tested against the hub; not seen in a real session |
 | Codex live status (hooks via `curl.exe`) | Hook install tested; not run against a real Codex |
-| Pip agent: ask, or explain / check / translate what you copied, in a new Claude or ChatGPT chat | Tab tested on Windows; opening the chat not clicked yet |
+| Chat with Pip right in the island (explain / check / translate what you copied, or ask about your screen), answered by your own Claude Code or Codex | Answer from the real Claude Code CLI tested on Windows (3.5 s); Codex not tried |
+| Welcome in six steps, redesigned Settings window with search, four Home layouts | Screenshots checked on Windows; clicked through in the smoke test |
+| Lyrics you can scroll, a click on a line jumps the song there | Drawn and checked on Windows with sample lyrics; seeking not tried on a live song |
+| A file arriving from the phone: progress in the island, confetti when it lands | Drawn on Windows; not yet tried with a real phone upload |
+| An agent error turns Pip's eyes and the glow red in the folded island | Drawn on Windows |
 | Music: now playing, cover art (fetched when missing), release year, controls, synced lyrics view | Tested on Windows with Media Player; the seek bar and fetched cover art not yet seen on a live song |
 | Focus timer, Modes (Work, Study, Sleep, Game) and the focus guard | Tested on Windows |
 | Calendar (day and month) and unread email count with Google sign-in | Tested end to end with a real Google account |
@@ -33,14 +37,16 @@ Pip, the `•••` menu → **Updates** tells you when a newer version is out.
 | Island brightness, size (80–140 %), transparency, Pip's colour and hat, hide tabs | Tested on Windows |
 | Spotify device switching (your own client ID, PKCE) | Token refresh and device list tested with a fake server; login not run |
 | Installer and uninstaller (plain NSIS, `build/pip.nsi`) | Built and opened on Windows |
+| **macOS build** (DMG for Intel and Apple silicon, built by GitHub Actions; Spotify and Music through AppleScript, volume) | Written, never run on a Mac. No focus guard, Wi-Fi or Bluetooth on the Mac yet. Not signed: right-click the app and choose Open the first time |
 
 ## Run it
 
 ```
 npm install
 npm start           # Ctrl+Alt+Space toggles the island
-npm test            # 32 Node tests, any OS
+npm test            # 34 Node tests, any OS
 npm run dist:win    # on Windows: Pip.exe and the installer in dist/ (needs makensis on PATH)
+npm run dist:mac    # on a Mac: dist/Pip-<version>-mac.dmg (GitHub Actions builds it on every push)
 PIP_HUB_PORT=48699 npx electron --no-sandbox tools/smoke.js out/   # full smoke test, next to a running Pip
 node tools/deploy-site.js [--site]                                 # publish pip.bang.co.tz (BANG DIGITAL's server)
 ```
@@ -72,8 +78,8 @@ replaces them with its own on its first start.
 ## What leaves your PC
 
 Only what you switch on: the town you type (Open-Meteo), song title and artist (lrclib.net for lyrics, iTunes Search
-for the year and cover art), your private calendar link, a screenshot and question to the agent you chose (through
-your own login), the Claude or ChatGPT page the Pip agent opens in your browser, Spotify if you connect it, Google if
+for the year and cover art), your private calendar link, a screenshot and question, or a chat with Pip, to the agent you
+chose (through your own login), Spotify if you connect it, Google if
 you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz when you check
 for updates. Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 

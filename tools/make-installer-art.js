@@ -1,5 +1,5 @@
 'use strict';
-// Draws the picture on the left of the installer's welcome and finish pages: the line "One Island to Rule All
+// Draws the picture on the left of the installer's welcome and finish pages: the line "One island to Rule All
 // Agents" over real screenshots of Pip (site/img), at twice NSIS's 164 x 314 so it stays sharp when Windows scales
 // the installer up. Rendered by Electron, saved as a 24-bit BMP (the format NSIS needs):
 //   npx electron tools/make-installer-art.js        ->  build/installer-side.bmp
@@ -23,7 +23,7 @@ h1 span { background: linear-gradient(90deg, #ffffff, #c9bfff 60%, #9b84ff); -we
 .b { top: 462px; width: 300px; transform: translateX(-50%) rotate(2deg); }
 </style>
 <span class="pip"><i></i><i></i></span>
-<h1>One Island<br>to Rule<br><span>All Agents</span></h1>
+<h1>One island<br>to Rule<br><span>All Agents</span></h1>
 <img class="shot pill" src="${img('pip-ruhusa.png')}">
 <img class="shot a" src="${img('pip-ai.png')}">
 <img class="shot b" src="${img('pip-lyrics.png')}">`;

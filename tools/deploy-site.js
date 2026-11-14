@@ -61,11 +61,14 @@ if (siteOnly) { // copied over the live files in place; download/ and latest.jso
 }
 fs.mkdirSync(path.join(out, 'download'));
 fs.copyFileSync(installer, path.join(out, 'download', `Pip-Setup-${version}.exe`));
-fs.writeFileSync(path.join(out, 'latest.json'), JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe` }) + '\n');
+// the Mac disk image is built on GitHub (macOS runner); put it in dist/ (gh run download -n Pip-mac -D dist) to publish it too
+const dmg = path.join(root, 'dist', `Pip-${version}-mac.dmg`), hasMac = fs.existsSync(dmg);
+if (hasMac) fs.copyFileSync(dmg, path.join(out, 'download', `Pip-${version}-mac.dmg`));
+fs.writeFileSync(path.join(out, 'latest.json'), JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, ...(hasMac ? { mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg` } : {}) }) + '\n');
 // upload next to the live folder, then swap, so visitors never see a half-copied site; only the newest installer is kept
 sh('rm -rf /srv/pip.new /srv/pip.old');
 copy(out, '/srv/pip.new', true);
 // Pip-Setup.exe always gives the newest: a link on the server, so the installer is uploaded only once
-sh(`set -e; ln -sf Pip-Setup-${version}.exe /srv/pip.new/download/Pip-Setup.exe; mkdir -p /srv/pip; mv /srv/pip /srv/pip.old; mv /srv/pip.new /srv/pip; chmod -R a+rX /srv/pip; rm -rf /srv/pip.old`);
+sh(`set -e; ln -sf Pip-Setup-${version}.exe /srv/pip.new/download/Pip-Setup.exe; ${hasMac ? `ln -sf Pip-${version}-mac.dmg /srv/pip.new/download/Pip-mac.dmg;` : ''} mkdir -p /srv/pip; mv /srv/pip /srv/pip.old; mv /srv/pip.new /srv/pip; chmod -R a+rX /srv/pip; rm -rf /srv/pip.old`);
 fs.rmSync(out, { recursive: true, force: true });
 console.log(`published Pip ${version} to https://${DOMAIN}`);

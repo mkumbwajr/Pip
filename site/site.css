@@ -70,7 +70,7 @@ html { transition: background-color .3s; }
 :is(.btn, .pill-btn, .link, summary, .nav a):focus-visible { outline: 2px solid var(--pip-2); outline-offset: 3px; border-radius: 8px; }
 
 /* hero */
-.hero { padding-top: 96px; text-align: center; }
+.hero { padding-top: 48px; text-align: center; }
 .eyebrow { font-size: 17px; font-weight: 600; color: var(--pip-2); margin-bottom: 14px; }
 h1 { font-size: clamp(44px, 8vw, 96px); line-height: 1.04; letter-spacing: -.045em; font-weight: 700; }
 .grad { background: linear-gradient(90deg, #f5f5f7 0%, #c9bfff 45%, #8f74ff 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -164,7 +164,7 @@ details p { padding: 0 4px 26px; color: var(--soft); font-size: 17px; max-width:
 @media (max-width: 734px) {
   :root { --gut: 18px; } html { font-size: 16px; }
   .nav nav { display: none; } .nav-in { justify-content: space-between; }
-  .hero { padding-top: 64px; } .desk { margin-top: 48px; padding: 8px; border-radius: 22px; } .desk-screen { border-radius: 15px; aspect-ratio: 4 / 3; } .desk-island { width: 92%; }
+  .hero { padding-top: 32px; } .desk { margin-top: 48px; padding: 8px; border-radius: 22px; } .desk-screen { border-radius: 15px; aspect-ratio: 4 / 3; } .desk-island { width: 92%; }
   .statement { padding-block: 100px 50px; }
   .bento { grid-template-columns: 1fr; gap: 14px; } .tile.wide { grid-column: auto; }
   .tile-text, .tile.wide .tile-text { padding: 30px 26px 0; } .tile > img, .tile.wide > img { width: calc(100% - 24px); margin: 22px 12px 12px; border-radius: 13px; }
@@ -184,6 +184,13 @@ details p { padding: 0 4px 26px; color: var(--soft); font-size: 17px; max-width:
 
 /* the island opening, right under the statement */
 .video-frame { max-width: var(--col); margin: 56px auto 0; padding: 0; border-radius: 30px; overflow: hidden; background: #0c0c0f; border: 1px solid var(--line); box-shadow: 0 50px 110px -40px rgba(124, 92, 255, .45), 0 30px 70px -30px rgba(0, 0, 0, .8); }
-.video-frame video { display: block; width: 100%; height: auto; aspect-ratio: 1400 / 780; }
+.video-frame video { display: block; width: 100%; height: auto; aspect-ratio: 1400 / 660; }
 .statement { max-width: var(--col); }
 @media (max-width: 734px) { .video-frame { margin-top: 36px; border-radius: 18px; } }
+
+/* the tabs in the video: the one on screen lights up, a click jumps the video there */
+.tour { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 22px auto 0; max-width: var(--col); }
+.tour button { height: 34px; padding: 0 15px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--soft); font: inherit; font-size: 14px; cursor: pointer; transition: background .25s, color .25s, border-color .25s; }
+.tour button:hover { color: var(--text); border-color: var(--soft); }
+.tour button.on { background: var(--text); border-color: var(--text); color: var(--bg); }
+@media (max-width: 734px) { .tour { gap: 6px; } .tour button { height: 30px; padding: 0 12px; font-size: 13px; } }
