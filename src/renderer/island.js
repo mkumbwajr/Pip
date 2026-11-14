@@ -7,11 +7,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const island = $('#island'), shell = $('#shell'), pill = $('#pill'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip'), bar = $('#bar'), tip = $('#tip'), menu = $('#menu'), volPop = $('#vol-pop');
 let t = window.makeT({});
 
-const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips', 'calendar']); // redrawn when data changes; the others hold what you are typing
+const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips', 'calendar', 'mail']); // redrawn when data changes; the others hold what you are typing
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#e8e8ee'];
 const AGENT = { claude: 'Claude Code', codex: 'Codex' };
 // Lists of words are built by functions so they follow the chosen language.
-const tabList = () => [['home', t('Home')], ['ai', t('Agents')], ['ask', t('Ask')], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')]];
+const tabList = () => [['home', t('Home')], ['ai', t('Agents')], ['ask', t('Ask')], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')], ['mail', t('Mail')]];
 const MODES = () => [['work', t('Work')], ['study', t('Study')], ['sleep', t('Sleep')], ['game', t('Game')]];
 const SITE_NAMES = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', reddit: 'Reddit', 'x.com': 'X', facebook: 'Facebook', netflix: 'Netflix' };
 const stateName = s => ({ idle: t('Idle'), working: t('Working'), asking: t('Needs you'), done: t('Done'), error: t('Error') }[s] || s);
@@ -23,7 +23,8 @@ const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: '
   weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
   platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false,
-  mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {} };
+  mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {},
+  google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0, list: null, listError: '', consent: false }, menuView: 'main', update: null };
 
 // ---------- small helpers ----------
 const locale = () => (S.settings?.lang === 'sw' ? 'sw-TZ' : undefined);
@@ -48,6 +49,7 @@ function chime(ok) {
 function songOf(m) { const x = !m.artist && String(m.title).match(/^(.+?)\s+[-–]\s+(.+)$/); return x ? { title: x[2], artist: x[1] } : { title: m.title, artist: m.artist }; }
 const APPS = { spotify: 'Spotify', zunemusic: 'Media Player', chrome: 'Chrome', msedge: 'Edge', firefox: 'Firefox', vlc: 'VLC' };
 const appName = id => { const s = String(id).toLowerCase(), k = Object.keys(APPS).find(k => s.includes(k)); return k ? APPS[k] : String(id).split(/[!\\]/).pop().replace(/\.exe$/i, ''); };
+const sameDay = (ms, d) => { const x = new Date(ms); return x.getFullYear() === d.getFullYear() && x.getMonth() === d.getMonth() && x.getDate() === d.getDate(); };
 function mediaPosition() { const m = S.win.media; if (!m) return 0; return Math.min(m.durationMs || Infinity, m.positionMs + (m.playing ? Date.now() - S.win.at : 0)); }
 
 // ---------- the pill ----------
@@ -67,13 +69,14 @@ function drawPill() {
   if (top?.state === 'working' && top.startedAt) side = time(Date.now() - top.startedAt);
   $('#pill-text').textContent = text; $('#pill-side').textContent = S.open ? clock() : side;
   if (S.open) {
-    $('#pill-date').textContent = dateLabel();
+    $('#pill-date').textContent = dateLabel(); drawNet();
     const u = S.ai.usage?.fiveHour; // the five-hour window is the one that runs out during a working day
     $('#pill-chip').textContent = u ? `${u.pct}%${u.resetsAt > Date.now() ? ' · ' + hms(u.resetsAt - Date.now()) : ''}` : '';
     const w = S.ai.usage?.sevenDay; // both windows on hover; the chip itself shows the one that runs out first
     $('#pill-chip').title = u ? `${t('Claude usage')}: ${t('5 hours')} ${u.pct}%${w ? ` · ${t('Week')} ${w.pct}%` : ''}` : '';
   }
   island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
+  document.documentElement.style.setProperty('--bright', S.settings?.island.brightness ?? 0.1);
   island.classList.toggle('bare', !S.open && !text && S.settings?.island.mode !== 'detach'); // attached and idle: only Pip in the notch
   // the shell's width is set in pixels so the change between sizes can be animated
   shell.style.width = S.open ? '' : Math.max(84, Math.min(440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
@@ -169,23 +172,50 @@ const pages = {
         ${row('block', 'shield', t('Block {sites}', { sites }))}${row('only', 'bell', t('Only {agent} can reach you', { agent }))}${row('music', 'music', t('Keep my music on'))}</div></div>`;
   },
   calendar() {
-    const now = new Date(), e = S.event, linked = /^https:\/\//.test(S.settings.calendarUrl || '');
-    const when = e && new Date(e.start).toLocaleString(locale(), e.allDay ? { weekday: 'long', day: 'numeric', month: 'short' } : { weekday: 'long', hour: 'numeric', minute: '2-digit' });
-    return `<div class="cal"><div class="cal-day"><div class="label">${esc(now.toLocaleDateString(locale(), { weekday: 'long' }))}</div><div class="cal-big">${now.getDate()}</div>
-      <div class="cal-month">${esc(now.toLocaleDateString(locale(), { month: 'long', year: 'numeric' }))}</div></div>
-      <div class="cal-next"><div class="label">${esc(t('Next'))}</div>${!linked ? `<h3>${esc(t('No calendar linked.'))}</h3><div><button class="wbtn sm" data-settings>${esc(t('Settings'))}</button></div>`
-        : e ? `<h3 class="cut">${esc(e.title)}</h3><p>${esc(when)}</p>` : `<h3>${esc(S.calLoaded ? t('Nothing planned') : '')}</h3>`}</div></div>`;
+    const c = S.cal, now = new Date(), linked = /^https:\/\//.test(S.settings.calendarUrl || '');
+    const head = c.view === 'day' ? t('Today') : now.toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
+    const seg = `<div class="seg2"><button class="${c.view === 'day' ? 'on' : ''}" data-cal-view="day">${esc(t('Day'))}</button><button class="${c.view === 'month' ? 'on' : ''}" data-cal-view="month">${esc(t('Month'))}</button></div>`;
+    const signIn = S.google ? '' : `<div class="cal-foot"><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button><button class="linkbtn" data-settings>${esc(t('Other calendar'))}</button></div>`;
+    let events = S.google ? c.events : (S.event ? [S.event] : (linked ? [] : null)); // the iCal link gives only the next event
+    const today = (events || []).filter(e => sameDay(e.start, now) || (e.start < now && e.end > now));
+    const next = today.find(e => (e.end || e.start) > Date.now()) || (!S.google && S.event && S.event.start > Date.now() ? S.event : null);
+    const title = c.error ? c.error : events === null ? (S.google ? '' : t('No calendar linked.')) : next ? next.title : t('Nothing planned');
+    const sub = next ? (next.allDay ? t('All day') : `${clock(new Date(next.start))}${next.end ? ' – ' + clock(new Date(next.end)) : ''}${sameDay(next.start, now) ? '' : ' · ' + new Date(next.start).toLocaleDateString(locale(), { weekday: 'short', day: 'numeric', month: 'short' })}`) : '';
+    if (c.view === 'month') {
+      const first = new Date(now.getFullYear(), now.getMonth(), 1), days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), lead = (first.getDay() + 6) % 7; // weeks start on Monday
+      const busy = new Set((events || []).map(e => new Date(e.start).getDate()));
+      const names = [...Array(7)].map((_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(locale(), { weekday: 'narrow' }));
+      const cells = [...Array(lead)].map(() => '<span></span>').concat([...Array(days)].map((_, i) => `<span class="${i + 1 === now.getDate() ? 'today' : ''} ${busy.has(i + 1) ? 'busy' : ''}">${i + 1}</span>`));
+      return `<div class="cal2"><div class="cal-top"><span class="label">${esc(head)}</span>${seg}</div>
+        <div class="month"><div class="month-names">${names.map(n => `<span>${esc(n)}</span>`).join('')}</div><div class="month-days">${cells.join('')}</div></div>${signIn}</div>`;
+    }
+    const H0 = 8, H1 = 20, pct = ms => { const d = new Date(ms); return Math.max(0, Math.min(100, ((d.getHours() + d.getMinutes() / 60) - H0) / (H1 - H0) * 100)); };
+    const blocks = today.filter(e => !e.allDay).map(e => `<i class="ev" data-left="${pct(e.start)}" data-w="${Math.max(1.2, pct(e.end || e.start + 1800e3) - pct(e.start))}" title="${esc(e.title)}"></i>`).join('');
+    const ticks = []; for (let h = H0; h <= H1; h++) ticks.push(`<i class="${(h - H0) % 4 ? '' : 'major'}" data-left="${(h - H0) / (H1 - H0) * 100}"></i>${(h - H0) % 4 ? '' : `<span data-left="${(h - H0) / (H1 - H0) * 100}">${String(h).padStart(2, '0')}:00</span>`}`);
+    return `<div class="cal2"><div class="cal-top"><span class="label">${esc(head)}</span>${seg}</div>
+      <h3 class="cal-title cut">${esc(title)}</h3><div class="cal-sub">${esc(sub)}</div>
+      <div class="timeline">${blocks}${ticks.join('')}<i class="now" id="cal-now" data-left="${pct(Date.now())}"></i></div>${signIn}</div>`;
+  },
+  mail() {
+    const m = S.mail;
+    if (!S.google) return `<div class="ml"><span class="ml-ico">${icon('mail')}</span><p>${esc(t('See how many emails are waiting and who the newest are from.'))}</p><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button></div>`;
+    const rows = m.consent ? `<div class="ml-empty"><p>${esc(t('Sign in again to let Peep show your newest emails.'))}</p><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button></div>`
+      : m.list === null ? `<div class="ml-empty dim">${esc(m.listError || '')}</div>`
+      : !m.list.length ? `<div class="ml-empty dim">${esc(t('Your inbox is empty.'))}</div>`
+      : m.list.map(x => `<button class="ml-row ${x.unread ? 'unread' : ''}" data-mail="${esc(x.id)}" title="${esc(x.from.address)}"><i></i><span class="ml-who cut">${esc(x.from.name)}</span><span class="ml-when">${esc(mailAge(x.at))}</span><span class="ml-subj cut">${esc(x.subject || t('(no subject)'))}</span></button>`).join('');
+    return `<div class="ml2"><div class="ml-side"><span class="label">${esc(t('Inbox'))}</span><div class="ml-count">${m.count === null ? '–' : m.count}</div><p>${esc(m.error || (m.count === 1 ? t('unread email in your inbox') : t('unread emails in your inbox')))}</p></div>
+      <div class="ml-list">${rows}</div></div>`;
   },
   ask() {
     const a = S.ask;
     return `<h2>${esc(t('Ask about your screen'))}</h2><div class="dim small">${esc(t('{name} takes one screenshot and asks {agent} through your own login.', { name: S.settings.mascot.name, agent: AGENT[S.settings.buddyAgent] }))}</div>
-      <div class="shots"><button class="shot ${a.pick ? '' : 'on'}" data-pick=""><span>${esc(t('Whole screen'))}</span></button>${a.windows.map(w => `<button class="shot ${a.pick === w.id ? 'on' : ''}" data-pick="${esc(w.id)}"><img alt="" src="${esc(w.thumb)}"><span class="cut">${esc(w.name)}</span></button>`).join('')}</div>
+      <div class="shots" id="shots"><button class="shot ${a.pick ? '' : 'on'}" data-pick=""><span class="shot-img whole">${icon('apps')}</span><span class="shot-name">${esc(t('Whole screen'))}</span></button>${a.windows.map(w => `<button class="shot ${a.pick === w.id ? 'on' : ''}" data-pick="${esc(w.id)}" title="${esc(w.name)}"><img class="shot-img" alt="" src="${esc(w.thumb)}"><span class="shot-name">${esc(w.name)}</span></button>`).join('')}</div>
       <textarea id="question" rows="2" placeholder="${esc(t('What does this error mean?'))}"></textarea><br><br><button class="btn primary" id="ask-go" ${a.busy ? 'disabled' : ''}>${esc(a.busy ? t('Looking…') : t('Ask'))}</button>
       ${a.error ? `<div class="card" data-kind="error">${esc(a.error)}</div>` : ''}${a.text ? `<div class="card answer">${esc(a.text)}</div>` : ''}`;
   }
 };
 
-const FILL = new Set(['home', 'music', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
+const FILL = new Set(['home', 'music', 'mail', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
 function draw(force) {
   drawPill();
   if (!S.open || S.dragging || (!force && (!LIVE.has(S.tab) || typing()))) return;
@@ -198,12 +228,14 @@ function draw(force) {
   for (const el of page.querySelectorAll('[data-kind=error]')) el.style.color = 'var(--error)';
   for (const el of page.querySelectorAll('[data-flat]')) el.style.margin = '0';
   if (S.tab === 'note') drawNoteSide();
+  if (S.tab === 'ask') shotFades();
   tick();
 }
 function drawTabs() {
-  tabs.innerHTML = tabList().map(([id, name]) => `<button type="button" data-tab="${id}" data-tip="${esc(name)}" aria-label="${esc(name)}" class="${id === S.tab ? 'on' : ''}">${icon(id)}<b>${esc(name)}</b></button>`).join('');
-  const gear = $('#bar-settings'), vol = $('#bar-vol');
-  gear.innerHTML = icon('gear'); gear.dataset.tip = t('Settings'); gear.setAttribute('aria-label', t('Settings'));
+  const hidden = new Set(S.settings?.hiddenTabs || []);
+  tabs.innerHTML = tabList().filter(([id]) => id === 'home' || !hidden.has(id)).map(([id, name]) => `<button type="button" data-tab="${id}" data-tip="${esc(name)}" aria-label="${esc(name)}" class="${id === S.tab ? 'on' : ''}">${icon(id)}<b>${esc(name)}</b></button>`).join('');
+  const gear = $('#bar-bright'), vol = $('#bar-vol');
+  gear.innerHTML = icon('sun'); gear.dataset.tip = t('Background brightness'); gear.setAttribute('aria-label', t('Background brightness')); $('#bright-ico').innerHTML = icon('sun');
   vol.innerHTML = icon('volume'); vol.dataset.tip = t('Volume'); vol.setAttribute('aria-label', t('Volume'));
   $('#vol-ico').innerHTML = icon('volume'); $('#pill-more').innerHTML = icon('dots'); $('#pill-more').setAttribute('aria-label', t('Menu'));
   drawPill();
@@ -212,7 +244,8 @@ function go(tab) {
   S.tab = tab; showMenu(false); drawTabs(); draw(true); hideTip();
   page.classList.remove('in'); void page.offsetWidth; page.classList.add('in'); // replay the short entrance of the page
   if (tab === 'home') refreshHome();
-  if (tab === 'calendar') api.calendar().then(e => { S.event = e; S.calLoaded = true; draw(); });
+  if (tab === 'calendar') refreshCalendar();
+  if (tab === 'mail') refreshMail();
   if (tab === 'ask') api.windows().then(list => { S.ask.windows = list || []; if (S.tab === 'ask' && !typing()) draw(true); });
   if (tab === 'music' && S.spotify.on) refreshDevices();
 }
@@ -222,15 +255,38 @@ function setOpen(open) {
   if (open === S.open) return;
   S.open = open;
   if (open) go(S.tab);
-  else { S.pinned = false; S.auto = false; showMenu(false); showVolume(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
+  else { S.pinned = false; S.auto = false; showMenu(false); showVolume(false); showBright(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
 }
 function openSettings() { api.openSettings(); setOpen(false); }
 
 // ---------- the menu behind the dots, the volume pop-up and the tooltips over the bar ----------
-function showMenu(on) {
-  S.menu = on; menu.hidden = !on;
-  if (on) menu.innerHTML = `<button data-menu="settings">${icon('gear')}${esc(t('Settings'))}</button>
-    <button data-menu="pin">${icon('tray')}${esc(S.pinned ? t('Fold') : t('Keep open'))}</button><hr><button class="quit" data-menu="quit">${esc(t('Quit Peep'))}</button>`;
+function showMenu(on, view = 'main') {
+  S.menu = on; S.menuView = view; menu.hidden = !on; if (!on) return;
+  const v = S.win.volume, back = title => `<div class="mn-head"><button class="mn-back" data-menu="main" aria-label="${esc(t('Back'))}">${icon('back')}</button><b>${esc(title)}</b></div>`;
+  const tile = (id, ico, name, cls = '') => `<button class="mn-tile ${cls}" data-menu="${id}">${icon(ico)}<span>${esc(name)}</span></button>`;
+  if (view === 'apps') menu.innerHTML = back(t('All apps')) + `<div class="mn-grid four mn-scroll">${tabList().map(([id, name]) => `<button class="mn-tile" data-menu-tab="${id}">${icon(id)}<span>${esc(name)}</span></button>`).join('')}</div>`;
+  else if (view === 'customize') {
+    const hidden = new Set(S.settings.hiddenTabs || []);
+    menu.innerHTML = back(t('Customize')) + `<div class="mn-list mn-scroll">${tabList().filter(([id]) => id !== 'home').map(([id, name]) => `<div class="mn-row">${icon(id)}<span>${esc(name)}</span><button class="sw ${hidden.has(id) ? '' : 'on'}" data-hide="${id}" aria-label="${esc(name)}"></button></div>`).join('')}</div>`;
+  }
+  else if (view === 'updates') {
+    const u = S.update;
+    menu.innerHTML = back(t('Updates')) + `<div class="mn-upd">${!u ? esc(t('Checking…')) : !u.ok ? esc(t('Could not check: {error}', { error: u.error })) : u.newer
+      ? `<b>${esc(t('Peep {version} is out', { version: u.latest }))}</b><button class="wbtn sm" data-release="${esc(u.url)}">${esc(t('Download'))}</button>` : esc(t('You have the newest Peep ({version}).', { version: u.current }))}</div>`;
+  }
+  else menu.innerHTML = (v ? `<div class="mn-vol">${icon('volume')}<input type="range" id="mvol" min="0" max="100" value="${v.level}" aria-label="${esc(t('Volume'))}"></div>` : '')
+    + `<div class="mn-grid">${tile('apps', 'apps', t('All apps'))}${tile('customize', 'pencil', t('Customize'))}${tile('settings', 'gear', t('Settings'))}${tile('updates', 'refresh', t('Updates'))}${tile('fold', 'up', t('Fold in'))}${tile('quit', 'power', t('Quit'), 'quit')}</div>`;
+  const mv = $('#mvol'); if (mv) mv.style.setProperty('--fill', mv.value + '%');
+  menuFades();
+}
+/** Lists in the menu fade at the top or bottom only while there is more to scroll that way. */
+function menuFades() {
+  for (const el of menu.querySelectorAll('.mn-scroll')) { el.classList.toggle('fade-t', el.scrollTop > 2); el.classList.toggle('fade-b', el.scrollHeight - el.clientHeight - el.scrollTop > 2); }
+}
+menu.addEventListener('scroll', menuFades, true);
+function showBright(on) {
+  S.bright = on; $('#bright-pop').hidden = !on; $('#bar-bright').classList.toggle('on', on);
+  if (on) { const v = Math.round((S.settings.island.brightness ?? 0.1) * 100); $('#qbright').value = v; $('#qbright-n').textContent = v + '%'; }
 }
 function showVolume(on) {
   const v = S.win.volume; S.vol = on && Boolean(v); volPop.hidden = !S.vol; $('#bar-vol').classList.toggle('on', S.vol);
@@ -292,6 +348,7 @@ function tick() {
   if (fd) fd.textContent = t('Done at {time}', { time: clock(new Date(Date.now() + S.focus.left * 1000)) });
   if (mark) mark.style.left = Math.min(100, S.focus.left / 36) + '%'; // 60 minutes = 3600 s = 100%
   if (ml) ml.textContent = time(S.focus.left * 1000);
+  const cn = $('#cal-now'); if (cn) { const d = new Date(); cn.style.left = Math.max(0, Math.min(100, ((d.getHours() + d.getMinutes() / 60) - 8) / 12 * 100)) + '%'; }
 }
 
 // ---------- modes: a timer plus three switches; stopping puts the focus guard back the way it was ----------
@@ -340,6 +397,77 @@ page.addEventListener('pointerdown', e => {
 });
 page.addEventListener('wheel', e => { const el = e.target.closest('.md-time'); if (el) { e.preventDefault(); setModeMinutes(S.modePick || S.mode?.id || 'work', e.deltaY < 0 ? 5 : -5); } }, { passive: false });
 
+async function refreshCalendar() {
+  if (!S.google) { S.event = await api.calendar(); S.calLoaded = true; S.cal.error = ''; return draw(); }
+  const now = new Date(), from = S.cal.view === 'day' ? new Date(now.getFullYear(), now.getMonth(), now.getDate()) : new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = S.cal.view === 'day' ? new Date(from.getTime() + 86400e3) : new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const r = await api.googleEvents(from.getTime(), to.getTime()); S.cal.events = r.ok ? r.events : []; S.cal.error = r.ok ? '' : r.error; draw();
+}
+async function refreshMail() {
+  if (!S.google || Date.now() - S.mail.at < 60e3) return draw(); // at most once a minute
+  const [c, l] = await Promise.all([api.googleUnread(), api.googleRecent()]);
+  S.mail = { count: c.ok ? c.count : S.mail.count, error: c.ok ? '' : c.error, at: Date.now(),
+    list: l.ok ? l.mails : null, listError: l.ok ? '' : l.error, consent: Boolean(l.needsConsent) };
+  draw();
+}
+/** "14:05" today, "Mon" this week, "3 Nov" before that */
+function mailAge(ms) {
+  const d = new Date(ms), now = new Date();
+  if (sameDay(ms, now)) return clock(d);
+  return now - d < 6 * 86400e3 ? d.toLocaleDateString(locale(), { weekday: 'short' }) : d.toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+}
+async function signInGoogle() {
+  S.cal.error = t('Finish the login in your browser…'); draw(true);
+  const r = await api.googleLogin(); S.cal.error = '';
+  if (r.ok) { S.google = true; S.mail.at = 0; if (S.tab === 'mail') refreshMail(); else refreshCalendar(); }
+  else if (r.needsClient) openSettings();
+  else { S.cal.error = r.error; S.mail.error = r.error; draw(true); }
+}
+/** The screenshot strip fades out at an edge only while there is more to scroll that way. */
+function shotFades() {
+  const el = $('#shots'); if (!el) return;
+  const more = el.scrollWidth - el.clientWidth - el.scrollLeft;
+  el.classList.toggle('fade-l', el.scrollLeft > 2); el.classList.toggle('fade-r', more > 2);
+}
+page.addEventListener('scroll', e => { if (e.target.id === 'shots') shotFades(); }, true);
+page.addEventListener('wheel', e => { const el = e.target.closest?.('#shots'); if (el && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { e.preventDefault(); el.scrollLeft += e.deltaY; } }, { passive: false });
+
+// ---------- music: the glow takes the artwork's main colour ----------
+/** The most vivid common colour of a picture: a 24 x 24 copy, pixels weighted by how colourful they are. */
+function artColor(b64) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 24; const g = c.getContext('2d', { willReadFrequently: true });
+        g.drawImage(img, 0, 0, 24, 24); const px = g.getImageData(0, 0, 24, 24).data;
+        let r = 0, gr = 0, b = 0, w = 0;
+        for (let i = 0; i < px.length; i += 4) {
+          const R = px[i], G = px[i + 1], B = px[i + 2], max = Math.max(R, G, B), min = Math.min(R, G, B);
+          const k = ((max - min) / 255) ** 2 * (max > 30 ? 1 : 0) + 0.02; // greys and near-black count for little
+          r += R * k; gr += G * k; b += B * k; w += k;
+        }
+        const col = [r / w, gr / w, b / w], top = Math.max(...col) || 1, lift = Math.min(2.2, 220 / top); // bright enough to glow
+        resolve(`rgb(${col.map(v => Math.round(Math.min(255, v * lift))).join(',')})`);
+      } catch { resolve(''); }
+    };
+    img.onerror = () => resolve('');
+    img.src = 'data:image/jpeg;base64,' + b64;
+  });
+}
+async function applyArtColor() {
+  const m = S.win.media, art = m && S.art?.key === m.title + '|' + m.artist ? S.art.data : '';
+  const col = art ? await artColor(art) : '';
+  if (col) island.style.setProperty('--art', col); else island.style.removeProperty('--art');
+}
+// Wi-Fi and Bluetooth after the date: lit when on, dim when off; a click switches the radio
+let netKey = '';
+function drawNet() {
+  const n = S.win.net, box = $('#pill-net'), key = JSON.stringify(n || null); if (key === netKey) return; netKey = key;
+  const b = (kind, ico, on, tip) => `<button type="button" class="net ${on ? 'on' : ''}" data-radio-kind="${kind}" data-on="${on ? 1 : 0}" title="${esc(tip)}" aria-label="${esc(tip)}">${icon(ico)}</button>`;
+  box.innerHTML = (n?.wifi ? b('WiFi', 'wifi', n.wifi.on, n.wifi.on ? (n.wifi.ssid ? 'Wi-Fi · ' + n.wifi.ssid : 'Wi-Fi') : t('Wi-Fi is off')) : '')
+    + (n?.bt ? b('Bluetooth', 'bt', n.bt.on, n.bt.on ? 'Bluetooth' : t('Bluetooth is off')) : '');
+}
 async function refreshHome() { const [w, e] = await Promise.all([api.weather(), api.calendar()]); S.weather = w && !w.error ? w : null; S.event = e; draw(); }
 async function refreshDevices() { const r = await api.spotifyDevices(); S.spotify = { on: r.ok || r.connected !== false, devices: r.devices || [], error: r.ok ? '' : r.error }; draw(); }
 async function refreshLyrics() {
@@ -364,28 +492,50 @@ async function sendReply(id) {
 // a click on the strip pins the island open; another click (or Esc) lets it fold away again
 pill.addEventListener('click', e => {
   if (e.target.closest('#pill-more')) { e.stopPropagation(); showVolume(false); return showMenu(!S.menu); }
+  const r = e.target.closest('[data-radio-kind]');
+  if (r) { // show the change at once; the helper reports the real state a moment later
+    e.stopPropagation(); const on = r.dataset.on !== '1', n = S.win.net, k = r.dataset.radioKind === 'WiFi' ? 'wifi' : 'bt';
+    api.setRadio(r.dataset.radioKind, on); if (n?.[k]) { n[k].on = on; drawNet(); } return;
+  }
   if (S.open && S.pinned) setOpen(false); else { S.pinned = true; if (S.open) drawPill(); else setOpen(true); }
 });
 pill.addEventListener('keydown', e => { if (e.target === pill && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pill.click(); } });
 bar.addEventListener('click', e => {
   if (e.target.closest('[data-settings]')) return openSettings();
-  if (e.target.closest('#bar-vol')) { showMenu(false); return showVolume(!S.vol); }
+  if (e.target.closest('#bar-vol')) { showMenu(false); showBright(false); return showVolume(!S.vol); }
+  if (e.target.closest('#bar-bright')) { showMenu(false); showVolume(false); return showBright(!S.bright); }
   const b = e.target.closest('[data-tab]'); if (b) { showVolume(false); go(b.dataset.tab); }
 });
-$('#qvol').addEventListener('input', e => { $('#qvol-n').textContent = e.target.value; api.setVolume(e.target.value); });
-menu.addEventListener('click', e => {
-  const b = e.target.closest('[data-menu]'); if (!b) return;
-  showMenu(false);
-  if (b.dataset.menu === 'settings') openSettings();
-  else if (b.dataset.menu === 'pin') { if (S.pinned) setOpen(false); else { S.pinned = true; drawPill(); } }
-  else if (b.dataset.menu === 'quit') api.quit();
+// brightness: shown at once while dragging, saved a moment after the last move
+$('#qbright').addEventListener('input', e => {
+  const v = +e.target.value; $('#qbright-n').textContent = v + '%'; S.settings.island.brightness = v / 100;
+  document.documentElement.style.setProperty('--bright', v / 100);
+  clearTimeout(showBright.t); showBright.t = setTimeout(() => save({ island: { brightness: v / 100 } }), 300);
 });
+$('#qvol').addEventListener('input', e => { $('#qvol-n').textContent = e.target.value; api.setVolume(e.target.value); });
+menu.addEventListener('click', async e => {
+  const b = e.target.closest('[data-menu], [data-menu-tab], [data-hide], [data-release]'); if (!b) return;
+  e.stopPropagation(); const d = b.dataset;
+  if (d.menuTab) { showMenu(false); go(d.menuTab); }
+  else if (d.hide) {
+    const hidden = new Set(S.settings.hiddenTabs || []); hidden.has(d.hide) ? hidden.delete(d.hide) : hidden.add(d.hide);
+    await save({ hiddenTabs: [...hidden] }); drawTabs(); showMenu(true, 'customize');
+  }
+  else if (d.release) api.openRelease(d.release);
+  else if (d.menu === 'main' || d.menu === 'apps' || d.menu === 'customize') showMenu(true, d.menu);
+  else if (d.menu === 'updates') { S.update = null; showMenu(true, 'updates'); S.update = await api.checkUpdate(); if (S.menu && S.menuView === 'updates') showMenu(true, 'updates'); }
+  else if (d.menu === 'settings') { showMenu(false); openSettings(); }
+  else if (d.menu === 'fold') { showMenu(false); setOpen(false); }
+  else if (d.menu === 'quit') api.quit();
+});
+menu.addEventListener('input', e => { if (e.target.id === 'mvol') { e.target.style.setProperty('--fill', e.target.value + '%'); api.setVolume(e.target.value); } });
 document.addEventListener('click', e => {
   if (S.menu && !e.target.closest('#menu, #pill-more')) showMenu(false);
   if (S.vol && !e.target.closest('#vol-pop, #bar-vol')) showVolume(false);
+  if (S.bright && !e.target.closest('#bright-pop, #bar-bright')) showBright(false);
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (S.menu || S.vol) { showMenu(false); showVolume(false); } else setOpen(false); }
+  if (e.key === 'Escape') { if (S.menu || S.vol || S.bright) { showMenu(false); showVolume(false); showBright(false); } else setOpen(false); }
   else if (e.key === 'Enter' && e.target.dataset?.replyFor) sendReply(e.target.dataset.replyFor);
 });
 document.addEventListener('mousemove', e => pointer(Boolean(e.target.closest && e.target.closest('#shell'))));
@@ -413,6 +563,9 @@ page.addEventListener('click', async e => {
   else if (d.share === 'stop') { await api.shareStop(); S.share = null; draw(); }
   else if (d.focus === 'toggle') { S.focus.running = !S.focus.running; draw(true); }
   else if (d.tabGo) go(d.tabGo);
+  else if (d.calView) { S.cal.view = d.calView; S.cal.events = null; draw(true); refreshCalendar(); }
+  else if (d.googleIn !== undefined) signInGoogle();
+  else if (d.mail) api.openMail(d.mail);
   else if (d.connect !== undefined) { const r = await api.connectAgent('claude', true); if (r?.agents) S.agents = r.agents; if (!r?.ok) openSettings(); else draw(true); }
   else if (d.modePick) { S.modePick = d.modePick; draw(true); }
   else if (d.modeGo) { if (S.mode?.id === d.modeGo) await stopMode(); else await startMode(d.modeGo); }
@@ -470,8 +623,8 @@ api.onAi(snap => {
   draw();
 });
 api.onFinish(entry => chime(entry.state === 'done'));
-api.onWin(state => { S.win = state; refreshLyrics(); refreshSongInfo(); draw(); });
-api.onArt(art => { S.art = art; if (S.tab === 'music') draw(); });
+api.onWin(state => { const was = S.win.media?.title; S.win = state; if (state.media?.title !== was) applyArtColor(); refreshLyrics(); refreshSongInfo(); draw(); });
+api.onArt(art => { S.art = art; applyArtColor(); if (S.tab === 'music') draw(); });
 // Pip looks at the pointer: the eyes shift a few pixels towards it, less when it is close
 api.onCursor(p => {
   const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);
@@ -483,7 +636,7 @@ api.onToggle(open => { if (open === true || !S.open) { S.pinned = true; setOpen(
 // something was changed in the settings window: take the new settings (a new language needs a fresh page)
 api.onChanged(async () => {
   const init = await api.init(), lang = S.settings.lang;
-  Object.assign(S, { settings: init.settings, agents: init.agents }); S.spotify.on = init.spotify;
+  Object.assign(S, { settings: init.settings, agents: init.agents }); S.spotify.on = init.spotify; S.google = init.google; drawTabs();
   if (init.settings.lang !== lang) return location.reload();
   applyMascot(); S.lyricsFor = ''; refreshLyrics(); if (S.open && S.tab === 'home') refreshHome(); else draw();
 });
@@ -492,8 +645,8 @@ api.onChanged(async () => {
   const init = await api.init();
   t = window.makeT(init.strings); document.documentElement.lang = init.settings.lang;
   Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art });
-  S.spotify.on = init.spotify; S.hubError = await api.hubError();
+  S.spotify.on = init.spotify; S.google = init.google; S.hubError = await api.hubError();
   // Peep was closed while a mode was running: put the focus guard back the way it was before the mode
   if (S.settings.modeRestore) await save({ modeRestore: null, guard: { on: Boolean(S.settings.modeRestore.guardOn) } });
-  applyMascot(); drawTabs(); drawPill(); setInterval(second, 1000);
+  applyMascot(); applyArtColor(); drawTabs(); drawPill(); setInterval(second, 1000);
 })();

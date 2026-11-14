@@ -56,7 +56,10 @@ const views = {
       <div class="panel">${check('s-sounds', s.sounds, esc(t('Chime when an agent finishes')))}${check('s-auto', S.autostart, esc(t('Start with Windows')))}</div>
       <div class="panel"><label class="field"><span>${esc(t('Town for the weather'))}</span><div class="row"><input type="text" class="grow" id="s-place" value="${esc(s.weather.place)}"><button class="btn" id="w-go">${esc(t('Check'))}</button></div></label>
         <div class="small dim" id="w-out"></div><br>
-        <label class="field"><span>${esc(t('Calendar link (private iCal address, https)'))}</span><input type="url" id="s-cal" value="${esc(s.calendarUrl)}"></label></div>`;
+        <label class="field"><span>${esc(t('Calendar link (private iCal address, https)'))}</span><input type="url" id="s-cal" value="${esc(s.calendarUrl)}"></label></div>
+      <div class="panel"><h2>Google</h2><div class="dim small">${esc(t('For your calendar, the number of unread emails, and the sender and subject of your 5 newest emails (never the text).'))}</div>
+        <div class="row" data-gap>${S.googleBuiltIn ? '<span class="grow"></span>' : `<input type="text" class="grow" id="go-id" placeholder="Client ID" value="${esc(s.google.clientId)}"><input type="password" class="grow" id="go-secret" placeholder="Client secret" value="${esc(s.google.secret)}">`}
+        <button class="btn ${S.google ? '' : 'primary'}" id="go-go">${esc(S.google ? t('Sign out') : t('Sign in with Google'))}</button></div><div class="small" id="go-error" data-kind="error"></div></div>`;
   },
   music() {
     const s = S.settings;
@@ -105,6 +108,12 @@ page.addEventListener('click', async e => {
   if (b.dataset.mode) { await save({ island: { mode: b.dataset.mode } }); draw(); }
   else if (b.dataset.color) { await save({ mascot: { color: b.dataset.color } }); draw(); }
   else if (b.id === 'w-go') { e.preventDefault(); checkWeather(); }
+  else if (b.id === 'go-go') {
+    if (S.google) { await api.googleLogout(); S.google = false; draw(); return; }
+    if ($('#go-id')) await save({ google: { clientId: $('#go-id').value.trim(), secret: $('#go-secret').value.trim() } });
+    $('#go-error').textContent = t('Finish the login in your browser…');
+    const r = await api.googleLogin(); S.google = r.ok; draw(); if (!r.ok) $('#go-error').textContent = r.error;
+  }
   else if (b.id === 'sp-go') {
     if (S.spotify) { await api.spotifyLogout(); S.spotify = false; draw(); return; }
     await save({ spotifyClientId: $('#sp-id').value.trim() }); $('#sp-error').textContent = t('Finish the login in your browser…');

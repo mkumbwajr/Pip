@@ -1,0 +1,5 @@
+{
+  "_why": "Copy to google-client.json and fill in a Google OAuth client of type Desktop app to build Peep with Google sign-in. google-client.json is kept out of git.",
+  "clientId": "",
+  "secret": ""
+}

@@ -46,7 +46,8 @@ kutengeneza installer.
 ## Kinachotoka nje ya PC yako
 
 Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo, jina la wimbo na msanii vinaenda lrclib.net (lyrics) na iTunes Search (mwaka wa wimbo), link ya kalenda
-inasomwa, swali la screen linaenda kwa agent uliyemchagua kupitia akaunti yako, na Spotify ukiiunganisha. Hooks,
+inasomwa, swali la screen linaenda kwa agent uliyemchagua kupitia akaunti yako, Spotify ukiiunganisha, Google ukiingia (kalenda yako, idadi ya email ambazo hujasoma, na mtumaji na subject ya email 5 za karibuni; maandishi ya email hayasomwi kamwe), na GitHub
+ukibonyeza Updates (kuangalia toleo jipya). Hooks,
 ulivyo-copy, noti na mafaili vinabaki kwenye PC.
 
 ## Kutafsiri

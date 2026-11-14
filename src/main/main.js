@@ -17,19 +17,22 @@ const { fetchLyrics } = require('./lyrics.js');
 const { fetchSongInfo } = require('./songinfo.js');
 const buddy = require('./buddy.js');
 const { Spotify } = require('./spotify.js');
+const { Google, clientFor } = require('./google.js');
+const { latestRelease } = require('./update.js');
 const { makeT } = require('../shared/i18n.js');
 
 // Peep.exe --remove-hooks: take Peep's entries out of the agents' config files and leave. The uninstaller runs this.
 if (process.argv.includes('--remove-hooks')) { try { hooks.uninstallClaude(); } catch {} try { hooks.uninstallCodex(); } catch {} app.exit(0); return; }
 if (!app.requestSingleInstanceLock()) { app.quit(); return; }
-app.setAppUserModelId('dev.peep.app');
+const APP_ID = 'dev.peep.app';
+app.setAppUserModelId(APP_ID);
 
 const data = (...p) => path.join(app.getPath('userData'), ...p);
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
 const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
-let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, quitting = false;
+let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, quitting = false;
 let strings = {}, t = makeT(strings);
 
 // ---------- language ----------
@@ -62,6 +65,19 @@ function token() {
 const send = (channel, payload) => { if (island && !island.isDestroyed()) island.webContents.send(channel, payload); };
 // Chromium's own network stack: it follows the Windows proxy and certificate settings, which Node's fetch does not
 const webFetch = (url, options) => net.fetch(url, options);
+
+// Windows shows a notification's app name and icon from the app ID's entry under HKCU\Software\Classes\AppUserModelId.
+// Without it, toasts and pop-ups fall back to "Electron". Written per user (no admin), refreshed at every start because
+// the icon file lives in Peep's own folder; the uninstaller removes the key.
+function registerAppId() {
+  if (process.platform !== 'win32') return;
+  try {
+    const png = data('peep-icon.png'); fs.mkdirSync(path.dirname(png), { recursive: true }); fs.writeFileSync(png, fs.readFileSync(ICON));
+    const key = 'HKCU\\Software\\Classes\\AppUserModelId\\' + APP_ID;
+    for (const [name, value] of [['DisplayName', 'Peep'], ['IconUri', png], ['IconBackgroundColor', 'FF0C0C10']])
+      spawnSync('reg', ['add', key, '/v', name, '/t', 'REG_SZ', '/d', value, '/f'], { windowsHide: true, timeout: 5000 });
+  } catch {}
+}
 
 // ---------- the island window ----------
 function displayFor() { const all = screen.getAllDisplays(); return all[store.get('island.display')] || screen.getPrimaryDisplay(); }
@@ -196,9 +212,13 @@ function checkGuard(front) {
   if ((snoozed.get(hit) || 0) > Date.now()) return;
   guarding = { hit, hwnd: front.hwnd };
   const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-  guardWin = new BrowserWindow({ ...d.bounds, frame: false, transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false,
+  // covers the screen with a light dim (drawn by the page) so the distracting window waits behind it; shown only once
+  // drawn, so there is no white flash, and focused so Esc and the buttons work straight away
+  guardWin = new BrowserWindow({ ...d.bounds, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, alwaysOnTop: true, skipTaskbar: true,
+    resizable: false, movable: false, minimizable: false, maximizable: false, show: false, title: 'Peep',
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   guardWin.setAlwaysOnTop(true, 'screen-saver');
+  guardWin.once('ready-to-show', () => { guardWin?.show(); guardWin?.focus(); });
   guardWin.loadFile(path.join(RENDERER, 'guard.html'), { query: { what: hit } });
   guardWin.on('closed', () => { guardWin = null; guarding = null; });
 }
@@ -210,7 +230,7 @@ const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e)
 function wireIpc() {
   handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
     art: helper.art, tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
-    strings, languages: languages(), node: hasNode(), spotify: spotify.connected }));
+    strings, languages: languages(), node: hasNode(), spotify: spotify.connected, google: google.connected, googleBuiltIn: Boolean(clientFor(null)) }));
   handle('app:strings', () => strings);
   handle('settings:set', patch => {
     if (!patch || typeof patch !== 'object') return store.all();
@@ -232,6 +252,19 @@ function wireIpc() {
   handle('spotify:logout', () => { spotify.logout(); changed(); return { ok: true }; });
   handle('spotify:devices', async () => { try { return { ok: true, devices: await spotify.devices() }; } catch (e) { return { ok: false, error: String(e.message || e), connected: spotify.connected }; } });
   handle('spotify:transfer', async id => { try { await spotify.transfer(id); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('google:login', async () => {
+    const c = clientFor(store.get('google')); if (!c) return { ok: false, error: t('Paste the client ID and client secret of your Google desktop app first.'), needsClient: true };
+    try { await google.login(c.clientId, c.secret); changed(); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; }
+  });
+  handle('google:logout', () => { google.logout(); changed(); return { ok: true }; });
+  handle('google:events', async (from, to) => { try { return { ok: true, events: await google.events(Number(from), Number(to)) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('google:unread', async () => { try { return { ok: true, count: await google.unread() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('google:recent', async () => { try { return { ok: true, mails: await google.recent(5) }; } catch (e) { return { ok: false, error: String(e.message || e), needsConsent: e.code === 'scope' }; } });
+  // opens one of those emails in Gmail in the browser (only Gmail's own address, with a message id from the list)
+  handle('google:openMail', id => (/^[0-9a-f]{6,32}$/i.test(String(id)) ? shell.openExternal('https://mail.google.com/mail/u/0/#inbox/' + id) : null));
+  // Updates: asks GitHub (only when you press the button) for the newest release, and opens its page to download it
+  handle('app:update', async () => { try { return { ok: true, ...(await latestRelease({ current: app.getVersion(), fetchImpl: webFetch })) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('app:release', url => (/^https:\/\/github\.com\/mkumbwajr\/Peep\/releases\//.test(String(url)) ? shell.openExternal(String(url)) : null));
   handle('buddy:windows', async () => {
     const list = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 240, height: 150 } });
     return list.filter(s => s.name && s.name !== 'Peep' && !s.thumbnail.isEmpty()).slice(0, 12).map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail.toDataURL() }));
@@ -257,7 +290,7 @@ function wireIpc() {
     try { e.sender.startDrag({ file: p, icon }); } catch {}
   });
   handle('share:start', async () => {
-    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(app.getPath('downloads'), 'Peep'), onReceive: p => { addToTray([p]); new Notification({ title: 'Peep', body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
+    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(app.getPath('downloads'), 'Peep'), onReceive: p => { addToTray([p]); new Notification({ title: 'Peep', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
     try { const s = await share.start(); return { ok: true, ...s, qr: await require('qrcode').toDataURL(s.url, { margin: 1, width: 220 }) }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
@@ -289,13 +322,19 @@ function wireIpc() {
 
 // ---------- start ----------
 app.whenReady().then(async () => {
-  store = new Store(data('settings.json')); loadLanguage();
+  store = new Store(data('settings.json')); loadLanguage(); registerAppId();
   const vault = data('spotify.bin');
   spotify = new Spotify({
     t: (...a) => t(...a), fetchImpl: webFetch,
     open: url => shell.openExternal(url),
     load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(vault))); } catch { return null; } },
     save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(vault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(vault, { force: true }); } catch {} }
+  });
+  const gvault = data('google.bin');
+  google = new Google({
+    t: (...a) => t(...a), fetchImpl: webFetch, open: url => shell.openExternal(url),
+    load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(gvault))); } catch { return null; } },
+    save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(gvault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(gvault, { force: true }); } catch {} }
   });
   try { const t = JSON.parse(fs.readFileSync(trayFile(), 'utf8')); if (Array.isArray(t)) trayFiles = t.map(String); } catch {}
   hub = new Hub({ token: token(), historyFile: data('history.json') });
@@ -304,7 +343,7 @@ app.whenReady().then(async () => {
   hub.on('finish', ({ session, entry }) => {
     send('ai:finish', entry);
     const name = session.agent === 'codex' ? 'Codex' : 'Claude Code';
-    try { new Notification({ title: entry.state === 'done' ? t('{agent} is done', { agent: name }) : t('{agent} hit an error', { agent: name }), body: entry.project ? `${entry.project}: ${entry.prompt}` : entry.prompt, silent: true }).show(); } catch {}
+    try { new Notification({ title: entry.state === 'done' ? t('{agent} is done', { agent: name }) : t('{agent} hit an error', { agent: name }), icon: ICON, body: entry.project ? `${entry.project}: ${entry.prompt}` : entry.prompt, silent: true }).show(); } catch {}
   });
   let hubError = '';
   try { await hub.start(); } catch (e) { hubError = e.code === 'EADDRINUSE' ? t('Port 48611 is in use by another program.') : String(e.message || e); }

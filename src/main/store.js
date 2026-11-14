@@ -8,8 +8,10 @@ const DEFAULTS = {
   lang: 'sw',            // 'sw' Kiswahili (Tanzania) or 'en' English
   agentLanguage: true,   // ask the agents to answer in the app's language
   spotifyClientId: '',
+  google: { clientId: '', secret: '' }, // your own Google "Desktop app" OAuth client, for calendar and the unread count
+  hiddenTabs: [],        // tabs taken off the bar with Customize (Home always stays)
   agents: { claude: false, codex: false },
-  island: { display: 0, mode: 'attach', opacity: 1 }, // attach: joined to the top edge; detach: floating just below it
+  island: { display: 0, mode: 'attach', opacity: 1, brightness: 0.1 }, // attach: joined to the top edge; detach: floating just below it. brightness: the tab colour behind the pages
   mascot: { name: 'Pip', color: '#7c5cff', hat: 'none' },
   sounds: true,
   lyrics: true,

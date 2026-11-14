@@ -23,6 +23,8 @@ VIAddVersionKey "LegalCopyright" "BANG DIGITAL LTD"
 
 ; ---------- the look: Modern UI with a welcome page (Peep's picture on the left), progress, and a finish page ----------
 !include "MUI2.nsh"
+!define MUI_ICON "peep.ico"                                   ; Pip's head, drawn by tools/make-icon.js
+!define MUI_UNICON "peep.ico"
 !include "nsDialogs.nsh"
 !define MUI_WELCOMEFINISHPAGE_BITMAP "installer-side.bmp"      ; drawn by tools/make-installer-art.js
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "installer-side.bmp"
@@ -76,4 +78,5 @@ Section "Uninstall"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Peep"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKCU "${UNINST}"
+  DeleteRegKey HKCU "Software\Classes\AppUserModelId\dev.peep.app" ; the name and icon Windows shows on notifications
 SectionEnd

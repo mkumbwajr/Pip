@@ -12,7 +12,7 @@ test('i18n: translates, fills values, falls back to English', () => {
 
 test('swahili: every text used in the app has a translation, and none is left over', () => {
   const root = path.join(__dirname, '..', 'src'), used = new Set();
-  const files = ['renderer/island.js', 'renderer/settings.js', 'renderer/guard.js', 'main/main.js', 'main/share.js', 'main/buddy.js', 'main/spotify.js'];
+  const files = ['renderer/island.js', 'renderer/settings.js', 'renderer/guard.js', 'main/main.js', 'main/share.js', 'main/buddy.js', 'main/spotify.js', 'main/google.js'];
   for (const f of files) for (const m of fs.readFileSync(path.join(root, f), 'utf8').matchAll(/\bt\('((?:[^'\\]|\\.)+)'/g)) used.add(m[1].replace(/\\'/g, "'"));
   const sw = JSON.parse(fs.readFileSync(path.join(root, 'locales', 'sw.json'), 'utf8'));
   assert.deepEqual([...used].filter(k => !sw[k]).sort(), [], 'missing from sw.json');

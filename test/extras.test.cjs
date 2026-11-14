@@ -89,3 +89,36 @@ test('song info: picks the first release of the same song, never a remix; caches
   assert.deepEqual(await fetchSongInfo({ title: 'Blinding Lights', artist: 'The Weeknd' }, { cacheDir: dir, fetchImpl: fake }), { year: 2019, album: 'After Hours' });
   await fetchSongInfo({ title: 'Blinding Lights', artist: 'The Weeknd' }, { cacheDir: dir, fetchImpl: fake }); assert.equal(calls, 1);
 });
+
+test('google: events become { title, start, end, allDay }, cancelled ones dropped; scopes stay read-only', () => {
+  const { toEvents, authorizeUrl, SCOPES } = require('../src/main/google.js');
+  const out = toEvents([
+    { summary: 'Standup', start: { dateTime: '2026-11-14T09:00:00Z' }, end: { dateTime: '2026-11-14T09:15:00Z' } },
+    { summary: 'Gone', status: 'cancelled', start: { dateTime: '2026-11-14T08:00:00Z' }, end: { dateTime: '2026-11-14T08:30:00Z' } },
+    { summary: 'Holiday', start: { date: '2026-11-13' }, end: { date: '2026-11-14' } }]);
+  assert.deepEqual(out.map(e => [e.title, e.allDay]), [['Holiday', true], ['Standup', false]]);
+  assert.equal(out[1].end - out[1].start, 15 * 60e3);
+  assert.deepEqual(SCOPES.split(' ').sort(), ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/gmail.labels', 'https://www.googleapis.com/auth/gmail.metadata']);
+  const u = new URL(authorizeUrl('x.apps.googleusercontent.com', 'ch', 'st'));
+  assert.equal(u.searchParams.get('redirect_uri'), 'http://127.0.0.1:48613'); assert.equal(u.searchParams.get('code_challenge_method'), 'S256');
+});
+
+test('update: version comparison and the "no release yet" answer', async () => {
+  const { isNewer, latestRelease } = require('../src/main/update.js');
+  assert.equal(isNewer('0.5.0', '0.4.0'), true); assert.equal(isNewer('v0.4.1', '0.4.0'), true); assert.equal(isNewer('0.4.0', '0.4.0'), false);
+  assert.equal(isNewer('0.10.0', '0.9.9'), true); assert.equal(isNewer('0.3.9', '0.4.0'), false); assert.equal(isNewer('1.0', '0.9.9'), true);
+  assert.deepEqual(await latestRelease({ current: '0.4.0', fetchImpl: async () => ({ status: 404, ok: false }) }), { current: '0.4.0', latest: '0.4.0', newer: false });
+  const r = await latestRelease({ current: '0.4.0', fetchImpl: async () => ({ status: 200, ok: true, json: async () => ({ tag_name: 'v0.5.0', html_url: 'https://github.com/mkumbwajr/Peep/releases/tag/v0.5.0' }) }) });
+  assert.equal(r.newer, true); assert.equal(r.latest, '0.5.0');
+});
+
+test('google: email headers become { from, subject, at, unread }; no body is ever read', () => {
+  const { toMail, parseFrom } = require('../src/main/google.js');
+  assert.deepEqual(parseFrom('"Asha Juma" <asha@duka.co.tz>'), { name: 'Asha Juma', address: 'asha@duka.co.tz' });
+  assert.deepEqual(parseFrom('Bank <alerts@bank.co.tz>'), { name: 'Bank', address: 'alerts@bank.co.tz' });
+  assert.deepEqual(parseFrom('noreply@github.com'), { name: 'noreply', address: 'noreply@github.com' });
+  const m = toMail({ id: '18c', internalDate: '1763100000000', labelIds: ['INBOX', 'UNREAD'], payload: { headers: [{ name: 'From', value: 'Asha <a@x.co>' }, { name: 'Subject', value: 'Invoice' }] } });
+  assert.deepEqual(m, { id: '18c', from: { name: 'Asha', address: 'a@x.co' }, subject: 'Invoice', at: 1763100000000, unread: true });
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src', 'main', 'google.js'), 'utf8');
+  assert.ok(src.includes('format=metadata') && !/format=(full|raw)/.test(src), 'only headers are fetched');
+});

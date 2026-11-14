@@ -7,15 +7,19 @@
 <link rel="stylesheet" href="guard.css">
 </head>
 <body>
-<div class="box">
-  <div class="ring" id="ring"></div>
+<main class="card" role="dialog" aria-modal="true" aria-labelledby="title" aria-describedby="what">
+  <div class="breath">
+    <svg class="ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="56"/><circle class="fill" id="fill" cx="60" cy="60" r="56"/></svg>
+    <span class="pip"><span class="eye"></span><span class="eye"></span></span>
+  </div>
+  <span class="label" id="label"></span>
   <h1 id="title"></h1>
   <p id="what"></p>
-  <div class="buttons" id="buttons" hidden>
-    <button id="back" class="primary"></button>
-    <button id="on"></button>
+  <div class="buttons" id="buttons">
+    <button id="back" class="primary" type="button"></button>
+    <button id="on" class="ghost" type="button"></button>
   </div>
-</div>
+</main>
 <script src="../shared/i18n.js"></script>
 <script src="guard.js"></script>
 </body>
