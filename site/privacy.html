@@ -15,7 +15,11 @@
   .nav-in { max-width: 980px; height: 100%; margin: 0 auto; padding: 0 22px; display: flex; align-items: center; gap: 28px; }
   .brand { display: inline-flex; align-items: center; gap: 9px; color: #f5f5f7; font-weight: 600; font-size: 17px; text-decoration: none; }
   .pip { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 24px; height: 21px; border-radius: 7.5px; background: #7c5cff; }
-  .pip i { width: 4px; height: 7px; border-radius: 2px; background: #fff; }
+  .pip i { width: 4px; height: 7px; border-radius: 2px; background: #fff; transform-origin: 50% 55%; animation: blink 5.2s infinite; }
+  @keyframes blink { 0%, 40%, 43.5%, 86%, 88.5%, 91%, 93.5%, 100% { transform: scaleY(1); } 41.8% { transform: scaleY(.08); } 87.2% { transform: scaleY(.08); } 92.2% { transform: scaleY(.08); } }
+  @keyframes blink-now { 0%, 100% { transform: scaleY(1); } 45% { transform: scaleY(.08); } }
+  .brand:hover .pip i { animation: blink-now .32s ease 2; }
+  @media (prefers-reduced-motion: reduce) { .pip i { animation: none !important; } }
   .nav nav { display: flex; gap: 26px; margin-left: auto; font-size: 13px; }
   .nav nav a { color: rgba(255, 255, 255, .8); text-decoration: none; } .nav nav a:hover { color: #fff; }
   .nav nav a[aria-current] { color: #fff; }
