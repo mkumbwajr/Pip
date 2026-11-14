@@ -18,6 +18,11 @@ function parseLrc(text) {
 /** The line being sung at `ms` (null before the first one). */
 function lineAt(lines, ms) { let cur = null; for (const l of lines) { if (l.t <= ms) cur = l; else break; } return cur; }
 
+/** Some players (Windows Media Player with untagged files) send "Artist - Title" as the title and no artist. */
+function splitTitle(title, artist) {
+  const m = !artist && String(title).match(/^(.+?)\s+[-–]\s+(.+)$/);
+  return m ? { title: m[2].trim(), artist: m[1].trim() } : { title, artist };
+}
 const simple = s => String(s || '').replace(/\s*[-–(\[].*(remaster|live|feat|version|edit|mono|stereo).*$/i, '').trim();
 
 async function fetchLyrics({ title, artist, durationSec }, { cacheDir, fetchImpl = fetch } = {}) {
@@ -26,14 +31,18 @@ async function fetchLyrics({ title, artist, durationSec }, { cacheDir, fetchImpl
   const file = cacheDir ? path.join(cacheDir, key + '.json') : null;
   if (file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')).lines; } catch {} }
   const headers = { 'User-Agent': 'Peep (https://github.com/mkumbwajr/peep)' };
-  const q = new URLSearchParams({ track_name: simple(title), artist_name: String(artist || '').split(/,|&| feat/i)[0].trim() });
-  const res = await fetchImpl('https://lrclib.net/api/search?' + q, { headers, signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error('lrclib ' + res.status); // not cached: asked again next time
-  const hits = (await res.json()).filter(h => h.syncedLyrics);
+  ({ title, artist } = splitTitle(title, artist));
+  const ask = async params => {
+    const res = await fetchImpl('https://lrclib.net/api/search?' + new URLSearchParams(params), { headers, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error('lrclib ' + res.status); // not cached: asked again next time
+    return (await res.json()).filter(h => h.syncedLyrics);
+  };
+  let hits = await ask({ track_name: simple(title), artist_name: String(artist || '').split(/,|&| feat/i)[0].trim() });
+  if (!hits.length) hits = await ask({ q: [artist, simple(title)].filter(Boolean).join(' ') }); // looser: one free-text search
   const hit = hits.find(h => !durationSec || Math.abs((h.duration || 0) - durationSec) <= 3) || hits[0];
   const lines = hit ? parseLrc(hit.syncedLyrics) : null;
   if (file) { try { fs.mkdirSync(cacheDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify({ lines })); } catch {} }
   return lines;
 }
 
-module.exports = { parseLrc, lineAt, fetchLyrics, simple };
+module.exports = { parseLrc, lineAt, fetchLyrics, simple, splitTitle };

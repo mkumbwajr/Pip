@@ -6,11 +6,16 @@ if (process.platform !== 'win32') { console.log('skipped: not Windows'); process
 const helper = new WinHelper(); let states = 0, last = null;
 helper.on('state', s => { states++; last = s; });
 helper.start();
-setTimeout(() => helper.send({ cmd: 'volume', level: 30 }), 6000);
+let before = null; // the volume is set to 30 to test the command, then put back
+setTimeout(() => { before = last?.volume?.level ?? null; helper.send({ cmd: 'volume', level: 30 }); }, 6000);
 setTimeout(() => {
-  helper.stop();
-  console.log(JSON.stringify({ states, front: last?.front?.proc || null, volume: last?.volume || null, media: Boolean(last?.media), net: last?.net || null }));
-  if (!states) { console.error('The helper reported nothing.'); process.exit(1); }
-  if (last.volume && last.volume.level !== 30) console.warn('warning: the volume did not change to 30 (no audio device on this machine?)');
-  process.exit(0);
+  const changed = last?.volume?.level === 30;
+  if (before !== null) helper.send({ cmd: 'volume', level: before });
+  setTimeout(() => {
+    helper.stop();
+    console.log(JSON.stringify({ states, front: last?.front?.proc || null, volume: last?.volume || null, media: last?.media ? `${last.media.title} (${last.media.app})` : null, net: last?.net || null }));
+    if (!states) { console.error('The helper reported nothing.'); process.exit(1); }
+    if (last.volume && !changed) console.warn('warning: the volume did not change to 30 (no audio device on this machine?)');
+    process.exit(0);
+  }, 1500);
 }, 12000);

@@ -13,6 +13,7 @@ const DEFAULTS = {
   mascot: { name: 'Pip', color: '#7c5cff', hat: 'none' },
   sounds: true,
   lyrics: true,
+  songInfo: true,        // release year from iTunes Search (song title and artist are sent)
   weather: { place: '', lat: null, lon: null },
   calendarUrl: '',
   note: '',

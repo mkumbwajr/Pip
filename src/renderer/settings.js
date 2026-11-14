@@ -60,7 +60,7 @@ const views = {
   },
   music() {
     const s = S.settings;
-    return `<div class="panel">${check('s-lyrics', s.lyrics, esc(t('Show song lyrics (asks lrclib.net for the song)')))}</div>
+    return `<div class="panel">${check('s-lyrics', s.lyrics, esc(t('Show song lyrics (asks lrclib.net for the song)')))}${check('s-songinfo', s.songInfo, esc(t('Show the release year (asks iTunes Search for the song)')))}</div>
       <div class="panel"><h2>Spotify</h2><div class="dim small">${esc(t('Only for choosing which device plays. Needs your own free client ID from developer.spotify.com, with this redirect address:'))} <span class="mono">http://127.0.0.1:48612/callback</span></div>
         <div class="row" data-gap><input type="text" class="grow" id="sp-id" placeholder="Client ID" value="${esc(s.spotifyClientId)}"><button class="btn ${S.spotify ? '' : 'primary'}" id="sp-go">${esc(S.spotify ? t('Disconnect') : t('Connect'))}</button></div><div class="small" id="sp-error" data-kind="error"></div></div>`;
   },
@@ -129,6 +129,7 @@ page.addEventListener('change', async e => {
   else if (el.id === 'm-hat') { await save({ mascot: { hat: el.value } }); draw(); }
   else if (el.id === 's-sounds') save({ sounds: el.checked });
   else if (el.id === 's-lyrics') save({ lyrics: el.checked });
+  else if (el.id === 's-songinfo') save({ songInfo: el.checked });
   else if (el.id === 's-auto') S.autostart = await api.setAutostart(el.checked);
   else if (el.id === 's-buddy') save({ buddyAgent: el.value });
   else if (el.id === 's-place') checkWeather();

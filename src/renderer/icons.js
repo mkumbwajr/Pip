@@ -21,6 +21,11 @@
     game: '<path d="M7 8h10a4 4 0 0 1 4 4v1a3.5 3.5 0 0 1-6.3 2.1L14 14h-4l-.7 1.1A3.5 3.5 0 0 1 3 13v-1a4 4 0 0 1 4-4z"/><path d="M7.5 11v3M6 12.5h3"/>',
     shield: '<path d="M12 3.5l7 2.5v5.5c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/>',
     bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 1.5h-15z"/><path d="M10 20.5h4"/>',
+    prev: '<path d="M6 5v14"/><path d="M19 5.5L9.5 12l9.5 6.5z" fill="currentColor"/>',
+    next: '<path d="M18 5v14"/><path d="M5 5.5l9.5 6.5L5 18.5z" fill="currentColor"/>',
+    play: '<path d="M8 5v14l11-7z" fill="currentColor"/>',
+    pause: '<path d="M8.5 5.5v13M15.5 5.5v13" stroke-width="3.4"/>',
+    lyrics: '<path d="M4 6.5h16M4 11.5h11M4 16.5h7"/><circle cx="18" cy="17" r="2"/><path d="M20 17V11"/>',
     phone: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>'
   };
   window.icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;

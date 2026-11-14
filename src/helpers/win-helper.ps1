@@ -7,7 +7,7 @@ $ErrorActionPreference = 'SilentlyContinue'
 [Console]::InputEncoding = [Text.Encoding]::UTF8
 
 Add-Type -TypeDefinition @'
-using System; using System.Text; using System.Runtime.InteropServices;
+using System; using System.Text; using System.IO; using System.Threading; using System.Collections.Concurrent; using System.Runtime.InteropServices;
 [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IAudioEndpointVolume {
   int RegisterControlChangeNotify(IntPtr p); int UnregisterControlChangeNotify(IntPtr p); int GetChannelCount(out int n);
@@ -30,6 +30,20 @@ public static class PeepAudio {
   public static int Level() { float v; Endpoint().GetMasterVolumeLevelScalar(out v); return (int)Math.Round(v * 100); }
   public static bool Muted() { bool m; Endpoint().GetMute(out m); return m; }
   public static void Set(int level) { Endpoint().SetMasterVolumeLevelScalar(Math.Max(0, Math.Min(100, level)) / 100f, Guid.Empty); }
+}
+// Commands from Peep arrive on stdin. Windows PowerShell's [Console]::In.ReadLineAsync() blocks until a whole line
+// arrives, which froze the loop below until Peep sent a command; a background thread reads them into a queue instead.
+public static class PeepInput {
+  static readonly ConcurrentQueue<string> lines = new ConcurrentQueue<string>();
+  public static volatile bool Closed;
+  public static void Start() {
+    var t = new Thread(() => {
+      try { var r = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false)); string l; while ((l = r.ReadLine()) != null) lines.Enqueue(l); } catch { }
+      Closed = true;
+    });
+    t.IsBackground = true; t.Start();
+  }
+  public static string Next() { string l; return lines.TryDequeue(out l) ? l : null; }
 }
 public static class PeepWin {
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
@@ -60,7 +74,7 @@ function MediaState {
   if ($playing -and $t.LastUpdatedTime.Year -gt 2000) { $pos += ([DateTimeOffset]::UtcNow - $t.LastUpdatedTime).TotalMilliseconds }
   if ($end -gt 0 -and $pos -gt $end) { $pos = $end }
   $script:props = $p
-  @{ title = $p.Title; artist = $p.Artist; album = $p.AlbumTitle; app = $s.SourceAppUserModelId; playing = $playing; positionMs = [long]$pos; durationMs = [long]$end }
+  @{ title = $p.Title; artist = $p.Artist; album = $p.AlbumTitle; albumArtist = $p.AlbumArtist; track = $p.TrackNumber; canSeek = [bool]$i.Controls.IsPlaybackPositionEnabled; app = $s.SourceAppUserModelId; playing = $playing; positionMs = [long]$pos; durationMs = [long]$end }
 }
 # The song's cover picture as base64 (empty when the player gives none). Sent once per song.
 $streamType = [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime]
@@ -94,14 +108,15 @@ function NetState {
 }
 function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 4)); [Console]::Out.Flush() }
 
-$line = [Console]::In.ReadLineAsync(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0
+[PeepInput]::Start(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0
 while ($true) {
-  if ($line.IsCompleted) {
-    if ($null -eq $line.Result) { break }
+  $closed = [PeepInput]::Closed # read before draining, so a last command sent just before stdin closed still runs
+  while ($null -ne ($text = [PeepInput]::Next())) {
     try {
-      $c = $line.Result | ConvertFrom-Json
+      $c = $text | ConvertFrom-Json
       switch ($c.cmd) {
         'media' { $s = Session; if ($s) { switch ($c.action) { 'toggle' { $s.TryTogglePlayPauseAsync() | Out-Null } 'next' { $s.TrySkipNextAsync() | Out-Null } 'prev' { $s.TrySkipPreviousAsync() | Out-Null } } } }
+        'seek' { $s = Session; if ($s) { $s.TryChangePlaybackPositionAsync([long]$c.ms * 10000) | Out-Null } } # position in 100 ns ticks
         'volume' { [PeepAudio]::Set([int]$c.level) }
         'minimize' { [PeepWin]::Minimize([long]$c.hwnd) }
         'radio' {
@@ -112,8 +127,9 @@ while ($true) {
         }
       }
     } catch {}
-    $line = [Console]::In.ReadLineAsync(); $lastKey = ''; $soon = 3 # look again a few times right after a command
+    $lastKey = ''; $soon = 3 # look again a few times right after a command
   }
+  if ($closed) { break } # Peep has gone
   if ($tick % 50 -eq 0) { $net = NetState }
   if ($tick % 2 -eq 0 -or $soon -gt 0) {
     if ($soon -gt 0) { $soon-- }

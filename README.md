@@ -45,7 +45,7 @@ kutengeneza installer.
 
 ## Kinachotoka nje ya PC yako
 
-Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo, jina la wimbo na msanii vinaenda lrclib.net, link ya kalenda
+Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo, jina la wimbo na msanii vinaenda lrclib.net (lyrics) na iTunes Search (mwaka wa wimbo), link ya kalenda
 inasomwa, swali la screen linaenda kwa agent uliyemchagua kupitia akaunti yako, na Spotify ukiiunganisha. Hooks,
 ulivyo-copy, noti na mafaili vinabaki kwenye PC.
 

@@ -189,5 +189,7 @@
   "Menu": "Menu",
   "Fold": "Kunja",
   "Keep open": "Acha wazi",
-  "Open": "Fungua"
+  "Open": "Fungua",
+  "Position": "Sehemu ya wimbo",
+  "Show the release year (asks iTunes Search for the song)": "Onyesha mwaka wimbo ulipotoka (inauliza iTunes Search kuhusu wimbo)"
 }

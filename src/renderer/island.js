@@ -23,7 +23,7 @@ const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: '
   weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
   platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false,
-  mode: null, modePick: '', menu: false, vol: false, calLoaded: false };
+  mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {} };
 
 // ---------- small helpers ----------
 const locale = () => (S.settings?.lang === 'sw' ? 'sw-TZ' : undefined);
@@ -44,6 +44,10 @@ function chime(ok) {
     setTimeout(() => ctx.close(), 900);
   } catch {}
 }
+/** Song and artist as people read them: some players send "Artist - Title" as the title with no artist. */
+function songOf(m) { const x = !m.artist && String(m.title).match(/^(.+?)\s+[-–]\s+(.+)$/); return x ? { title: x[2], artist: x[1] } : { title: m.title, artist: m.artist }; }
+const APPS = { spotify: 'Spotify', zunemusic: 'Media Player', chrome: 'Chrome', msedge: 'Edge', firefox: 'Firefox', vlc: 'VLC' };
+const appName = id => { const s = String(id).toLowerCase(), k = Object.keys(APPS).find(k => s.includes(k)); return k ? APPS[k] : String(id).split(/[!\\]/).pop().replace(/\.exe$/i, ''); };
 function mediaPosition() { const m = S.win.media; if (!m) return 0; return Math.min(m.durationMs || Infinity, m.positionMs + (m.playing ? Date.now() - S.win.at : 0)); }
 
 // ---------- the pill ----------
@@ -91,9 +95,9 @@ const pages = {
         ${S.hubError ? `<div class="hm-err">${esc(S.hubError)}</div>` : ''}
         <div class="hm-next"><span class="label">${esc(t('Next'))}</span>${e ? `<b class="cut">${esc(e.title)}</b><span>${esc(new Date(e.start).toLocaleString(locale(), e.allDay ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}</span>` : `<b>${esc(/^https:\/\//.test(S.settings.calendarUrl || '') ? t('Nothing planned') : t('No calendar linked.'))}</b>`}</div></div>
       <div class="hm-tiles"><div class="tile">${agent}</div>
-        <div class="tile">${art ? `<img class="tile-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="tile-art">${icon('music')}</span>`}<div class="grow"><b>${esc(m ? m.title : t('Nothing is playing.'))}</b>${m?.artist ? `<div class="sub">${esc(m.artist)}</div>` : ''}</div>
+        <div class="tile">${art ? `<img class="tile-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="tile-art">${icon('music')}</span>`}<div class="grow"><b>${esc(m ? songOf(m).title : t('Nothing is playing.'))}</b>${m && songOf(m).artist ? `<div class="sub">${esc(songOf(m).artist)}</div>` : ''}</div>
           ${m ? `<button class="round" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${m.playing ? '❚❚' : '▶'}</button>` : ''}</div>
-        <div class="tile"><span class="tile-art">${icon('focus')}</span><div class="grow"><span class="label">${esc(t('Focus'))}</span><b class="mono" id="hm-focus">${time(f.left * 1000)}</b></div><button class="wbtn sm" data-focus="toggle">${esc(f.running ? t('Pause') : t('Start'))}</button></div></div></div>`;
+        <div class="tile"><span class="tile-art">${icon('focus')}</span><div class="grow"><span class="label">${esc(t('Focus'))}</span><b class="num" id="hm-focus">${time(f.left * 1000)}</b></div><button class="wbtn sm" data-focus="toggle">${esc(f.running ? t('Pause') : t('Start'))}</button></div></div></div>`;
   },
   ai() {
     const cards = S.ai.sessions.map(s => `<div class="card">
@@ -109,16 +113,25 @@ const pages = {
     return `<h2>${esc(t('Sessions'))}</h2>${cards || `<div class="card dim">${esc(t('Nothing running. Start Claude Code or Codex in a terminal.'))}</div>`}<h2>${esc(t('History'))}</h2>${history || `<div class="dim">${esc(t('Finished jobs appear here.'))}</div>`}`;
   },
   music() {
-    const m = S.win.media, v = S.win.volume, sp = S.spotify, art = m && S.art?.key === m.title + '|' + m.artist ? S.art.data : '', on = S.settings.lyrics;
-    if (S.platform !== 'win32') return `<div class="card dim">${esc(t('Music controls need Windows.'))}</div>`;
-    return `${m ? `<div class="card"><div class="row">${art ? `<img class="art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : '<div class="art"></div>'}
-          <div class="grow"><div class="cut"><b>${esc(m.title)}</b></div><div class="dim cut">${esc(m.artist)}${m.album ? ' · ' + esc(m.album) : ''}</div></div>
-          <button class="btn toggle ${on ? 'on' : ''}" data-lyrics>${esc(t('Lyrics'))}</button></div>
-        ${on ? '<div class="lyrics"><div id="ly-prev"></div><div id="ly-now" class="now"></div><div id="ly-next"></div></div>' : '<br>'}
-        <div class="bar"><i id="progress"></i></div><div class="row small dim"><span id="pos"></span><span class="grow"></span><span>${m.durationMs ? time(m.durationMs) : ''}</span></div></div>` : `<div class="card dim">${esc(t('Nothing is playing.'))}</div>`}
-      <div class="row" data-center><button class="btn icon" data-media="prev" aria-label="${esc(t('Previous'))}">⏮</button><button class="btn icon primary" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${m?.playing ? '⏸' : '▶'}</button><button class="btn icon" data-media="next" aria-label="${esc(t('Next'))}">⏭</button></div>
-      ${v ? `<h2>${esc(t('Volume'))}</h2><div class="row"><input type="range" id="volume" min="0" max="100" value="${v.level}"><span class="dim" id="vol-n">${v.level}</span></div>` : ''}
-      ${sp.on ? `<h2>${esc(t('Play on'))}</h2>${sp.devices.map(d => `<div class="item" data-device="${esc(d.id)}"><span class="grow cut">${esc(d.name)}</span>${d.active ? `<span class="badge done">${esc(t('Playing'))}</span>` : ''}</div>`).join('') || `<div class="dim">${esc(sp.error || t('Open Spotify on a device to see it here.'))}</div>`}` : ''}`;
+    const m = S.win.media, sp = S.spotify, on = S.settings.lyrics;
+    if (S.platform !== 'win32') return `<div class="cl-empty">${esc(t('Music controls need Windows.'))}</div>`;
+    if (!m) return `<div class="mu"><span class="mu-art">${icon('music')}</span><div class="mu-info"><span class="label">${esc(t('Playing'))}</span><h3>${esc(t('Nothing is playing.'))}</h3></div></div>`;
+    const song = songOf(m), art = S.art?.key === m.title + '|' + m.artist ? S.art.data : '', year = S.years[song.title + '|' + song.artist];
+    const meta = [m.album || year?.album, year?.year].filter(Boolean).join(' · '); // the player's album first; iTunes fills a missing one
+    return `<div class="mu">${art ? `<img class="mu-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="mu-art">${icon('music')}</span>`}
+      <div class="mu-info"><span class="label">${esc(t('Playing'))}${m.app ? ' · ' + esc(appName(m.app)) : ''}</span>
+        <h3 class="cut" title="${esc(song.title)}">${esc(song.title)}</h3>
+        <div class="mu-artist cut">${esc(song.artist || '')}</div>
+        <div class="mu-meta cut">${esc(meta)}</div>
+        ${on ? '<div class="mu-lyric cut" id="ly-now"></div>' : ''}
+        <input type="range" id="seek" min="0" max="${m.durationMs || 0}" value="0" ${m.canSeek && m.durationMs ? '' : 'disabled'} aria-label="${esc(t('Position'))}">
+        <div class="mu-times"><span id="pos"></span><span>${m.durationMs ? time(m.durationMs) : ''}</span></div>
+        <div class="mu-ctl"><button class="mu-btn" data-media="prev" aria-label="${esc(t('Previous'))}">${icon('prev')}</button>
+          <button class="mu-btn play" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${icon(m.playing ? 'pause' : 'play')}</button>
+          <button class="mu-btn" data-media="next" aria-label="${esc(t('Next'))}">${icon('next')}</button><span class="grow"></span>
+          ${sp.on && sp.devices.length ? `<select id="device" aria-label="${esc(t('Play on'))}">${sp.devices.map(d => `<option value="${esc(d.id)}" ${d.active ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`
+            : sp.on ? `<select id="device" disabled title="${esc(sp.error || t('Open Spotify on a device to see it here.'))}"><option>${esc(t('Play on'))}</option></select>` : ''}
+          <button class="mu-chip ${on ? 'on' : ''}" data-lyrics>${icon('lyrics')}${esc(t('Lyrics'))}</button></div></div></div>`;
   },
   tray() {
     const sh = S.share;
@@ -173,7 +186,7 @@ const pages = {
   }
 };
 
-const FILL = new Set(['home', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
+const FILL = new Set(['home', 'music', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
 function draw(force) {
   drawPill();
   if (!S.open || S.dragging || (!force && (!LIVE.has(S.tab) || typing()))) return;
@@ -263,13 +276,12 @@ function tick() {
   const hf = $('#hm-focus'); if (hf) hf.textContent = time(S.focus.left * 1000);
   const m = S.win.media;
   if (m && S.tab === 'music') {
-    const pos = mediaPosition(), p = $('#progress'), n = $('#pos');
-    if (p) p.style.width = (m.durationMs ? Math.min(100, 100 * pos / m.durationMs) : 0) + '%';
-    if (n) n.textContent = time(pos);
+    const pos = mediaPosition(), sk = $('#seek'), n = $('#pos');
+    if (sk && !seeking) { sk.value = pos; sk.style.setProperty('--fill', (m.durationMs ? Math.min(100, 100 * pos / m.durationMs) : 0) + '%'); }
+    if (n && !seeking) n.textContent = time(pos);
     const now = $('#ly-now');
     if (now) {
       const lines = S.lyrics || []; let i = -1; while (i + 1 < lines.length && lines[i + 1].t <= pos) i++;
-      $('#ly-prev').textContent = lines[i - 1]?.text || ''; $('#ly-next').textContent = lines[i + 1]?.text || '';
       now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? '' : t('No lyrics for this song.'));
     }
   }
@@ -332,6 +344,12 @@ async function refreshLyrics() {
   const m = S.win.media, key = m ? m.title + '|' + m.artist : '';
   if (key === S.lyricsFor) return; S.lyricsFor = key; S.lyrics = null;
   if (m && S.settings.lyrics) { const lines = await api.lyrics({ title: m.title, artist: m.artist, durationSec: Math.round((m.durationMs || 0) / 1000) }); if (S.lyricsFor === key) S.lyrics = lines || []; }
+}
+async function refreshSongInfo() {
+  const m = S.win.media; if (!m || !S.settings.songInfo) return;
+  const song = songOf(m), key = song.title + '|' + song.artist; if (key in S.years) return;
+  S.years[key] = null; // asked once per song
+  const info = await api.songInfo(song); if (info) { S.years[key] = info; if (S.tab === 'music') draw(); }
 }
 function applyMascot() { document.documentElement.style.setProperty('--pip', S.settings.mascot.color); }
 async function save(patch) { S.settings = await api.setSettings(patch); applyMascot(); drawPill(); }
@@ -414,13 +432,17 @@ page.addEventListener('click', async e => {
     if (S.tab === 'ask') { draw(true); $('#question').value = question; }
   }
 });
+let seeking = false; // while the seek bar is held, the second-by-second update leaves it alone
 page.addEventListener('input', e => {
   const el = e.target;
+  if (el.id === 'seek') { seeking = true; $('#pos').textContent = time(+el.value); el.style.setProperty('--fill', (100 * el.value / (el.max || 1)) + '%'); return; }
   if (el.id === 'volume') { S.dragging = true; $('#vol-n').textContent = el.value; api.setVolume(el.value); }
   else if (el.id === 'note') { S.settings.note = el.value; drawNoteSide(); clearTimeout(page._note); page._note = setTimeout(() => save({ note: el.value }), 500); }
 });
 page.addEventListener('change', async e => {
   const el = e.target;
+  if (el.id === 'seek') { const m = S.win.media; api.seek(+el.value); if (m) { m.positionMs = +el.value; S.win.at = Date.now(); } seeking = false; return; }
+  if (el.id === 'device') { await api.spotifyTransfer(el.value); setTimeout(refreshDevices, 1200); return; }
   if (el.id === 'volume') S.dragging = false;
   else if (el.dataset.radio) api.setRadio(el.dataset.radio, el.checked);
 });
@@ -446,7 +468,7 @@ api.onAi(snap => {
   draw();
 });
 api.onFinish(entry => chime(entry.state === 'done'));
-api.onWin(state => { S.win = state; refreshLyrics(); draw(); });
+api.onWin(state => { S.win = state; refreshLyrics(); refreshSongInfo(); draw(); });
 api.onArt(art => { S.art = art; if (S.tab === 'music') draw(); });
 // Pip looks at the pointer: the eyes shift a few pixels towards it, less when it is close
 api.onCursor(p => {

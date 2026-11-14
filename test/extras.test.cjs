@@ -1,7 +1,7 @@
 const test = require('node:test'), assert = require('node:assert');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const { nextEvent, parseEvents } = require('../src/main/ics.js');
-const { parseLrc, lineAt, fetchLyrics, simple } = require('../src/main/lyrics.js');
+const { parseLrc, lineAt, fetchLyrics, simple, splitTitle } = require('../src/main/lyrics.js');
 const { Share, safeName } = require('../src/main/share.js');
 const { Store } = require('../src/main/store.js');
 
@@ -63,4 +63,29 @@ test('store: modes keep their other switches when one changes; the restore point
   again.set({ modeRestore: null, guard: { on: false } });
   assert.equal(new Store(file).get('modeRestore'), null); assert.equal(new Store(file).get('guard.on'), false);
   assert.equal(new Store(file).get('guard.sites').length, 5);
+});
+
+test('lyrics: "Artist - Title" with no artist is split; a free-text search runs when the exact one finds nothing', async () => {
+  assert.deepEqual(splitTitle('Cass - Jidai', ''), { title: 'Jidai', artist: 'Cass' });
+  assert.deepEqual(splitTitle('Love - Live', 'Band'), { title: 'Love - Live', artist: 'Band' });
+  const asked = [];
+  const fake = async url => { const p = new URL(url).searchParams; asked.push(Object.fromEntries(p)); return { ok: true, json: async () => (p.get('q') ? [{ duration: 100, syncedLyrics: '[00:02.00]hi' }] : []) }; };
+  const lines = await fetchLyrics({ title: 'Cass - Jidai', artist: '' }, { fetchImpl: fake });
+  assert.equal(lines[0].text, 'hi');
+  assert.deepEqual(asked, [{ track_name: 'Jidai', artist_name: 'Cass' }, { q: 'Cass Jidai' }]);
+});
+
+test('song info: picks the first release of the same song, never a remix; caches the answer', async () => {
+  const { pick, fetchSongInfo } = require('../src/main/songinfo.js');
+  const results = [
+    { artistName: 'The Weeknd & ROSALIA', trackName: 'Blinding Lights (Remix)', collectionName: 'Remix - Single', releaseDate: '2020-12-04T08:00:00Z' },
+    { artistName: 'The Weeknd', trackName: 'Blinding Lights', collectionName: 'After Hours (Deluxe)', releaseDate: '2020-03-20T07:00:00Z' },
+    { artistName: 'The Weeknd', trackName: 'Blinding Lights', collectionName: 'After Hours', releaseDate: '2019-11-29T08:00:00Z' }];
+  assert.equal(pick(results, 'Blinding Lights', 'The Weeknd').collectionName, 'After Hours');
+  assert.equal(pick(results, 'Save Your Tears', 'The Weeknd'), null);
+  assert.equal(pick([{ artistName: 'Rema', trackName: 'Calm Down (feat. Selena Gomez)', releaseDate: '2022-08-25' }], 'Calm Down', 'Rema').releaseDate, '2022-08-25');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peep-song-')); let calls = 0;
+  const fake = async () => { calls++; return { ok: true, json: async () => ({ results }) }; };
+  assert.deepEqual(await fetchSongInfo({ title: 'Blinding Lights', artist: 'The Weeknd' }, { cacheDir: dir, fetchImpl: fake }), { year: 2019, album: 'After Hours' });
+  await fetchSongInfo({ title: 'Blinding Lights', artist: 'The Weeknd' }, { cacheDir: dir, fetchImpl: fake }); assert.equal(calls, 1);
 });

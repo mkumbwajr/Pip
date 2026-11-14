@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('peep', {
   setSettings: call('settings:set'), openSettings: call('settings:open'), setAutostart: call('autostart:set'),
   connectAgent: call('agents:connect'), decide: call('ai:decide'), reply: call('ai:reply'), setRadio: call('radio:set'),
   spotifyLogin: call('spotify:login'), spotifyLogout: call('spotify:logout'), spotifyDevices: call('spotify:devices'), spotifyTransfer: call('spotify:transfer'),
-  media: call('media:cmd'), setVolume: call('volume:set'), lyrics: call('lyrics:get'),
+  media: call('media:cmd'), seek: call('media:seek'), setVolume: call('volume:set'), lyrics: call('lyrics:get'), songInfo: call('song:info'),
   weather: call('weather:get'), calendar: call('calendar:get'), stats: call('stats:get'),
   trayAdd: call('tray:add'), trayRemove: call('tray:remove'), trayOpen: call('tray:open'), copyClip: call('clips:copy'), clearClips: call('clips:clear'), quit: call('app:quit'),
   shareStart: call('share:start'), shareStop: call('share:stop'),

@@ -14,6 +14,7 @@ const { WinHelper } = require('./win-helper.js');
 const { Share } = require('./share.js');
 const { nextEvent } = require('./ics.js');
 const { fetchLyrics } = require('./lyrics.js');
+const { fetchSongInfo } = require('./songinfo.js');
 const buddy = require('./buddy.js');
 const { Spotify } = require('./spotify.js');
 const { makeT } = require('../shared/i18n.js');
@@ -228,8 +229,10 @@ function wireIpc() {
     return list.filter(s => s.name && s.name !== 'Peep' && !s.thumbnail.isEmpty()).slice(0, 12).map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail.toDataURL() }));
   });
   handle('media:cmd', action => ['toggle', 'next', 'prev'].includes(action) && helper.send({ cmd: 'media', action }));
+  handle('media:seek', ms => helper.send({ cmd: 'seek', ms: Math.max(0, Math.round(Number(ms) || 0)) }));
   handle('volume:set', level => helper.send({ cmd: 'volume', level: Math.max(0, Math.min(100, Math.round(Number(level) || 0))) }));
   handle('lyrics:get', song => (store.get('lyrics') ? fetchLyrics(song || {}, { cacheDir: data('lyrics'), fetchImpl: webFetch }).catch(() => null) : null));
+  handle('song:info', song => (store.get('songInfo') ? fetchSongInfo({ title: String(song?.title || ''), artist: String(song?.artist || '') }, { cacheDir: data('songinfo'), fetchImpl: webFetch }).catch(() => null) : null));
   handle('weather:get', () => weather().catch(e => ({ error: String(e.message || e) })));
   handle('calendar:get', () => calendar().catch(() => null));
   handle('stats:get', () => stats());
