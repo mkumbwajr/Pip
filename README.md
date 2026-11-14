@@ -1,4 +1,4 @@
-# Peep
+# Pip
 
 Kisiwa kidogo juu ya screen yako ya Windows kinachokuonyesha ma-agent wako wa AI (Claude Code na Codex) wanafanya
 nini. Pip, kale ka-mascot, anakushtua agent akikuhitaji na akimaliza kazi.
