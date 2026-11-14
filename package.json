@@ -1,7 +1,7 @@
 {
-  "name": "peep",
-  "productName": "Peep",
-  "version": "0.4.1",
+  "name": "pip",
+  "productName": "Pip",
+  "version": "0.5.0",
   "description": "Kisiwa cha bure na open source kwa Windows kinachokuonyesha ma-agent wako wa AI wanafanya nini. A free, open-source status island for Windows.",
   "main": "src/main/main.js",
   "license": "MIT",
@@ -9,8 +9,8 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.cjs",
-    "dist": "electron-builder --win dir --x64 --publish never && makensis build/peep.nsi",
-    "dist:win": "electron-builder --win dir --x64 --publish never -c.win.signAndEditExecutable=true && makensis build/peep.nsi"
+    "dist": "electron-builder --win dir --x64 --publish never && makensis build/pip.nsi",
+    "dist:win": "electron-builder --win dir --x64 --publish never -c.win.signAndEditExecutable=true && makensis build/pip.nsi"
   },
   "dependencies": {
     "qrcode": "^1.5.4"
@@ -20,9 +20,9 @@
     "electron-builder": "^25.1.8"
   },
   "build": {
-    "appId": "tz.co.bang.peep",
-    "productName": "Peep",
-    "extraMetadata": { "description": "Peep" },
+    "appId": "tz.co.bang.pip",
+    "productName": "Pip",
+    "extraMetadata": { "description": "Pip" },
     "files": [
       "src/**/*",
       "assets/**/*",
@@ -41,13 +41,13 @@
           ]
         }
       ],
-      "icon": "build/peep.ico",
+      "icon": "build/pip.ico",
       "signAndEditExecutable": false
     }
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mkumbwajr/peep.git"
+    "url": "https://github.com/mkumbwajr/pip.git"
   },
-  "homepage": "https://github.com/mkumbwajr/peep"
+  "homepage": "https://github.com/mkumbwajr/pip"
 }

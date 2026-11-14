@@ -1,6 +1,6 @@
 'use strict';
 // Starts and talks to the PowerShell helper (src/helpers/win-helper.ps1). On other systems nothing is started and
-// every question simply has no answer, so the rest of Peep still runs (useful for development).
+// every question simply has no answer, so the rest of Pip still runs (useful for development).
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');

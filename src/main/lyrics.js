@@ -30,7 +30,7 @@ async function fetchLyrics({ title, artist, durationSec }, { cacheDir, fetchImpl
   const key = createHash('sha1').update([title, artist, Math.round(durationSec || 0)].join('|').toLowerCase()).digest('hex');
   const file = cacheDir ? path.join(cacheDir, key + '.json') : null;
   if (file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')).lines || []; } catch {} }
-  const headers = { 'User-Agent': 'Peep (https://github.com/mkumbwajr/peep)' };
+  const headers = { 'User-Agent': 'Pip (https://github.com/mkumbwajr/pip)' };
   ({ title, artist } = splitTitle(title, artist));
   const ask = async params => {
     const res = await fetchImpl('https://lrclib.net/api/search?' + new URLSearchParams(params), { headers, signal: AbortSignal.timeout(8000) });

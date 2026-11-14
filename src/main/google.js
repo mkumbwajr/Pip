@@ -16,7 +16,7 @@ function authorizeUrl(clientId, challenge, state) {
   return 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({ client_id: clientId, response_type: 'code', redirect_uri: REDIRECT, scope: SCOPES,
     code_challenge_method: 'S256', code_challenge: challenge, state, access_type: 'offline', prompt: 'consent' });
 }
-/** Google's event shape to Peep's: { title, start, end (ms), allDay }. Cancelled events are left out. */
+/** Google's event shape to Pip's: { title, start, end (ms), allDay }. Cancelled events are left out. */
 function toEvents(items) {
   return (items || []).filter(e => e.status !== 'cancelled').map(e => {
     const allDay = Boolean(e.start?.date && !e.start?.dateTime);
@@ -48,7 +48,7 @@ class Google {
       const server = this.server = http.createServer(async (req, res) => {
         const url = new URL(req.url, REDIRECT);
         if (url.pathname !== '/' || url.searchParams.get('state') !== state) { res.writeHead(404).end(); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end('<body style="font:18px system-ui;padding:40px">Peep: tayari. Unaweza kufunga tab hii.</body>');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end('<body style="font:18px system-ui;padding:40px">Pip: tayari. Unaweza kufunga tab hii.</body>');
         const code = url.searchParams.get('code'); if (!code) return done(reject, new Error(this.t('Login was cancelled.')));
         try { await this.token({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: clientId, client_secret: secret, code_verifier: verifier }); done(resolve, true); } catch (e) { done(reject, e); }
       });
@@ -76,7 +76,7 @@ class Google {
   async unread() { return Number((await this.api('https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX')).messagesUnread) || 0; }
 }
 
-/** The client to sign in with: your own from Settings when you set one, else the one Peep ships with. */
+/** The client to sign in with: your own from Settings when you set one, else the one Pip ships with. */
 function clientFor(own) {
   if (own?.clientId && own?.secret) return { clientId: own.clientId, secret: own.secret };
   try { const c = require('./google-client.json'); if (c.clientId && c.secret) return { clientId: c.clientId, secret: c.secret }; } catch {}

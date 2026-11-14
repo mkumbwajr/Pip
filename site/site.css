@@ -1,4 +1,4 @@
-/* peep.bang.co.tz. One stylesheet, no frameworks, no web fonts, no trackers.
+/* pip.bang.co.tz. One stylesheet, no frameworks, no web fonts, no trackers.
    Layout: a 980 px reading column and a 1120 px content column, generous vertical rhythm, one idea per section. */
 :root {
   --pip: #7c5cff; --pip-2: #b2a3ff;
@@ -62,7 +62,7 @@ h1 { font-size: clamp(44px, 8vw, 96px); line-height: 1.04; letter-spacing: -.045
 .statement h2 { font-size: clamp(32px, 5vw, 56px); line-height: 1.08; letter-spacing: -.035em; }
 
 /* bento: tiles of different widths, each one feature with its screenshot */
-.bento { max-width: var(--col); margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.bento { max-width: var(--col); margin: 0 auto 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .tile { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: 30px; background: var(--tile); border: 1px solid var(--line); }
 .tile.wide { grid-column: span 2; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; }
 .tile-text { padding: 40px 40px 26px; }
@@ -146,3 +146,10 @@ details p { padding: 0 4px 26px; color: var(--soft); font-size: 17px; max-width:
   .start ol { grid-template-columns: 1fr; } .final { padding-block: 120px 100px; }
   summary { font-size: 18px; padding: 20px 2px; } .copy { margin-left: 0; }
 }
+
+/* a heading before each group of tiles */
+.group-head { max-width: var(--read); margin: 0 auto; padding: 130px var(--gut) 48px; text-align: center; }
+.statement + .group-head { padding-top: 40px; }
+.group-head h2 { font-size: clamp(36px, 5.4vw, 64px); line-height: 1.05; letter-spacing: -.04em; }
+.group-head p { max-width: 640px; margin: 16px auto 0; font-size: clamp(18px, 2vw, 22px); line-height: 1.4; color: var(--soft); }
+@media (max-width: 734px) { .group-head { padding: 90px var(--gut) 32px; } }

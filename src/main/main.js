@@ -1,5 +1,5 @@
 'use strict';
-// Peep: main process. Owns the island window, the tray icon, the hook hub and every bridge to the system.
+// Pip: main process. Owns the island window, the tray icon, the hook hub and every bridge to the system.
 const { app, BrowserWindow, Tray, Menu, ipcMain, globalShortcut, Notification, clipboard, shell, screen, nativeImage, desktopCapturer, safeStorage, net } = require('electron');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -22,18 +22,35 @@ const { Google, clientFor } = require('./google.js');
 const { latestRelease, isReleaseUrl } = require('./update.js');
 const { makeT } = require('../shared/i18n.js');
 
-// Peep.exe --remove-hooks: take Peep's entries out of the agents' config files and leave. The uninstaller runs this.
+// Pip.exe --remove-hooks: take Pip's entries out of the agents' config files and leave. The uninstaller runs this.
 if (process.argv.includes('--remove-hooks')) { try { hooks.uninstallClaude(); } catch {} try { hooks.uninstallCodex(); } catch {} app.exit(0); return; }
 if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+// Pip was called Peep before 0.5. On the first start after the update, bring the user's things over from Peep's
+// folder: settings, the hook token, history, the files in the tray, Google and Spotify logins (encrypted with a key
+// kept in "Local State", so that file comes too) and the lyrics, song and cover caches. Runs before Electron reads
+// Local State; nothing is deleted from the old folder.
+let migratedFromPeep = false;
+(function migrateFromPeep() {
+  try {
+    const to = app.getPath('userData'), from = path.join(path.dirname(to), 'Peep');
+    if (from === to || !fs.existsSync(from) || fs.existsSync(path.join(to, 'settings.json'))) return;
+    fs.mkdirSync(to, { recursive: true });
+    for (const f of ['settings.json', 'hook-token', 'history.json', 'tray.json', 'google.bin', 'spotify.bin', 'Local State']) {
+      try { fs.copyFileSync(path.join(from, f), path.join(to, f)); } catch {}
+    }
+    for (const d of ['lyrics', 'songinfo', 'artwork']) { try { fs.cpSync(path.join(from, d), path.join(to, d), { recursive: true }); } catch {} }
+    migratedFromPeep = true;
+  } catch {}
+})();
 // Windows groups taskbar buttons and remembers their picture per app ID. Runs from source (npm start, tests) use their
-// own ID, so the installed Peep never inherits Electron's icon from a development run on the same PC.
-const APP_ID = app.isPackaged ? 'tz.co.bang.peep' : 'tz.co.bang.peep.dev';
+// own ID, so the installed Pip never inherits Electron's icon from a development run on the same PC.
+const APP_ID = app.isPackaged ? 'tz.co.bang.pip' : 'tz.co.bang.pip.dev';
 app.setAppUserModelId(APP_ID);
 
 const data = (...p) => path.join(app.getPath('userData'), ...p);
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
-// windows and the tray on Windows use the same multi-size .ico as Peep.exe, so every place shows the same Pip
+// windows and the tray on Windows use the same multi-size .ico as Pip.exe, so every place shows the same Pip
 const WIN_ICON = path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
@@ -73,27 +90,31 @@ const webFetch = (url, options) => net.fetch(url, options);
 
 // Windows shows a notification's app name and icon from the app ID's entry under HKCU\Software\Classes\AppUserModelId.
 // Without it, toasts and pop-ups fall back to "Electron". Written per user (no admin), refreshed at every start because
-// the icon file lives in Peep's own folder; the uninstaller removes the key.
+// the icon file lives in Pip's own folder; the uninstaller removes the key.
 function registerAppId() {
   if (process.platform !== 'win32') return;
   try {
-    const png = data('peep-icon.png'); fs.mkdirSync(path.dirname(png), { recursive: true }); fs.writeFileSync(png, fs.readFileSync(ICON));
-    fs.writeFileSync(data('peep-icon.ico'), fs.readFileSync(WIN_ICON)); // a real file the Windows shell can read (not inside app.asar)
+    const png = data('pip-icon.png'); fs.mkdirSync(path.dirname(png), { recursive: true }); fs.writeFileSync(png, fs.readFileSync(ICON));
+    fs.writeFileSync(data('pip-icon.ico'), fs.readFileSync(WIN_ICON)); // a real file the Windows shell can read (not inside app.asar)
     const key = 'HKCU\\Software\\Classes\\AppUserModelId\\' + APP_ID;
-    for (const [name, value] of [['DisplayName', 'Peep'], ['IconUri', png], ['IconBackgroundColor', 'FF0C0C10']])
+    for (const [name, value] of [['DisplayName', 'Pip'], ['IconUri', png], ['IconBackgroundColor', 'FF0C0C10']])
       spawnSync('reg', ['add', key, '/v', name, '/t', 'REG_SZ', '/d', value, '/f'], { windowsHide: true, timeout: 5000 });
   } catch {}
 }
 
 // ---------- the island window ----------
 function displayFor() { const all = screen.getAllDisplays(); return all[store.get('island.display')] || screen.getPrimaryDisplay(); }
+// Island size (Settings, 80 to 140%): the page is zoomed and the window grows or shrinks with it, so nothing is cut off
+const islandScale = () => Math.max(0.8, Math.min(1.4, Number(store?.get('island.scale')) || 1));
 function placeIsland() {
   if (!island) return;
   const { x, y, width } = displayFor().bounds; // the very top of the screen: "attach" sits flush against it
-  island.setBounds({ x: Math.round(x + (width - ISLAND.width) / 2), y, width: ISLAND.width, height: ISLAND.height });
+  const k = islandScale(), w = Math.round(ISLAND.width * k), h = Math.round(ISLAND.height * k);
+  island.setBounds({ x: Math.round(x + (width - w) / 2), y, width: w, height: h });
+  island.webContents.setZoomFactor(k);
 }
-// Windows lets a newly opened topmost window (a browser pop-up, a full-screen video, another overlay) sit above Peep.
-// Peep puts itself back in front whenever the window in front changes, and every few seconds as a safety net.
+// Windows lets a newly opened topmost window (a browser pop-up, a full-screen video, another overlay) sit above Pip.
+// Pip puts itself back in front whenever the window in front changes, and every few seconds as a safety net.
 // moveTop does not take the keyboard focus, so typing in the other window is not interrupted.
 function keepOnTop() {
   if (!island || island.isDestroyed() || !island.isVisible() || guardWin) return; // the focus guard's pause screen stays above
@@ -112,6 +133,7 @@ function createIsland() {
   island.webContents.on('will-navigate', e => e.preventDefault());
   island.loadFile(path.join(RENDERER, 'island.html'));
   island.once('ready-to-show', () => { placeIsland(); island.showInactive(); keepOnTop(); });
+  island.webContents.on('did-finish-load', () => island.webContents.setZoomFactor(islandScale()));
   island.on('blur', keepOnTop);
   island.on('close', e => { if (!quitting) e.preventDefault(); });
 }
@@ -119,13 +141,13 @@ function createIsland() {
 // ---------- the settings window ----------
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
-  settingsWin = new BrowserWindow({ width: 1000, height: 700, minWidth: 760, minHeight: 520, title: t('Peep settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: WIN_ICON,
+  settingsWin = new BrowserWindow({ width: 1000, height: 700, minWidth: 760, minHeight: 520, title: t('Pip settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: WIN_ICON,
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   settingsWin.setMenu(null);
   // The taskbar button takes its picture from these details, not from the cache Windows keeps per app ID (which can
-  // still hold another picture, e.g. Electron's own while developing). Peep.exe when installed, else the .ico copy.
+  // still hold another picture, e.g. Electron's own while developing). Pip.exe when installed, else the .ico copy.
   if (process.platform === 'win32') try {
-    settingsWin.setAppDetails({ appId: APP_ID, appIconPath: app.isPackaged ? process.execPath : data('peep-icon.ico'), appIconIndex: 0, relaunchDisplayName: 'Peep',
+    settingsWin.setAppDetails({ appId: APP_ID, appIconPath: app.isPackaged ? process.execPath : data('pip-icon.ico'), appIconIndex: 0, relaunchDisplayName: 'Pip',
       relaunchCommand: app.isPackaged ? `"${process.execPath}"` : '' });
   } catch {}
   settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -138,14 +160,14 @@ const changed = () => send('app:changed');
 function buildTray() {
   // the .ico carries a hand-drawn 16 and 20 px Pip; Windows picks the one that fits the tray
   const image = nativeImage.createFromPath(WIN_ICON);
-  tray = new Tray(image); tray.setToolTip('Peep');
+  tray = new Tray(image); tray.setToolTip('Pip');
   const menu = () => Menu.buildFromTemplate([
     { label: t('Open island'), click: () => send('island:toggle', true) },
     { label: t('Settings'), click: openSettings },
     { type: 'separator' },
     { label: t('Start with Windows'), type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: item => app.setLoginItemSettings({ openAtLogin: item.checked }) },
     { type: 'separator' },
-    { label: t('Quit Peep'), click: () => { quitting = true; app.quit(); } }
+    { label: t('Quit Pip'), click: () => { quitting = true; app.quit(); } }
   ]);
   tray.on('click', () => send('island:toggle', true));
   tray.on('right-click', () => tray.popUpContextMenu(menu()));
@@ -246,7 +268,7 @@ function checkGuard(front) {
   // covers the screen with a light dim (drawn by the page) so the distracting window waits behind it; shown only once
   // drawn, so there is no white flash, and focused so Esc and the buttons work straight away
   guardWin = new BrowserWindow({ ...d.bounds, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, alwaysOnTop: true, skipTaskbar: true,
-    resizable: false, movable: false, minimizable: false, maximizable: false, show: false, title: 'Peep', icon: WIN_ICON,
+    resizable: false, movable: false, minimizable: false, maximizable: false, show: false, title: 'Pip', icon: WIN_ICON,
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   guardWin.setAlwaysOnTop(true, 'screen-saver');
   guardWin.once('ready-to-show', () => { guardWin?.show(); guardWin?.focus(); });
@@ -254,7 +276,7 @@ function checkGuard(front) {
   guardWin.on('closed', () => { guardWin = null; guarding = null; });
 }
 
-// ---------- IPC: only Peep's own pages may call these ----------
+// ---------- IPC: only Pip's own pages may call these ----------
 const ours = e => String(e.senderFrame?.url || '').startsWith(pathToFileURL(RENDERER).href);
 const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e) ? fn(...args) : null));
 
@@ -267,7 +289,7 @@ function wireIpc() {
     if (!patch || typeof patch !== 'object') return store.all();
     const before = store.all(), after = store.set(patch);
     if (before.shortcut !== after.shortcut) bindShortcut();
-    if (before.island.display !== after.island.display) placeIsland();
+    if (before.island.display !== after.island.display || before.island.scale !== after.island.scale) placeIsland();
     if (before.weather.place !== after.weather.place) { store.set({ weather: { lat: null, lon: null } }); weatherCache.at = 0; }
     if (before.lang !== after.lang) { loadLanguage(); tray?.refresh(); }
     hub.context = agentContext(); changed();
@@ -302,7 +324,7 @@ function wireIpc() {
   handle('app:release', url => (isReleaseUrl(url) ? shell.openExternal(String(url)) : null));
   handle('buddy:windows', async () => {
     const list = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 240, height: 150 } });
-    return list.filter(s => s.name && s.name !== 'Peep' && !s.thumbnail.isEmpty()).slice(0, 12).map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail.toDataURL() }));
+    return list.filter(s => s.name && s.name !== 'Pip' && !s.thumbnail.isEmpty()).slice(0, 12).map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail.toDataURL() }));
   });
   handle('media:cmd', action => ['toggle', 'next', 'prev'].includes(action) && helper.send({ cmd: 'media', action }));
   handle('media:seek', ms => helper.send({ cmd: 'seek', ms: Math.max(0, Math.round(Number(ms) || 0)) }));
@@ -326,7 +348,7 @@ function wireIpc() {
     try { e.sender.startDrag({ file: p, icon }); } catch {}
   });
   handle('share:start', async () => {
-    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(app.getPath('downloads'), 'Peep'), onReceive: p => { addToTray([p]); new Notification({ title: 'Peep', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
+    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(app.getPath('downloads'), 'Pip'), onReceive: p => { addToTray([p]); new Notification({ title: 'Pip', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
     // margin 4 is the quiet zone the QR standard asks for: phone cameras need it to find the code
     try { const s = await share.start(); return { ok: true, ...s, firewall: firewall.hasRule(), qr: await require('qrcode').toDataURL(s.url, { margin: 4, width: 264, errorCorrectionLevel: 'M' }) }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
@@ -361,6 +383,12 @@ function wireIpc() {
 // ---------- start ----------
 app.whenReady().then(async () => {
   store = new Store(data('settings.json')); loadLanguage(); registerAppId();
+  // Peep started with Windows: Pip takes over that place, and Peep's own start-up entry goes
+  if (migratedFromPeep && process.platform === 'win32') {
+    const run = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
+    const had = ['electron.app.Peep', 'Peep'].filter(v => spawnSync('reg', ['query', run, '/v', v], { windowsHide: true }).status === 0);
+    if (had.length) { app.setLoginItemSettings({ openAtLogin: true }); for (const v of had) spawnSync('reg', ['delete', run, '/v', v, '/f'], { windowsHide: true }); }
+  }
   const vault = data('spotify.bin');
   spotify = new Spotify({
     t: (...a) => t(...a), fetchImpl: webFetch,
@@ -387,7 +415,9 @@ app.whenReady().then(async () => {
   try { await hub.start(); } catch (e) { hubError = e.code === 'EADDRINUSE' ? t('Port 48611 is in use by another program.') : String(e.message || e); }
   setInterval(() => hub.sweep(), 30e3);
   // hooks carry the current token: keep connected agents in step (a reinstall or a wiped profile makes a new one)
-  const a = agentState(); if (a.claude) connect('claude', true); if (a.codex) connect('codex', true);
+  // also when Peep (Pip's earlier name) was connected: its entries are replaced by Pip's own
+  const a = agentState(), was = store.get('agents');
+  if (a.claude || was.claude) connect('claude', true); if (a.codex || was.codex) connect('codex', true);
 
   wireIpc(); handle('hub:error', () => hubError);
   createIsland(); buildTray(); bindShortcut(); watchClipboard();
@@ -401,11 +431,11 @@ app.whenReady().then(async () => {
   setInterval(() => {
     if (!island || island.isDestroyed()) return;
     const p = screen.getCursorScreenPoint(), key = p.x + ',' + p.y; if (key === lastPoint) return;
-    lastPoint = key; const b = island.getBounds(); send('cursor', { x: p.x - b.x, y: p.y - b.y });
+    lastPoint = key; const b = island.getBounds(), k = islandScale(); send('cursor', { x: (p.x - b.x) / k, y: (p.y - b.y) / k }); // in the page's own (zoomed) pixels
   }, 33);
   helper.start();
   screen.on('display-metrics-changed', placeIsland); screen.on('display-added', placeIsland); screen.on('display-removed', placeIsland);
-  app.on('second-instance', openSettings); // starting Peep again from the Start menu shows its settings
+  app.on('second-instance', openSettings); // starting Pip again from the Start menu shows its settings
 });
 app.on('before-quit', () => { quitting = true; helper.stop(); hub?.stop(); share?.stop(); });
 app.on('will-quit', () => globalShortcut.unregisterAll());

@@ -1,11 +1,11 @@
 'use strict';
-// Phones reach Peep's share page through Windows Firewall. Windows asks the first time Peep listens, but that prompt
+// Phones reach Pip's share page through Windows Firewall. Windows asks the first time Pip listens, but that prompt
 // only allows "private" networks unless you tick "public" too, so on a Wi-Fi Windows calls public the phone's request
-// is dropped and the page never loads. Peep adds one rule of its own, after you approve it in Windows' admin prompt:
-// Peep.exe only, incoming TCP, only from devices on the same local network, on any network type.
+// is dropped and the page never loads. Pip adds one rule of its own, after you approve it in Windows' admin prompt:
+// Pip.exe only, incoming TCP, only from devices on the same local network, on any network type.
 const { spawnSync, spawn } = require('node:child_process');
 
-const RULE = 'Peep phone sharing';
+const RULE = 'Pip phone sharing';
 
 /** Reads `netsh advfirewall firewall show rule ... verbose`: is there an enabled allow rule for this program? */
 function ruleCovers(output, exe) {

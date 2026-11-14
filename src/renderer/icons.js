@@ -1,5 +1,5 @@
 'use strict';
-// Peep's own line icons, drawn for this app. 24-unit grid, stroked with the current text colour.
+// Pip's own line icons, drawn for this app. 24-unit grid, stroked with the current text colour.
 (() => {
   const P = {
     home: '<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z"/>',

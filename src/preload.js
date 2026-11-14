@@ -1,11 +1,11 @@
 'use strict';
-// The only bridge between Peep's pages and the main process: a fixed list of calls, nothing generic.
+// The only bridge between Pip's pages and the main process: a fixed list of calls, nothing generic.
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 const call = channel => (...args) => ipcRenderer.invoke(channel, ...args);
 const on = channel => fn => { const h = (_e, payload) => fn(payload); ipcRenderer.on(channel, h); return () => ipcRenderer.removeListener(channel, h); };
 
-contextBridge.exposeInMainWorld('peep', {
+contextBridge.exposeInMainWorld('pip', {
   init: call('app:init'), hubError: call('hub:error'), strings: call('app:strings'),
   setSettings: call('settings:set'), openSettings: call('settings:open'), setAutostart: call('autostart:set'),
   connectAgent: call('agents:connect'), decide: call('ai:decide'), reply: call('ai:reply'), setRadio: call('radio:set'),

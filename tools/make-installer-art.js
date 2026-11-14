@@ -1,5 +1,5 @@
 'use strict';
-// Draws the picture on the left of the installer's welcome and finish pages (Pip in a soft glow on Peep's dark
+// Draws the picture on the left of the installer's welcome and finish pages (Pip in a soft glow on Pip's dark
 // background) into build/installer-side.bmp, with no dependencies: node tools/make-installer-art.js
 // Drawn at twice NSIS's 164 x 314 so it stays sharp when Windows scales the installer up.
 const fs = require('node:fs'), path = require('node:path');
@@ -11,7 +11,7 @@ const inRound = (x, y, x0, y0, w, h, r) => { if (x < x0 || y < y0 || x > x0 + w 
 const FACE = { w: 172, h: 156, r: 52 }; FACE.x = (W - FACE.w) / 2; FACE.y = 236;
 const EYE = { w: 26, h: 46, r: 13, gap: 30, y: FACE.y + 52 };
 function sample(x, y) {
-  // background: deep violet at the top fading to Peep's near-black, with a glow of Pip's colour behind the face
+  // background: deep violet at the top fading to Pip's near-black, with a glow of Pip's colour behind the face
   let c = mix([30, 20, 62], [8, 8, 11], Math.min(1, y / (H * 0.85)));
   const d = Math.hypot(x - W / 2, (y - (FACE.y + FACE.h / 2)) * 0.9);
   c = mix(c, PIP, 0.55 * Math.exp(-((d / 150) ** 2)));

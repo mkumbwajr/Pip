@@ -6,7 +6,7 @@ nini. Pip, kale ka-mascot, anakushtua agent akikuhitaji na akimaliza kazi.
 Ni bure na open source (MIT). Hakuna akaunti, hakuna malipo, hakuna telemetry. App nzima iko kwa Kiswahili cha
 mtaani cha Tanzania; English ipo kwenye Settings ukiitaka. [English README](README.en.md)
 
-Download: [Releases](https://github.com/mkumbwajr/peep/releases). Installer haina signature bado, kwa hiyo Windows SmartScreen
+Download: [Releases](https://github.com/mkumbwajr/pip/releases). Installer haina signature bado, kwa hiyo Windows SmartScreen
 itakuonya; bonyeza "More info" kisha "Run anyway". Bado hakuna auto-update.
 
 ## Inafanya nini
@@ -34,7 +34,7 @@ Fungua **Settings** kwenye kisiwa, kisha tiki **Fuatilia Claude Code** au **Fuat
 uzikubali hooks mpya (andika `/hooks` ndani ya Codex).
 
 Kujibu ukiwa kwenye kisiwa na bar za matumizi vinahitaji Node.js kwenye PC. Ukiwa tayari una status line yako kwenye
-Claude Code, Peep haiigusi; bar za matumizi hazitaonekana mpaka uiondoe.
+Claude Code, Pip haiigusi; bar za matumizi hazitaonekana mpaka uiondoe.
 
 ## Kimejaribiwa mpaka wapi
 
@@ -59,6 +59,6 @@ lolote usilolipenda humo; test moja inahakikisha hakuna neno lililosahaulika. Lu
 ## Kuitoa
 
 Uninstaller inaondoa hooks zenyewe. Ukiitoa kwa mkono, toa tiki za ma-agent kwenye Settings kwanza, au run
-`Peep.exe --remove-hooks`.
+`Pip.exe --remove-hooks`.
 
-Peep ni project inayojitegemea. Haitumii code wala michoro ya app nyingine yoyote ya aina hii.
+Pip ni project inayojitegemea. Haitumii code wala michoro ya app nyingine yoyote ya aina hii.

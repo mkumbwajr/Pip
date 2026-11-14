@@ -1,4 +1,4 @@
-# Peep's Windows helper. One hidden PowerShell that stays running while Peep runs.
+# Pip's Windows helper. One hidden PowerShell that stays running while Pip runs.
 # It reports, as one JSON object per line: what is playing (Windows media session), the master volume,
 # the window in front, and whether Wi-Fi and Bluetooth are on. It can switch those two on and off. It takes commands as JSON lines on stdin. It exits when stdin closes.
 # Nothing is written to disk or sent anywhere.
@@ -22,7 +22,7 @@ interface IMMDevice { int Activate(ref Guid id, int ctx, IntPtr p, [MarshalAs(Un
 [Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 interface IMMDeviceEnumerator { int EnumAudioEndpoints(int flow, int mask, out IntPtr list); int GetDefaultAudioEndpoint(int flow, int role, out IMMDevice dev); }
 [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumerator { }
-public static class PeepAudio {
+public static class PipAudio {
   static IAudioEndpointVolume Endpoint() {
     var e = (IMMDeviceEnumerator)(new MMDeviceEnumerator()); IMMDevice d; Marshal.ThrowExceptionForHR(e.GetDefaultAudioEndpoint(0, 1, out d));
     Guid id = typeof(IAudioEndpointVolume).GUID; object o; Marshal.ThrowExceptionForHR(d.Activate(ref id, 23, IntPtr.Zero, out o)); return (IAudioEndpointVolume)o;
@@ -31,9 +31,9 @@ public static class PeepAudio {
   public static bool Muted() { bool m; Endpoint().GetMute(out m); return m; }
   public static void Set(int level) { Endpoint().SetMasterVolumeLevelScalar(Math.Max(0, Math.Min(100, level)) / 100f, Guid.Empty); }
 }
-// Commands from Peep arrive on stdin. Windows PowerShell's [Console]::In.ReadLineAsync() blocks until a whole line
-// arrives, which froze the loop below until Peep sent a command; a background thread reads them into a queue instead.
-public static class PeepInput {
+// Commands from Pip arrive on stdin. Windows PowerShell's [Console]::In.ReadLineAsync() blocks until a whole line
+// arrives, which froze the loop below until Pip sent a command; a background thread reads them into a queue instead.
+public static class PipInput {
   static readonly ConcurrentQueue<string> lines = new ConcurrentQueue<string>();
   public static volatile bool Closed;
   public static void Start() {
@@ -45,7 +45,7 @@ public static class PeepInput {
   }
   public static string Next() { string l; return lines.TryDequeue(out l) ? l : null; }
 }
-public static class PeepWin {
+public static class PipWin {
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
@@ -87,9 +87,9 @@ function Artwork {
   } catch { '' }
 }
 function FrontState {
-  $h = [PeepWin]::Front(); if ($h -eq 0) { return $null }
-  $name = ''; $proc = Get-Process -Id ([PeepWin]::Pid($h)); if ($proc) { $name = $proc.ProcessName }
-  @{ hwnd = $h; title = [PeepWin]::Title($h); proc = $name }
+  $h = [PipWin]::Front(); if ($h -eq 0) { return $null }
+  $name = ''; $proc = Get-Process -Id ([PipWin]::Pid($h)); if ($proc) { $name = $proc.ProcessName }
+  @{ hwnd = $h; title = [PipWin]::Title($h); proc = $name }
 }
 # Wi-Fi and Bluetooth: the same switches as in Windows Settings (Windows.Devices.Radios)
 $radioType = [Windows.Devices.Radios.Radio, Windows.System.Devices, ContentType = WindowsRuntime]
@@ -108,17 +108,17 @@ function NetState {
 }
 function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 4)); [Console]::Out.Flush() }
 
-[PeepInput]::Start(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0
+[PipInput]::Start(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0
 while ($true) {
-  $closed = [PeepInput]::Closed # read before draining, so a last command sent just before stdin closed still runs
-  while ($null -ne ($text = [PeepInput]::Next())) {
+  $closed = [PipInput]::Closed # read before draining, so a last command sent just before stdin closed still runs
+  while ($null -ne ($text = [PipInput]::Next())) {
     try {
       $c = $text | ConvertFrom-Json
       switch ($c.cmd) {
         'media' { $s = Session; if ($s) { switch ($c.action) { 'toggle' { $s.TryTogglePlayPauseAsync() | Out-Null } 'next' { $s.TrySkipNextAsync() | Out-Null } 'prev' { $s.TrySkipPreviousAsync() | Out-Null } } } }
         'seek' { $s = Session; if ($s) { $s.TryChangePlaybackPositionAsync([long]$c.ms * 10000) | Out-Null } } # position in 100 ns ticks
-        'volume' { [PeepAudio]::Set([int]$c.level) }
-        'minimize' { [PeepWin]::Minimize([long]$c.hwnd) }
+        'volume' { [PipAudio]::Set([int]$c.level) }
+        'minimize' { [PipWin]::Minimize([long]$c.hwnd) }
         'radio' {
           Await ($radioType::RequestAccessAsync()) $accessType | Out-Null
           $r = Radio "$($c.kind)"; $to = 'Off'; if ($c.on) { $to = 'On' }
@@ -129,12 +129,12 @@ while ($true) {
     } catch {}
     $lastKey = ''; $soon = 3 # look again a few times right after a command
   }
-  if ($closed) { break } # Peep has gone
+  if ($closed) { break } # Pip has gone
   if ($tick % 50 -eq 0) { $net = NetState }
   if ($tick % 2 -eq 0 -or $soon -gt 0) {
     if ($soon -gt 0) { $soon-- }
     $media = MediaState; $front = FrontState
-    $vol = $null; try { $vol = @{ level = [PeepAudio]::Level(); muted = [PeepAudio]::Muted() } } catch {}
+    $vol = $null; try { $vol = @{ level = [PipAudio]::Level(); muted = [PipAudio]::Muted() } } catch {}
     $key = "$($media.title)|$($media.artist)|$($media.playing)|$($vol.level)|$($vol.muted)|$($front.hwnd)|$($front.title)|$($net.wifi.on)|$($net.wifi.ssid)|$($net.bt.on)"
     if ($key -ne $lastKey -or ([DateTime]::UtcNow - $lastAt).TotalSeconds -ge 5) {
       Emit @{ type = 'state'; media = $media; volume = $vol; front = $front; net = $net }

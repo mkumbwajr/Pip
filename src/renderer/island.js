@@ -1,7 +1,7 @@
 'use strict';
 // The island: one page, drawn from the state the main process sends. No framework: small render functions per tab.
 // Every text the user sees goes through t(): English here, translated by src/locales/<language>.json.
-const api = window.peep;
+const api = window.pip;
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const island = $('#island'), shell = $('#shell'), pill = $('#pill'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip'), bar = $('#bar'), tip = $('#tip'), menu = $('#menu'), volPop = $('#vol-pop');
@@ -59,7 +59,7 @@ function drawPill() {
   const mood = S.ai.top !== 'idle' ? S.ai.top : (m?.playing ? 'music' : 'idle');
   pip.className = 'pip ' + mood + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
-  let text = S.open ? (S.settings?.mascot.name || 'Peep') : '', side = clock();
+  let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock();
   const pillAsk = !S.open && top?.state === 'asking' && top.ask?.canAnswer ? top : null; // a permission: answer it right in the pill
   if (pillAsk) text = `${t('Allow')}: ${top.ask.detail || verb(top.ask.verb)}?`;
   else if (top && top.state === 'asking') text = t('{agent} needs you', { agent: AGENT[top.agent] });
@@ -209,9 +209,9 @@ const pages = {
   },
   mail() {
     const m = S.mail;
-    if (!S.google) return `<div class="ml"><span class="ml-ico">${icon('mail')}</span><p>${esc(t('{name} only sees how many. Not who, and not what.', { name: 'Peep' }))}</p><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button></div>`;
+    if (!S.google) return `<div class="ml"><span class="ml-ico">${icon('mail')}</span><p>${esc(t('{name} only sees how many. Not who, and not what.', { name: 'Pip' }))}</p><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button></div>`;
     return `<div class="ml"><div class="ml-count">${m.count === null ? '–' : m.count}</div><p>${esc(m.error || (m.count === 1 ? t('unread email in your inbox') : t('unread emails in your inbox')))}</p>
-      <button class="gbtn" data-inbox>${icon('mail')}${esc(t('Open Gmail'))}</button><p class="ml-note">${esc(t('{name} only sees how many. Not who, and not what.', { name: 'Peep' }))}</p></div>`;
+      <button class="gbtn" data-inbox>${icon('mail')}${esc(t('Open Gmail'))}</button><p class="ml-note">${esc(t('{name} only sees how many. Not who, and not what.', { name: 'Pip' }))}</p></div>`;
   },
   pip() {
     const quick = [['explain', t('Explain what I copied')], ['spell', t('Check my spelling')], ['translate', t('Translate to English')], ['sw', t('Translate to Swahili')]];
@@ -286,7 +286,7 @@ function showMenu(on, view = 'main') {
   else if (view === 'updates') {
     const u = S.update;
     menu.innerHTML = back(t('Updates')) + `<div class="mn-upd">${!u ? esc(t('Checking…')) : !u.ok ? esc(t('Could not check: {error}', { error: u.error })) : u.newer
-      ? `<b>${esc(t('Peep {version} is out', { version: u.latest }))}</b><button class="wbtn sm" data-release="${esc(u.url)}">${esc(t('Download'))}</button>` : esc(t('You have the newest Peep ({version}).', { version: u.current }))}</div>`;
+      ? `<b>${esc(t('Pip {version} is out', { version: u.latest }))}</b><button class="wbtn sm" data-release="${esc(u.url)}">${esc(t('Download'))}</button>` : esc(t('You have the newest Pip ({version}).', { version: u.current }))}</div>`;
   }
   else menu.innerHTML = (v ? `<div class="mn-vol">${icon('volume')}<input type="range" id="mvol" min="0" max="100" value="${v.level}" aria-label="${esc(t('Volume'))}"></div>` : '')
     + `<div class="mn-grid">${tile('apps', 'apps', t('All apps'))}${tile('customize', 'pencil', t('Customize'))}${tile('settings', 'gear', t('Settings'))}${tile('updates', 'refresh', t('Updates'))}${tile('fold', 'up', t('Fold in'))}${tile('quit', 'power', t('Quit'), 'quit')}</div>`;
@@ -673,7 +673,7 @@ api.onChanged(async () => {
   t = window.makeT(init.strings); document.documentElement.lang = init.settings.lang;
   Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art });
   S.spotify.on = init.spotify; S.google = init.google; S.hubError = await api.hubError();
-  // Peep was closed while a mode was running: put the focus guard back the way it was before the mode
+  // Pip was closed while a mode was running: put the focus guard back the way it was before the mode
   if (S.settings.modeRestore) await save({ modeRestore: null, guard: { on: Boolean(S.settings.modeRestore.guardOn) } });
   applyMascot(); applyArtColor(); drawTabs(); drawPill(); setInterval(second, 1000);
 })();

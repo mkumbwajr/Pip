@@ -23,7 +23,7 @@ test('lyrics: parse, current line, cache', async () => {
   assert.deepEqual(lines.map(l => l.t), [1500, 5000, 9000]);
   assert.equal(lineAt(lines, 6000).text, 'two'); assert.equal(lineAt(lines, 100), null);
   assert.equal(simple('Song - Remastered 2011'), 'Song');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peep-')); let calls = 0;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-')); let calls = 0;
   const fake = async () => { calls++; return { ok: true, json: async () => [{ duration: 200, syncedLyrics: '[00:01.00]la' }] }; };
   const song = { title: 'Song', artist: 'A', durationSec: 201 };
   assert.equal((await fetchLyrics(song, { cacheDir: dir, fetchImpl: fake }))[0].text, 'la');
@@ -31,7 +31,7 @@ test('lyrics: parse, current line, cache', async () => {
 });
 
 test('share: secret link, download, upload with a safe name', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peep-')), a = path.join(dir, 'a.txt'); fs.writeFileSync(a, 'hello');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-')), a = path.join(dir, 'a.txt'); fs.writeFileSync(a, 'hello');
   const got = []; const share = new Share({ files: () => [a], saveDir: path.join(dir, 'in'), onReceive: p => got.push(p), host: '127.0.0.1', port: 0 });
   const { url } = await share.start();
   try {
@@ -46,14 +46,14 @@ test('share: secret link, download, upload with a safe name', async () => {
 });
 
 test('store: defaults, deep merge, persistence', () => {
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'peep-')), 's.json');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pip-')), 's.json');
   const s = new Store(file); assert.equal(s.get('mascot.name'), 'Pip');
   s.set({ mascot: { color: '#fff' } });
   const again = new Store(file); assert.equal(again.get('mascot.color'), '#fff'); assert.equal(again.get('mascot.name'), 'Pip');
 });
 
 test('store: modes keep their other switches when one changes; the restore point can be cleared', () => {
-  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'peep-modes-')), 'settings.json');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pip-modes-')), 'settings.json');
   const s = new Store(file);
   assert.deepEqual(s.get('modes.work'), { min: 50, block: true, only: true, music: true });
   s.set({ modes: { work: { music: false } }, modeRestore: { guardOn: false }, guard: { on: true } });
@@ -84,7 +84,7 @@ test('song info: picks the first release of the same song, never a remix; caches
   assert.equal(pick(results, 'Blinding Lights', 'The Weeknd').collectionName, 'After Hours');
   assert.equal(pick(results, 'Save Your Tears', 'The Weeknd'), null);
   assert.equal(pick([{ artistName: 'Rema', trackName: 'Calm Down (feat. Selena Gomez)', releaseDate: '2022-08-25' }], 'Calm Down', 'Rema').releaseDate, '2022-08-25');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peep-song-')); let calls = 0;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-song-')); let calls = 0;
   const fake = async () => { calls++; return { ok: true, json: async () => ({ results }) }; };
   assert.deepEqual(await fetchSongInfo({ title: 'Blinding Lights', artist: 'The Weeknd' }, { cacheDir: dir, fetchImpl: fake }), { year: 2019, album: 'After Hours', artwork: '' });
   await fetchSongInfo({ title: 'Blinding Lights', artist: 'The Weeknd' }, { cacheDir: dir, fetchImpl: fake }); assert.equal(calls, 1);
@@ -109,16 +109,16 @@ test('update: version comparison and the "no release yet" answer', async () => {
   assert.equal(isNewer('0.10.0', '0.9.9'), true); assert.equal(isNewer('0.3.9', '0.4.0'), false); assert.equal(isNewer('1.0', '0.9.9'), true);
   assert.deepEqual(await latestRelease({ current: '0.4.0', fetchImpl: async () => ({ status: 404, ok: false }) }), { current: '0.4.0', latest: '0.4.0', newer: false });
   // the site answers first
-  const site = await latestRelease({ current: '0.4.0', fetchImpl: async u => (u.startsWith('https://peep.bang.co.tz/') ? { ok: true, status: 200, json: async () => ({ version: '0.5.0', url: 'https://peep.bang.co.tz/download/Peep-Setup-0.5.0.exe' }) } : assert.fail('github asked')) });
-  assert.deepEqual(site, { current: '0.4.0', latest: '0.5.0', newer: true, url: 'https://peep.bang.co.tz/download/Peep-Setup-0.5.0.exe' });
+  const site = await latestRelease({ current: '0.4.0', fetchImpl: async u => (u.startsWith('https://pip.bang.co.tz/') ? { ok: true, status: 200, json: async () => ({ version: '0.5.0', url: 'https://pip.bang.co.tz/download/Pip-Setup-0.5.0.exe' }) } : assert.fail('github asked')) });
+  assert.deepEqual(site, { current: '0.4.0', latest: '0.5.0', newer: true, url: 'https://pip.bang.co.tz/download/Pip-Setup-0.5.0.exe' });
   // site down: GitHub Releases
-  const r = await latestRelease({ current: '0.4.0', fetchImpl: async u => (u.startsWith('https://peep.bang.co.tz/') ? { ok: false, status: 502 } : { status: 200, ok: true, json: async () => ({ tag_name: 'v0.5.0', html_url: 'https://github.com/mkumbwajr/Peep/releases/tag/v0.5.0' }) }) });
+  const r = await latestRelease({ current: '0.4.0', fetchImpl: async u => (u.startsWith('https://pip.bang.co.tz/') ? { ok: false, status: 502 } : { status: 200, ok: true, json: async () => ({ tag_name: 'v0.5.0', html_url: 'https://github.com/mkumbwajr/Pip/releases/tag/v0.5.0' }) }) });
   assert.equal(r.newer, true); assert.equal(r.latest, '0.5.0');
   const { isReleaseUrl } = require('../src/main/update.js');
-  assert.equal(isReleaseUrl('https://peep.bang.co.tz/download/x.exe'), true); assert.equal(isReleaseUrl('https://evil.example/peep.bang.co.tz/'), false);
+  assert.equal(isReleaseUrl('https://pip.bang.co.tz/download/x.exe'), true); assert.equal(isReleaseUrl('https://evil.example/pip.bang.co.tz/'), false);
 });
 
-test('google: Peep never asks for email contents or headers (only counts), so it can be verified for everyone', () => {
+test('google: Pip never asks for email contents or headers (only counts), so it can be verified for everyone', () => {
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src', 'main', 'google.js'), 'utf8');
   assert.ok(!/gmail\.(readonly|metadata|modify)|mail\.google\.com\/$/.test(src), 'no restricted Gmail permission');
   assert.ok(!/\/messages/.test(src), 'no message is ever listed or read');
@@ -128,10 +128,10 @@ test('share: the page address comes from the adapter that carries traffic; the f
   const { routeAddress } = require('../src/main/share.js');
   const a = await routeAddress(); assert.ok(a === null || /^\d+\.\d+\.\d+\.\d+$/.test(a));
   const { ruleCovers } = require('../src/main/firewall.js');
-  const out = 'Rule Name:                            Peep phone sharing\r\n----------------------------------------------------------------------\r\nEnabled:                              Yes\r\nDirection:                            In\r\nProfiles:                             Domain,Private,Public\r\nRemoteIP:                             LocalSubnet\r\nProtocol:                             TCP\r\nAction:                               Allow\r\nProgram:                              C:\\Users\\A\\AppData\\Local\\Programs\\Peep\\Peep.exe\r\n';
-  assert.equal(ruleCovers(out, 'c:\\users\\a\\appdata\\local\\programs\\peep\\peep.exe'), true);
-  assert.equal(ruleCovers(out.replace('Yes', 'No'), 'C:\\Users\\A\\AppData\\Local\\Programs\\Peep\\Peep.exe'), false);
-  assert.equal(ruleCovers(out, 'C:\\Other\\Peep.exe'), false);
+  const out = 'Rule Name:                            Pip phone sharing\r\n----------------------------------------------------------------------\r\nEnabled:                              Yes\r\nDirection:                            In\r\nProfiles:                             Domain,Private,Public\r\nRemoteIP:                             LocalSubnet\r\nProtocol:                             TCP\r\nAction:                               Allow\r\nProgram:                              C:\\Users\\A\\AppData\\Local\\Programs\\Pip\\Pip.exe\r\n';
+  assert.equal(ruleCovers(out, 'c:\\users\\a\\appdata\\local\\programs\\pip\\pip.exe'), true);
+  assert.equal(ruleCovers(out.replace('Yes', 'No'), 'C:\\Users\\A\\AppData\\Local\\Programs\\Pip\\Pip.exe'), false);
+  assert.equal(ruleCovers(out, 'C:\\Other\\Pip.exe'), false);
   assert.equal(ruleCovers('No rules match the specified criteria.', 'x'), false);
 });
 
@@ -145,7 +145,7 @@ test('song info: cover art address comes from Apple only, at 600 px', async () =
 });
 
 test('lyrics: a song without timed lyrics is an empty list (cached); a network failure throws so it is asked again', async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peep-ly-')); let calls = 0;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-ly-')); let calls = 0;
   const none = async () => { calls++; return { ok: true, json: async () => [{ duration: 100, plainLyrics: 'la' }] }; };
   assert.deepEqual(await fetchLyrics({ title: 'Song', artist: 'A' }, { cacheDir: dir, fetchImpl: none }), []);
   assert.deepEqual(await fetchLyrics({ title: 'Song', artist: 'A' }, { cacheDir: dir, fetchImpl: none }), []);

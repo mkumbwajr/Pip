@@ -1,7 +1,7 @@
 const test = require('node:test'), assert = require('node:assert');
 const { Hub, describeTool } = require('../src/main/hooks-hub.js');
 
-const post = (port, body, token = 'tok', q = '') => fetch(`http://127.0.0.1:${port}/peep/event${q}`, { method: 'POST', headers: { 'X-Peep-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const post = (port, body, token = 'tok', q = '') => fetch(`http://127.0.0.1:${port}/pip/event${q}`, { method: 'POST', headers: { 'X-Pip-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 test('describeTool', () => {
   assert.deepEqual(describeTool('Read', { file_path: 'C:\\a\\b.js' }), { verb: 'Reading', detail: 'b.js' });
@@ -68,5 +68,16 @@ test('a new session is handed the extra instructions (answer in Swahili)', async
     const start = await (await post(port, { hook_event_name: 'SessionStart', session_id: 'z' })).json();
     assert.deepEqual(start, { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: 'Jibu kwa Kiswahili.' } });
     assert.deepEqual(await (await post(port, { hook_event_name: 'PreToolUse', session_id: 'z', tool_name: 'Read' })).json(), {});
+  } finally { await hub.stop(); }
+});
+
+test('rename: hooks still written by Peep (/peep/event, X-Peep-Token) keep working until Pip replaces them', async () => {
+  const hub = new Hub({ token: 'tok', port: 0 }); const port = await hub.start();
+  try {
+    const old = (body, token = 'tok') => fetch(`http://127.0.0.1:${port}/peep/event`, { method: 'POST', headers: { 'X-Peep-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await old({ hook_event_name: 'UserPromptSubmit', session_id: 'old', prompt: 'x' })).status, 200);
+    assert.equal(hub.snapshot().sessions.some(s => s.id === 'old'), true);
+    assert.equal((await old({}, 'wrong')).status, 404);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/other/event`, { method: 'POST', headers: { 'X-Pip-Token': 'tok' }, body: '{}' })).status, 404);
   } finally { await hub.stop(); }
 });

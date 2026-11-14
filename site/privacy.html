@@ -3,12 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Peep privacy policy</title>
+<title>Pip privacy policy</title>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/icon.png" type="image/png">
 <style>
-  body { margin: 0; padding: 32px 20px 60px; background: #0b0b0e; color: #ececf1; font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-  main { max-width: 760px; margin: 0 auto; }
+  body { margin: 0; padding: 0 0 60px; background: #0b0b0e; color: #ececf1; font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 0; }
+  /* the same top bar as the homepage */
+  .nav { position: sticky; top: 0; z-index: 10; height: 52px; background: rgba(0, 0, 0, .72); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .nav-in { max-width: 980px; height: 100%; margin: 0 auto; padding: 0 22px; display: flex; align-items: center; gap: 28px; }
+  .brand { display: inline-flex; align-items: center; gap: 9px; color: #f5f5f7; font-weight: 600; font-size: 17px; text-decoration: none; }
+  .pip { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 24px; height: 21px; border-radius: 7.5px; background: #7c5cff; }
+  .pip i { width: 4px; height: 7px; border-radius: 2px; background: #fff; }
+  .nav nav { display: flex; gap: 26px; margin-left: auto; font-size: 13px; }
+  .nav nav a { color: rgba(255, 255, 255, .8); text-decoration: none; } .nav nav a:hover { color: #fff; }
+  .nav nav a[aria-current] { color: #fff; }
+  .pill-btn { display: inline-flex; align-items: center; height: 28px; padding: 0 14px; border-radius: 14px; background: #fff; color: #000 !important; font-size: 13px; font-weight: 600; text-decoration: none; }
+  @media (max-width: 734px) { .nav nav { display: none; } .nav-in { justify-content: space-between; } }
   h1 { font-size: 34px; line-height: 1.2; margin: 0 0 6px; }
   h2 { font-size: 20px; margin: 36px 0 8px; }
   p, li { color: #c4c4cc; }
@@ -25,41 +36,48 @@
 </style>
 </head>
 <body>
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="/"><span class="pip"><i></i><i></i></span><span>Pip</span></a>
+    <nav aria-label="Kurasa"><a href="/#vipengele">Vipengele</a><a href="/privacy" aria-current="page">Faragha</a><a href="/#maswali">Maswali</a><a href="https://github.com/mkumbwajr/Pip">GitHub</a></nav>
+    <a class="pill-btn" href="/download/Pip-Setup.exe">Pakua</a>
+  </div>
+</header>
 <main>
-  <h1>Peep privacy policy</h1>
-  <p class="meta">Peep for Windows &middot; BANG DIGITAL LTD, Tanzania &middot; Last updated 14 November 2026</p>
+  <h1>Pip privacy policy</h1>
+  <p class="meta">Pip for Windows &middot; BANG DIGITAL LTD, Tanzania &middot; Last updated 14 November 2026</p>
 
   <div class="box">
-    <p><strong>Short version.</strong> Peep runs on your own PC. It has no accounts, no ads and no analytics. Information
+    <p><strong>Short version.</strong> Pip runs on your own PC. It has no accounts, no ads and no analytics. Information
       leaves your PC only for a feature you choose to use, and then only what that feature needs. BANG DIGITAL does not
       sell, share or keep your data.</p>
-    <p lang="sw"><strong>Kwa ufupi.</strong> Peep inafanya kazi kwenye PC yako. Hakuna akaunti, matangazo wala telemetry.
+    <p lang="sw"><strong>Kwa ufupi.</strong> Pip inafanya kazi kwenye PC yako. Hakuna akaunti, matangazo wala telemetry.
       Kinachotoka nje ya PC ni kile tu kinachohitajika na kipengele ulichochagua kutumia. BANG DIGITAL haiuzi, haigawi wala
       haihifadhi data yako.</p>
   </div>
 
   <h2>1. Google account (optional)</h2>
-  <p>If you choose <strong>Sign in with Google</strong>, Peep asks Google for two read-only permissions and uses them only to
-    show you information inside Peep, on your own screen:</p>
+  <p>If you choose <strong>Sign in with Google</strong>, Pip asks Google for two read-only permissions and uses them only to
+    show you information inside Pip, on your own screen:</p>
   <table>
-    <tr><th>Permission</th><th>What Peep reads</th><th>Why</th></tr>
+    <tr><th>Permission</th><th>What Pip reads</th><th>Why</th></tr>
     <tr><td><code>calendar.readonly</code><br>Google Calendar, read only</td><td>Titles and times of your events for today and the current month</td><td>The Calendar tab: today's timeline, the month view and your next event</td></tr>
-    <tr><td><code>gmail.labels</code><br>Gmail labels</td><td>Only the number of unread emails in your inbox</td><td>The unread count on the Mail tab. Peep never reads, lists or opens your emails, senders or subjects</td></tr>
+    <tr><td><code>gmail.labels</code><br>Gmail labels</td><td>Only the number of unread emails in your inbox</td><td>The unread count on the Mail tab. Pip never reads, lists or opens your emails, senders or subjects</td></tr>
   </table>
-  <p>Sign-in happens in your own browser. Google sends the access tokens to Peep on your PC, where they are stored encrypted
-    with Windows' data protection. Calendar events and the unread count are held in memory only while Peep shows them. This
+  <p>Sign-in happens in your own browser. Google sends the access tokens to Pip on your PC, where they are stored encrypted
+    with Windows' data protection. Calendar events and the unread count are held in memory only while Pip shows them. This
     Google data is never sent to BANG DIGITAL or to anyone else, never sold, never used for advertising, never used to train
-    artificial intelligence models, and never read by people. Signing out in Peep's settings deletes the stored tokens. You
-    can also remove Peep's access at any time at
+    artificial intelligence models, and never read by people. Signing out in Pip's settings deletes the stored tokens. You
+    can also remove Pip's access at any time at
     <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</p>
-  <p><strong>Peep's use and transfer to any other app of information received from Google APIs will adhere to the
+  <p><strong>Pip's use and transfer to any other app of information received from Google APIs will adhere to the
     <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
     including the Limited Use requirements.</strong></p>
 
   <h2>2. Sending files between your phone and your PC</h2>
-  <p>When you choose <strong>Get from your phone</strong>, Peep makes a private link and QR code that works for one hour, or
-    until you stop sharing. So that it also works when your phone is not on the same Wi-Fi, the files travel through Peep's
-    relay at <code>peep.bang.co.tz</code>, encrypted on the way (HTTPS). The relay only passes them along as they move: it
+  <p>When you choose <strong>Get from your phone</strong>, Pip makes a private link and QR code that works for one hour, or
+    until you stop sharing. So that it also works when your phone is not on the same Wi-Fi, the files travel through Pip's
+    relay at <code>pip.bang.co.tz</code>, encrypted on the way (HTTPS). The relay only passes them along as they move: it
     does not save files, does not keep copies, and does not record file names or contents. Anyone who has the link can open
     it while it works, so only share it with your own devices.</p>
 
@@ -70,31 +88,31 @@
     <tr><td>Weather</td><td>The town you type</td><td>Open-Meteo</td></tr>
     <tr><td>Song lyrics</td><td>Song title, artist and length</td><td>lrclib.net</td></tr>
     <tr><td>Release year of a song</td><td>Song title and artist</td><td>Apple iTunes Search</td></tr>
-    <tr><td>Calendar link (iCal)</td><td>Peep downloads the private calendar link you paste</td><td>Your calendar provider</td></tr>
+    <tr><td>Calendar link (iCal)</td><td>Pip downloads the private calendar link you paste</td><td>Your calendar provider</td></tr>
     <tr><td>Spotify devices</td><td>Your Spotify login and your list of devices</td><td>Spotify</td></tr>
     <tr><td>Ask about your screen</td><td>One screenshot and your question</td><td>Claude Code or Codex, using your own account on your PC</td></tr>
-    <tr><td>Check for updates</td><td>A request for the newest version number</td><td>peep.bang.co.tz (or GitHub)</td></tr>
+    <tr><td>Check for updates</td><td>A request for the newest version number</td><td>pip.bang.co.tz (or GitHub)</td></tr>
   </table>
   <p>Everything else, including what your AI agents are doing, your notes, copied text, files and settings, stays on your PC.</p>
 
   <h2>4. This website</h2>
-  <p>peep.bang.co.tz serves the installer, this page, the update check and the file relay. Like any web server it briefly
+  <p>pip.bang.co.tz serves the installer, this page, the update check and the file relay. Like any web server it briefly
     keeps standard access logs (IP address, time, page requested, browser name) to keep the service working and safe. They
     are deleted after 14 days and are never shared or sold. The website uses no cookies and no trackers.</p>
 
   <h2>5. Children</h2>
-  <p>Peep is a tool for developers and is not directed at children under 13.</p>
+  <p>Pip is a tool for developers and is not directed at children under 13.</p>
 
   <h2>6. Your choices</h2>
-  <p>You can use Peep without any of the online features above. You can sign out of Google or Spotify, switch off lyrics,
-    the song year and the weather in Settings, and uninstall Peep at any time; uninstalling removes Peep and its changes to
+  <p>You can use Pip without any of the online features above. You can sign out of Google or Spotify, switch off lyrics,
+    the song year and the weather in Settings, and uninstall Pip at any time; uninstalling removes Pip and its changes to
     your AI agents' settings.</p>
 
   <h2>7. Changes and contact</h2>
   <p>If this policy changes, the new version is published on this page with a new date. Questions about your data:
     <a href="mailto:info@bang.co.tz">info@bang.co.tz</a> &middot; BANG DIGITAL LTD, Tanzania.</p>
 
-  <footer>&copy; 2026 BANG DIGITAL LTD &middot; <a href="https://peep.bang.co.tz/">peep.bang.co.tz</a> &middot; <a href="https://github.com/mkumbwajr/Peep">Source code (MIT)</a></footer>
+  <footer>&copy; 2026 BANG DIGITAL LTD &middot; <a href="https://pip.bang.co.tz/">pip.bang.co.tz</a> &middot; <a href="https://github.com/mkumbwajr/Pip">Source code (MIT)</a></footer>
 </main>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// peep.bang.co.tz: the current version on the download buttons, and sections that ease in as they scroll into view.
+// pip.bang.co.tz: the current version on the download buttons, and sections that ease in as they scroll into view.
 document.documentElement.classList.add('js');
 
 const reveal = document.querySelectorAll('.reveal');

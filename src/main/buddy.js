@@ -1,5 +1,5 @@
 'use strict';
-// "Ask about my screen": Peep takes one screenshot of the screen the island is on, and asks the coding agent you
+// "Ask about my screen": Pip takes one screenshot of the screen the island is on, and asks the coding agent you
 // already use (Claude Code or Codex, through its own command-line program and your own login) your question about it.
 // The screenshot lives in a temporary folder and is deleted right after the answer.
 const { spawn } = require('node:child_process');
@@ -39,7 +39,7 @@ function run({ cmd, args, parse }, input, cwd, t) {
 
 /** png: Buffer of the screenshot. Returns the agent's answer as text. */
 async function ask({ agent = 'claude', question, png, language = '', t = s => s }) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peep-ask-')), image = path.join(dir, 'screen.png');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-ask-')), image = path.join(dir, 'screen.png');
   try {
     fs.writeFileSync(image, png);
     const prompt = agent === 'codex'

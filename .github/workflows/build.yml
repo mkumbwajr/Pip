@@ -22,4 +22,4 @@ jobs:
       - name: Installer
         run: npm run dist:win
       - uses: actions/upload-artifact@v4
-        with: { name: Peep-Setup, path: dist/*.exe }
+        with: { name: Pip-Setup, path: dist/*.exe }

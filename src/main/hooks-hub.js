@@ -8,7 +8,10 @@ const { EventEmitter } = require('node:events');
 const { timingSafeEqual } = require('node:crypto');
 
 const PORT = 48611;
-const PREFIX = '/peep';
+const PREFIX = '/pip';
+// Pip was called Peep before 0.5: its hooks call /peep/... with an X-Peep-Token header. They keep working until
+// Pip rewrites them on its first start, so an agent never goes quiet during the update.
+const LEGACY_PREFIX = '/peep';
 const PERMISSION_WAIT_MS = 4 * 60 * 1000, REPLY_WAIT_MS = 30 * 60 * 1000;
 const FEED_MAX = 30, HISTORY_MAX = 50, BODY_MAX = 2 * 1024 * 1024;
 
@@ -56,14 +59,14 @@ class Hub extends EventEmitter {
   stop() { for (const id of this.pending.keys()) this.release(id, null); for (const id of this.waiters.keys()) this.endWait(id, null); return new Promise(r => (this.server ? this.server.close(() => r()) : r())); }
 
   authorised(req) {
-    const given = Buffer.from(String(req.headers['x-peep-token'] || '')), want = Buffer.from(this.token);
+    const given = Buffer.from(String(req.headers['x-pip-token'] || req.headers['x-peep-token'] || '')), want = Buffer.from(this.token);
     return given.length === want.length && timingSafeEqual(given, want);
   }
 
   onRequest(req, res) {
     const url = new URL(req.url, 'http://127.0.0.1');
-    const route = url.pathname.slice(PREFIX.length + 1);
-    if (req.method !== 'POST' || !url.pathname.startsWith(PREFIX + '/') || !['event', 'status', 'wait'].includes(route) || !this.authorised(req)) { res.writeHead(404).end(); return; }
+    const prefix = url.pathname.startsWith(LEGACY_PREFIX + '/') ? LEGACY_PREFIX : PREFIX, route = url.pathname.slice(prefix.length + 1);
+    if (req.method !== 'POST' || !url.pathname.startsWith(prefix + '/') || !['event', 'status', 'wait'].includes(route) || !this.authorised(req)) { res.writeHead(404).end(); return; }
     let size = 0; const chunks = [];
     req.on('data', c => { size += c.length; if (size > BODY_MAX) req.destroy(); else chunks.push(c); });
     req.on('end', () => {
@@ -154,7 +157,7 @@ class Hub extends EventEmitter {
   release(id, behavior) {
     const p = this.pending.get(id); if (!p) return false;
     clearTimeout(p.timer); this.pending.delete(id);
-    const body = behavior ? { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: behavior === 'allow' ? { behavior: 'allow' } : { behavior: 'deny', message: 'Denied from Peep' } } } : {};
+    const body = behavior ? { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: behavior === 'allow' ? { behavior: 'allow' } : { behavior: 'deny', message: 'Denied from Pip' } } } : {};
     try { p.res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(body)); } catch {}
     return true;
   }
@@ -215,4 +218,4 @@ class Hub extends EventEmitter {
   }
 }
 
-module.exports = { Hub, describeTool, PORT, PREFIX };
+module.exports = { Hub, describeTool, PORT, PREFIX, LEGACY_PREFIX };

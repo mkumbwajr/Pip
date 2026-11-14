@@ -1,6 +1,6 @@
 'use strict';
-// Draws Peep's icon (Pip's head: a rounded violet square with two eyes) with no dependencies:
-//   node tools/make-icon.js   ->  assets/icon.png (256 px) and build/peep.ico (16 to 256 px, for the app and the installer)
+// Draws Pip's icon (Pip's head: a rounded violet square with two eyes) with no dependencies:
+//   node tools/make-icon.js   ->  assets/icon.png (256 px) and build/pip.ico (16 to 256 px, for the app and the installer)
 // Every size is drawn on its own with smoothed edges, so the small ones in the taskbar stay crisp.
 const zlib = require('node:zlib'), fs = require('node:fs'), path = require('node:path');
 
@@ -42,6 +42,6 @@ function ico(sizes) {
 const root = path.join(__dirname, '..');
 fs.writeFileSync(path.join(root, 'assets', 'icon.png'), png(256));
 const icoFile = ico([16, 20, 24, 32, 40, 48, 64, 128, 256]);
-fs.writeFileSync(path.join(root, 'build', 'peep.ico'), icoFile);  // the exe and the installer
-fs.writeFileSync(path.join(root, 'assets', 'icon.ico'), icoFile); // Peep's windows and tray, so they match the exe exactly
-console.log('wrote assets/icon.png, assets/icon.ico and build/peep.ico');
+fs.writeFileSync(path.join(root, 'build', 'pip.ico'), icoFile);  // the exe and the installer
+fs.writeFileSync(path.join(root, 'assets', 'icon.ico'), icoFile); // Pip's windows and tray, so they match the exe exactly
+console.log('wrote assets/icon.png, assets/icon.ico and build/pip.ico');

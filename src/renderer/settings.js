@@ -1,6 +1,6 @@
 'use strict';
-// Peep's settings window. Every change is saved at once; the main process tells the island to pick it up.
-const api = window.peep;
+// Pip's settings window. Every change is saved at once; the main process tells the island to pick it up.
+const api = window.pip;
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const page = $('#page');
@@ -12,8 +12,8 @@ const check = (id, on, label) => `<label class="check"><input type="checkbox" id
 
 // The sections in the sidebar: [id, group, name, one line under the title]
 const sections = () => [
-  ['overview', 'Peep', t('Overview'), t('How Peep is set up on this PC')],
-  ['agents', 'Peep', t('Agents'), t('Which agents Peep follows, and how they answer you')],
+  ['overview', 'Pip', t('Overview'), t('How Pip is set up on this PC')],
+  ['agents', 'Pip', t('Agents'), t('Which agents Pip follows, and how they answer you')],
   ['look', S.settings.mascot.name, t('Look'), t('Name, colour and hat')],
   ['island', t('Settings'), t('Island'), t('Where the island sits on your screen')],
   ['general', t('Settings'), t('General'), t('Language, sound, start-up, weather and calendar')],
@@ -29,7 +29,7 @@ const views = {
     return `<div class="panel"><h2>${esc(t('Agents'))}</h2>${fact(S.agents.claude, 'Claude Code: ' + esc(S.agents.claude ? t('Connected') : t('Not connected')))}${fact(S.agents.codex, 'Codex: ' + esc(S.agents.codex ? t('Connected') : t('Not connected')))}
         ${fact(S.node, esc(S.node ? t('Node.js found: you can answer from the island and see your usage.') : t('Answering from here and the usage bars need Node.js on this PC.')))}
         ${S.hubError ? fact(false, esc(S.hubError)) : ''}</div>
-      <div class="panel"><h2>Peep</h2>${fact(null, esc(t('Version {v}', { v: S.version })) + ' · MIT')}${fact(null, esc(t('Shortcut: {keys}', { keys: s.shortcut })))}${fact(null, esc(t('Hover over the island to open it. Click it to keep it open.')))}</div>`;
+      <div class="panel"><h2>Pip</h2>${fact(null, esc(t('Version {v}', { v: S.version })) + ' · MIT')}${fact(null, esc(t('Shortcut: {keys}', { keys: s.shortcut })))}${fact(null, esc(t('Hover over the island to open it. Click it to keep it open.')))}</div>`;
   },
   agents() {
     return `<div class="panel"><h2>${esc(t('Follow'))}</h2>${check('ag-claude', S.agents.claude, esc(t('Follow Claude Code')) + ` <span class="dim small">(~/.claude/settings.json)</span>`)}${check('ag-codex', S.agents.codex, esc(t('Follow Codex')) + ` <span class="dim small">(~/.codex/hooks.json)</span>`)}<div class="small" id="ag-error" data-kind="error"></div></div>
@@ -47,6 +47,7 @@ const views = {
     return `<div class="panel"><div class="seg">
         <button data-mode="attach" class="${s.island.mode === 'detach' ? '' : 'on'}"><b>${esc(t('Attach'))}</b><span>${esc(t('Joined to the top edge of the screen'))}</span></button>
         <button data-mode="detach" class="${s.island.mode === 'detach' ? 'on' : ''}"><b>${esc(t('Detach'))}</b><span>${esc(t('Floating just below the top edge'))}</span></button></div></div>
+      <div class="panel"><label class="field"><span>${esc(t('Island size'))}</span><div class="row"><input type="range" id="i-size" min="80" max="140" step="5" value="${Math.round((s.island.scale || 1) * 100)}"><span class="dim" id="i-size-n">${Math.round((s.island.scale || 1) * 100)}%</span></div></label></div>
       <div class="panel"><label class="field"><span>${esc(t('Background transparency'))}</span><div class="row"><input type="range" id="i-alpha" min="0" max="60" value="${Math.round((1 - (s.island.opacity ?? 1)) * 100)}"><span class="dim" id="i-alpha-n">${Math.round((1 - (s.island.opacity ?? 1)) * 100)}%</span></div></label></div>
       ${S.displays > 1 ? `<div class="panel"><label class="field"><span>${esc(t('Screen'))}</span><select id="s-display">${Array.from({ length: S.displays }, (_, i) => `<option value="${i}" ${i === s.island.display ? 'selected' : ''}>${esc(t('Screen {n}', { n: i + 1 }))}</option>`).join('')}</select></label></div>` : ''}`;
   },
@@ -76,10 +77,10 @@ const views = {
 
 function draw() {
   const s = S.settings, list = sections(), now = list.find(x => x[0] === current) || list[0];
-  document.title = t('Peep settings'); $('#brand-sub').textContent = t('Settings');
+  document.title = t('Pip settings'); $('#brand-sub').textContent = t('Settings');
   let group = '';
   $('#nav').innerHTML = list.map(([id, g, name]) => `${g !== group ? `<h3>${esc(group = g)}</h3>` : ''}<button data-go="${id}" class="${id === now[0] ? 'on' : ''}"><i></i>${esc(name)}</button>`).join('');
-  $('#foot').textContent = `Peep ${S.version}`;
+  $('#foot').textContent = `Pip ${S.version}`;
   $('#title').textContent = now[2]; $('#subtitle').textContent = now[3];
   page.innerHTML = views[now[0]]();
   for (const el of page.querySelectorAll('[data-color]')) el.style.background = el.dataset.color;
@@ -123,6 +124,7 @@ page.addEventListener('click', async e => {
 $('#nav').addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) { current = b.dataset.go; draw(); page.scrollTop = 0; } });
 page.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 's-place') { e.preventDefault(); checkWeather(); } });
 page.addEventListener('input', e => {
+  if (e.target.id === 'i-size') { $('#i-size-n').textContent = e.target.value + '%'; save({ island: { scale: e.target.value / 100 } }); return; } // live, while dragging
   if (e.target.id !== 'i-alpha') return;
   $('#i-alpha-n').textContent = e.target.value + '%'; save({ island: { opacity: 1 - e.target.value / 100 } }); // live, while dragging
 });

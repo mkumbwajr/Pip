@@ -40,7 +40,7 @@ class Spotify {
       const server = this.server = http.createServer(async (req, res) => {
         const url = new URL(req.url, REDIRECT);
         if (url.pathname !== '/callback' || url.searchParams.get('state') !== state) { res.writeHead(404).end(); return; }
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end('<body style="font:18px system-ui;padding:40px">Peep: tayari. Unaweza kufunga tab hii.</body>');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end('<body style="font:18px system-ui;padding:40px">Pip: tayari. Unaweza kufunga tab hii.</body>');
         const code = url.searchParams.get('code'); if (!code) return done(reject, new Error(this.t('Login was cancelled.')));
         try { await this.token({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: clientId, code_verifier: verifier }); done(resolve, true); } catch (e) { done(reject, e); }
       });

@@ -1,4 +1,4 @@
-/* Peep's settings window: a sidebar of sections, and on the right a header that carries a live copy of the island
+/* Pip's settings window: a sidebar of sections, and on the right a header that carries a live copy of the island
    (so Attach / Detach, the colour and the hat show as you change them) above the cards of the chosen section. */
 body.window { display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
 #side { flex: none; width: 216px; display: flex; flex-direction: column; padding: 16px 10px 12px; border-right: 1px solid var(--line); background: #09090c; }

@@ -1,12 +1,12 @@
-# Peep
+# Pip
 
-Peep is a free, open-source (MIT) status island for Windows. A notch at the top of the screen shows what AI coding
+Pip is a free, open-source (MIT) status island for Windows. A notch at the top of the screen shows what AI coding
 agents (Claude Code, Codex) are doing, and opens on hover into a panel of small tools. The mascot is Pip.
-Publisher: BANG DIGITAL LTD. Repo: https://github.com/mkumbwajr/Peep
+Publisher: BANG DIGITAL LTD. Repo: https://github.com/mkumbwajr/Pip
 
 ## Rules that do not change
 
-1. **Original work only.** Peep was inspired by a commercial app called TwoCode. Never copy its code, artwork,
+1. **Original work only.** Pip was inspired by a commercial app called TwoCode. Never copy its code, artwork,
    mascot, wording, icons or exact visual design. Matching *what a feature does* is fine; matching *how it looks* is
    not. Pip is a coloured rounded-square face with two eyes, and stays that way.
 2. **Swahili first.** Every text a user sees goes through `t('English text')`. The translation lives in
@@ -15,7 +15,7 @@ Publisher: BANG DIGITAL LTD. Repo: https://github.com/mkumbwajr/Peep
    The owner reviews wording: list every new string in your summary.
 3. **No account, no paywall, no telemetry.** Anything that leaves the PC must be switched on by the user and named
    in the README's "Kinachotoka nje ya PC yako" section.
-4. **Never break the user's agent config.** `hook-install.js` only touches its own entries, keeps a `.peep-backup`,
+4. **Never break the user's agent config.** `hook-install.js` only touches its own entries, keeps a `.pip-backup`,
    never replaces an existing status line and refuses to write JSON it cannot parse. Keep those guarantees and
    their tests.
 5. **Say what was tested.** Most Windows-only code has never run on Windows. Do not claim it works until it has.
@@ -36,10 +36,10 @@ node tools/check-helper.js                      # Windows: runs the PowerShell h
 | Path | What it is |
 | --- | --- |
 | `src/main/main.js` | Main process: island window, settings window, tray, shortcuts, all IPC |
-| `src/main/hooks-hub.js` | HTTP server on `127.0.0.1:48611` (token header). Routes: `/peep/event`, `/peep/status`, `/peep/wait`. Session state, permission holds, replies, usage |
+| `src/main/hooks-hub.js` | HTTP server on `127.0.0.1:48611` (token header). Routes: `/pip/event`, `/pip/status`, `/pip/wait`. Session state, permission holds, replies, usage |
 | `src/main/hook-install.js` | Adds/removes hooks in `~/.claude/settings.json` and `~/.codex/hooks.json` |
-| `src/hooks/peep-reply.cjs` | Background Stop hook (`asyncRewake`): waits for an answer typed in the island, exits 2 to wake Claude |
-| `src/hooks/peep-status.cjs` | Status line: forwards `rate_limits` to the hub |
+| `src/hooks/pip-reply.cjs` | Background Stop hook (`asyncRewake`): waits for an answer typed in the island, exits 2 to wake Claude |
+| `src/hooks/pip-status.cjs` | Status line: forwards `rate_limits` to the hub |
 | `src/helpers/win-helper.ps1` | One hidden PowerShell: media session, artwork, volume, front window, Wi-Fi/Bluetooth. JSON lines both ways |
 | `src/main/win-helper.js` | Starts and talks to that script |
 | `src/main/share.js` | Phone transfer over the LAN (random link, QR, one hour) |
@@ -49,7 +49,7 @@ node tools/check-helper.js                      # Windows: runs the PowerShell h
 | `src/renderer/settings.*` | Settings window (sidebar, header with live island preview, cards) |
 | `src/renderer/guard.*` | Focus-guard pause screen |
 | `src/shared/i18n.js`, `src/locales/sw.json` | Translation helper and the Swahili strings |
-| `build/peep.nsi` | Installer (plain NSIS; per-user; uninstaller runs `Peep.exe --remove-hooks`) |
+| `build/pip.nsi` | Installer (plain NSIS; per-user; uninstaller runs `Pip.exe --remove-hooks`) |
 
 Conventions: plain JavaScript, no framework, no bundler. Renderers are sandboxed with a strict CSP (no inline
 styles or scripts: set styles from JS). Every IPC handler checks the sender. Comments explain *why*, in English.
@@ -68,7 +68,7 @@ real error; get that error and fix the cause.
 
 ## Work to do: features to reach
 
-The owner wants every function below. Build them in Peep's own layout (next section), not the reference's.
+The owner wants every function below. Build them in Pip's own layout (next section), not the reference's.
 Legend: ✅ have, ◐ partial, ☐ missing.
 
 **Status strip (always visible in the open island)**
@@ -131,7 +131,7 @@ Legend: ✅ have, ◐ partial, ☐ missing.
 - ✅ Idle notch, hover to open, fold in, per-tab colour glow, spring motion
 - ☐ Auto-update (removed: design it for the plain NSIS installer, e.g. check GitHub Releases and offer the download)
 
-## Peep's own layout (use this, not the reference's placement)
+## Pip's own layout (use this, not the reference's placement)
 
 - **Navigation is a vertical rail on the left edge** of the open panel: icons only, the active one with its label
   beside it. Custom launchers sit at the bottom of the rail.
@@ -145,5 +145,5 @@ Legend: ✅ have, ◐ partial, ☐ missing.
 
 - One feature per commit. Add or update a test for anything in `src/main/` that can run under Node.
 - After UI changes run the smoke test and look at the screenshots.
-- Bump `version` in `package.json` and `VERSION` in `build/peep.nsi` together.
+- Bump `version` in `package.json` and `VERSION` in `build/pip.nsi` together.
 - Ask the owner before: adding a dependency, sending any data off the PC, or changing wording he has reviewed.

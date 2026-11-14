@@ -1,5 +1,5 @@
 'use strict';
-// Phone transfer over your own Wi-Fi: Peep serves a small page on this PC's LAN address, protected by a random
+// Phone transfer over your own Wi-Fi: Pip serves a small page on this PC's LAN address, protected by a random
 // link. Scan the QR code with a phone on the same network to download the files in the tray or send files to the PC.
 // No cloud relay and no account: nothing leaves your network. The link dies after an hour or when you stop it.
 // Trade-off: plain HTTP on the local network, so use it on networks you trust.
@@ -103,7 +103,7 @@ class Share {
       || `<p class="empty">${esc(t('Nothing in the tray yet.'))}</p>`;
     const icon = ICON ? `<link rel="icon" href="${ICON}"><link rel="apple-touch-icon" href="${ICON}">` : '';
     return `<!doctype html><html lang="sw"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0b0b0e"><title>Peep</title>${icon}
+<meta name="theme-color" content="#0b0b0e"><title>Pip</title>${icon}
 <style>
 :root{--pip:#7c5cff;--bg:#0b0b0e;--card:#16161b;--line:#26262d;--soft:#b6b6be;--mute:#86868f}
 *{box-sizing:border-box}html{background:var(--bg)}
@@ -136,12 +136,12 @@ input{display:none}
 .meta{margin-top:6px;font-size:12px;color:var(--mute);display:flex;justify-content:space-between}
 footer{margin-top:34px;text-align:center;font-size:12px;color:var(--mute)}
 </style>
-<header><span class="pip"><i></i><i></i></span><div><b>Peep</b><span>${esc(t('Files between your phone and your PC'))}</span></div></header>
+<header><span class="pip"><i></i><i></i></span><div><b>Pip</b><span>${esc(t('Files between your phone and your PC'))}</span></div></header>
 <h2>${esc(t('From your PC'))}</h2>${rows}
 <h2>${esc(t('Send to your PC'))}</h2>
-<label class="pick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><b>${esc(t('Choose files'))}</b><span>${esc(t('They go to the Peep folder in Downloads on the PC.'))}</span><input id="f" type="file" multiple></label>
+<label class="pick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><b>${esc(t('Choose files'))}</b><span>${esc(t('They go to the Pip folder in Downloads on the PC.'))}</span><input id="f" type="file" multiple></label>
 <div id="jobs"></div>
-<footer>Peep · BANG DIGITAL</footer>
+<footer>Pip · BANG DIGITAL</footer>
 <script>
 const SENDING=${js(t('Sending…'))},SENT=${js(t('Sent'))},FAILED=${js(t('Could not send. Try again.'))};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
