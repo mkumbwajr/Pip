@@ -57,7 +57,7 @@ const views = {
       <div class="panel"><label class="field"><span>${esc(t('Town for the weather'))}</span><div class="row"><input type="text" class="grow" id="s-place" value="${esc(s.weather.place)}"><button class="btn" id="w-go">${esc(t('Check'))}</button></div></label>
         <div class="small dim" id="w-out"></div><br>
         <label class="field"><span>${esc(t('Calendar link (private iCal address, https)'))}</span><input type="url" id="s-cal" value="${esc(s.calendarUrl)}"></label></div>
-      <div class="panel"><h2>Google</h2><div class="dim small">${esc(t('For your calendar, the number of unread emails, and the sender and subject of your 5 newest emails (never the text).'))}</div>
+      <div class="panel"><h2>Google</h2><div class="dim small">${esc(t('For your calendar and the number of unread emails (never who or what).'))}</div>
         <div class="row" data-gap>${S.googleBuiltIn ? '<span class="grow"></span>' : `<input type="text" class="grow" id="go-id" placeholder="Client ID" value="${esc(s.google.clientId)}"><input type="password" class="grow" id="go-secret" placeholder="Client secret" value="${esc(s.google.secret)}">`}
         <button class="btn ${S.google ? '' : 'primary'}" id="go-go">${esc(S.google ? t('Sign out') : t('Sign in with Google'))}</button></div><div class="small" id="go-error" data-kind="error"></div></div>`;
   },

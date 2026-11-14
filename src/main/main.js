@@ -12,24 +12,29 @@ const { Hub } = require('./hooks-hub.js');
 const hooks = require('./hook-install.js');
 const { WinHelper } = require('./win-helper.js');
 const { Share } = require('./share.js');
+const firewall = require('./firewall.js');
 const { nextEvent } = require('./ics.js');
-const { fetchLyrics } = require('./lyrics.js');
+const { fetchLyrics, splitTitle } = require('./lyrics.js');
 const { fetchSongInfo } = require('./songinfo.js');
 const buddy = require('./buddy.js');
 const { Spotify } = require('./spotify.js');
 const { Google, clientFor } = require('./google.js');
-const { latestRelease } = require('./update.js');
+const { latestRelease, isReleaseUrl } = require('./update.js');
 const { makeT } = require('../shared/i18n.js');
 
 // Peep.exe --remove-hooks: take Peep's entries out of the agents' config files and leave. The uninstaller runs this.
 if (process.argv.includes('--remove-hooks')) { try { hooks.uninstallClaude(); } catch {} try { hooks.uninstallCodex(); } catch {} app.exit(0); return; }
 if (!app.requestSingleInstanceLock()) { app.quit(); return; }
-const APP_ID = 'dev.peep.app';
+// Windows groups taskbar buttons and remembers their picture per app ID. Runs from source (npm start, tests) use their
+// own ID, so the installed Peep never inherits Electron's icon from a development run on the same PC.
+const APP_ID = app.isPackaged ? 'tz.co.bang.peep' : 'tz.co.bang.peep.dev';
 app.setAppUserModelId(APP_ID);
 
 const data = (...p) => path.join(app.getPath('userData'), ...p);
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
+// windows and the tray on Windows use the same multi-size .ico as Peep.exe, so every place shows the same Pip
+const WIN_ICON = path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
 let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, quitting = false;
@@ -73,6 +78,7 @@ function registerAppId() {
   if (process.platform !== 'win32') return;
   try {
     const png = data('peep-icon.png'); fs.mkdirSync(path.dirname(png), { recursive: true }); fs.writeFileSync(png, fs.readFileSync(ICON));
+    fs.writeFileSync(data('peep-icon.ico'), fs.readFileSync(WIN_ICON)); // a real file the Windows shell can read (not inside app.asar)
     const key = 'HKCU\\Software\\Classes\\AppUserModelId\\' + APP_ID;
     for (const [name, value] of [['DisplayName', 'Peep'], ['IconUri', png], ['IconBackgroundColor', 'FF0C0C10']])
       spawnSync('reg', ['add', key, '/v', name, '/t', 'REG_SZ', '/d', value, '/f'], { windowsHide: true, timeout: 5000 });
@@ -96,7 +102,7 @@ function keepOnTop() {
 function createIsland() {
   island = new BrowserWindow({
     ...ISLAND, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
-    skipTaskbar: true, alwaysOnTop: true, hasShadow: false, show: false, focusable: true,
+    skipTaskbar: true, alwaysOnTop: true, hasShadow: false, show: false, focusable: true, icon: WIN_ICON,
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, autoplayPolicy: 'no-user-gesture-required' }
   });
   island.setAlwaysOnTop(true, 'screen-saver');
@@ -113,9 +119,15 @@ function createIsland() {
 // ---------- the settings window ----------
 function openSettings() {
   if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
-  settingsWin = new BrowserWindow({ width: 1000, height: 700, minWidth: 760, minHeight: 520, title: t('Peep settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: ICON,
+  settingsWin = new BrowserWindow({ width: 1000, height: 700, minWidth: 760, minHeight: 520, title: t('Peep settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: WIN_ICON,
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   settingsWin.setMenu(null);
+  // The taskbar button takes its picture from these details, not from the cache Windows keeps per app ID (which can
+  // still hold another picture, e.g. Electron's own while developing). Peep.exe when installed, else the .ico copy.
+  if (process.platform === 'win32') try {
+    settingsWin.setAppDetails({ appId: APP_ID, appIconPath: app.isPackaged ? process.execPath : data('peep-icon.ico'), appIconIndex: 0, relaunchDisplayName: 'Peep',
+      relaunchCommand: app.isPackaged ? `"${process.execPath}"` : '' });
+  } catch {}
   settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   settingsWin.loadFile(path.join(RENDERER, 'settings.html'));
   settingsWin.on('closed', () => { settingsWin = null; });
@@ -124,7 +136,8 @@ const changed = () => send('app:changed');
 
 // ---------- tray ----------
 function buildTray() {
-  let image = nativeImage.createFromPath(ICON); if (!image.isEmpty()) image = image.resize({ width: 16, height: 16 });
+  // the .ico carries a hand-drawn 16 and 20 px Pip; Windows picks the one that fits the tray
+  const image = nativeImage.createFromPath(WIN_ICON);
   tray = new Tray(image); tray.setToolTip('Peep');
   const menu = () => Menu.buildFromTemplate([
     { label: t('Open island'), click: () => send('island:toggle', true) },
@@ -203,6 +216,24 @@ function stats() {
   return { cpu, mem: Math.round(100 * (1 - os.freemem() / os.totalmem())) };
 }
 
+// ---------- cover art for songs whose player gives none: from iTunes Search (the same switch as the release year) ----------
+async function fillArtwork(key) {
+  if (!store.get('songInfo') || !key) return;
+  const [title, artist] = key.split('|'), song = splitTitle(title, artist);
+  const file = data('artwork', require('node:crypto').createHash('sha1').update(key.toLowerCase()).digest('hex') + '.jpg');
+  let b64 = '';
+  try { b64 = fs.readFileSync(file).toString('base64'); } catch {
+    const info = await fetchSongInfo(song, { cacheDir: data('songinfo'), fetchImpl: webFetch }).catch(() => null);
+    if (!info?.artwork) return;
+    const r = await webFetch(info.artwork, { signal: AbortSignal.timeout(10000) }).catch(() => null); if (!r?.ok) return;
+    const buf = Buffer.from(await r.arrayBuffer()); if (!buf.length || buf.length > 3e6) return;
+    try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, buf); } catch {}
+    b64 = buf.toString('base64');
+  }
+  if (helper.art?.key !== key || helper.art.data) return; // the song changed meanwhile, or the player sent its own
+  helper.art = { key, data: b64 }; send('win:art', helper.art);
+}
+
 // ---------- focus guard: a pause before a distracting window ----------
 const snoozed = new Map(); let guarding = null;
 function checkGuard(front) {
@@ -215,7 +246,7 @@ function checkGuard(front) {
   // covers the screen with a light dim (drawn by the page) so the distracting window waits behind it; shown only once
   // drawn, so there is no white flash, and focused so Esc and the buttons work straight away
   guardWin = new BrowserWindow({ ...d.bounds, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, alwaysOnTop: true, skipTaskbar: true,
-    resizable: false, movable: false, minimizable: false, maximizable: false, show: false, title: 'Peep',
+    resizable: false, movable: false, minimizable: false, maximizable: false, show: false, title: 'Peep', icon: WIN_ICON,
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   guardWin.setAlwaysOnTop(true, 'screen-saver');
   guardWin.once('ready-to-show', () => { guardWin?.show(); guardWin?.focus(); });
@@ -259,12 +290,16 @@ function wireIpc() {
   handle('google:logout', () => { google.logout(); changed(); return { ok: true }; });
   handle('google:events', async (from, to) => { try { return { ok: true, events: await google.events(Number(from), Number(to)) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('google:unread', async () => { try { return { ok: true, count: await google.unread() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  handle('google:recent', async () => { try { return { ok: true, mails: await google.recent(5) }; } catch (e) { return { ok: false, error: String(e.message || e), needsConsent: e.code === 'scope' }; } });
-  // opens one of those emails in Gmail in the browser (only Gmail's own address, with a message id from the list)
-  handle('google:openMail', id => (/^[0-9a-f]{6,32}$/i.test(String(id)) ? shell.openExternal('https://mail.google.com/mail/u/0/#inbox/' + id) : null));
+  // Pip agent: a new chat with the question filled in, in the user's browser (nothing is sent until they press enter there)
+  handle('agent:open', (which, question) => {
+    const q = encodeURIComponent(String(question || '').slice(0, 4000));
+    const url = which === 'chatgpt' ? 'https://chatgpt.com/?q=' + q : which === 'claude' ? 'https://claude.ai/new?q=' + q : null;
+    return url ? shell.openExternal(url) : null;
+  });
+  handle('google:openInbox', () => shell.openExternal('https://mail.google.com/mail/u/0/#inbox'));
   // Updates: asks GitHub (only when you press the button) for the newest release, and opens its page to download it
   handle('app:update', async () => { try { return { ok: true, ...(await latestRelease({ current: app.getVersion(), fetchImpl: webFetch })) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  handle('app:release', url => (/^https:\/\/github\.com\/mkumbwajr\/Peep\/releases\//.test(String(url)) ? shell.openExternal(String(url)) : null));
+  handle('app:release', url => (isReleaseUrl(url) ? shell.openExternal(String(url)) : null));
   handle('buddy:windows', async () => {
     const list = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 240, height: 150 } });
     return list.filter(s => s.name && s.name !== 'Peep' && !s.thumbnail.isEmpty()).slice(0, 12).map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail.toDataURL() }));
@@ -272,7 +307,7 @@ function wireIpc() {
   handle('media:cmd', action => ['toggle', 'next', 'prev'].includes(action) && helper.send({ cmd: 'media', action }));
   handle('media:seek', ms => helper.send({ cmd: 'seek', ms: Math.max(0, Math.round(Number(ms) || 0)) }));
   handle('volume:set', level => helper.send({ cmd: 'volume', level: Math.max(0, Math.min(100, Math.round(Number(level) || 0))) }));
-  handle('lyrics:get', song => (store.get('lyrics') ? fetchLyrics(song || {}, { cacheDir: data('lyrics'), fetchImpl: webFetch }).catch(() => null) : null));
+  handle('lyrics:get', song => (store.get('lyrics') ? fetchLyrics(song || {}, { cacheDir: data('lyrics'), fetchImpl: webFetch }).catch(() => null) : [])); // null only when lrclib could not be reached
   handle('song:info', song => (store.get('songInfo') ? fetchSongInfo({ title: String(song?.title || ''), artist: String(song?.artist || '') }, { cacheDir: data('songinfo'), fetchImpl: webFetch }).catch(() => null) : null));
   handle('weather:get', () => weather().catch(e => ({ error: String(e.message || e) })));
   handle('calendar:get', () => calendar().catch(() => null));
@@ -281,6 +316,7 @@ function wireIpc() {
   handle('tray:remove', p => { trayFiles = trayFiles.filter(f => f !== p); saveTray(); return trayView(); });
   handle('tray:open', p => (trayFiles.includes(p) ? shell.showItemInFolder(p) : null));
   handle('clips:copy', text => { lastClip = String(text); clipboard.writeText(lastClip); return true; });
+  handle('clips:last', () => clips[0]?.text || '');
   handle('clips:clear', () => { clips.length = 0; send('clips:changed', clips); return clips; }); // lastClip stays, so the text still on the clipboard does not come straight back
   handle('app:quit', () => { quitting = true; app.quit(); });
   // a file from the tray dragged out of the island into another app (only files that are in the tray)
@@ -291,10 +327,12 @@ function wireIpc() {
   });
   handle('share:start', async () => {
     share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(app.getPath('downloads'), 'Peep'), onReceive: p => { addToTray([p]); new Notification({ title: 'Peep', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
-    try { const s = await share.start(); return { ok: true, ...s, qr: await require('qrcode').toDataURL(s.url, { margin: 1, width: 220 }) }; }
+    // margin 4 is the quiet zone the QR standard asks for: phone cameras need it to find the code
+    try { const s = await share.start(); return { ok: true, ...s, firewall: firewall.hasRule(), qr: await require('qrcode').toDataURL(s.url, { margin: 4, width: 264, errorCorrectionLevel: 'M' }) }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
   handle('share:stop', async () => { await share?.stop(); return { ok: true }; });
+  handle('share:firewall', async () => ({ ok: await firewall.addRule() }));
   handle('buddy:ask', async (question, windowId) => {
     question = String(question || '').trim().slice(0, 2000); if (!question) return { ok: false, error: t('Ask something first.') };
     try {
@@ -357,7 +395,7 @@ app.whenReady().then(async () => {
   let lastFront = null;
   helper.on('state', s => { send('win:state', s); checkGuard(s.front); if (s.front?.hwnd !== lastFront) { lastFront = s.front?.hwnd; keepOnTop(); } });
   setInterval(keepOnTop, 3000);
-  helper.on('art', art => send('win:art', art));
+  helper.on('art', art => { send('win:art', art); if (!art.data) fillArtwork(art.key); });
   // Pip's eyes follow the pointer wherever it is on the screen, so its position is sent while it moves (30 times a second at most)
   let lastPoint = '';
   setInterval(() => {

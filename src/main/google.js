@@ -1,6 +1,7 @@
 'use strict';
-// Optional Google sign-in, for: today's and this month's calendar events, the number of unread emails, and the sender,
-// subject and time of the 5 newest inbox emails (headers only: the text of an email is never fetched). You bring your own OAuth client (a "Desktop app" client from
+// Optional Google sign-in, for two things only: today's and this month's calendar events, and the NUMBER of unread
+// emails in the inbox (never senders, subjects or text). Both permissions are ones Google can verify without a paid
+// security assessment, so the app can be opened to everyone. You bring your own OAuth client (a "Desktop app" client from
 // console.cloud.google.com), so there is no shared key. Login runs in your browser with PKCE and comes back to this
 // PC on 127.0.0.1. Tokens are stored through a save/load pair the main process supplies (encrypted by Windows).
 const http = require('node:http');
@@ -8,9 +9,8 @@ const { randomBytes } = require('node:crypto');
 const { pkce } = require('./spotify.js');
 
 const REDIRECT_PORT = 48613, REDIRECT = `http://127.0.0.1:${REDIRECT_PORT}`;
-// calendar.readonly cannot change anything; gmail.labels gives the unread count; gmail.metadata gives headers
-// (sender, subject, date) and can never read an email's text or attachments
-const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.labels https://www.googleapis.com/auth/gmail.metadata';
+// calendar.readonly cannot change anything; gmail.labels gives the unread count and cannot open any message
+const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.labels';
 
 function authorizeUrl(clientId, challenge, state) {
   return 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({ client_id: clientId, response_type: 'code', redirect_uri: REDIRECT, scope: SCOPES,
@@ -64,8 +64,6 @@ class Google {
     if (Date.now() > this.tokens.expires) await this.token({ grant_type: 'refresh_token', refresh_token: this.tokens.refresh, client_id: this.tokens.clientId, client_secret: this.tokens.secret });
     const r = await this.fetchImpl(url, { headers: { Authorization: 'Bearer ' + this.tokens.access }, signal: AbortSignal.timeout(10000) });
     if (r.status === 401) { this.logout(); throw new Error(this.t('Google login expired. Sign in again.')); }
-    // signed in before Peep asked for this permission (e.g. email headers): the user has to approve it once
-    if (r.status === 403 && /insufficient|scope/i.test(await r.text().catch(() => ''))) throw Object.assign(new Error(this.t('Sign in again to let Peep show your newest emails.')), { code: 'scope' });
     if (!r.ok) throw new Error(this.t('Google said no ({code}).', { code: r.status }));
     return r.json();
   }
@@ -76,13 +74,6 @@ class Google {
   }
   /** How many unread emails are in the inbox. Only the count: the label call carries no message at all. */
   async unread() { return Number((await this.api('https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX')).messagesUnread) || 0; }
-  /** The newest inbox emails: who sent them, the subject, when, and whether they are unread. Headers only. */
-  async recent(n = 5) {
-    const base = 'https://gmail.googleapis.com/gmail/v1/users/me/messages';
-    const list = (await this.api(`${base}?labelIds=INBOX&maxResults=${n}`)).messages || [];
-    const full = await Promise.all(list.map(m => this.api(`${base}/${encodeURIComponent(m.id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`)));
-    return full.map(toMail);
-  }
 }
 
 /** The client to sign in with: your own from Settings when you set one, else the one Peep ships with. */
@@ -92,15 +83,4 @@ function clientFor(own) {
   return null;
 }
 
-/** "Asha Juma <asha@x.co>" -> { name: 'Asha Juma', address: 'asha@x.co' }; a bare address keeps its part before @ as the name. */
-function parseFrom(v) {
-  const s = String(v || '').trim(), m = s.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
-  const address = (m ? m[2] : s).trim(), name = (m && m[1].trim()) || address.split('@')[0];
-  return { name, address };
-}
-function toMail(m) {
-  const h = name => (m.payload?.headers || []).find(x => x.name.toLowerCase() === name)?.value || '';
-  return { id: m.id, from: parseFrom(h('from')), subject: h('subject'), at: Number(m.internalDate) || 0, unread: (m.labelIds || []).includes('UNREAD') };
-}
-
-module.exports = { Google, authorizeUrl, toEvents, toMail, parseFrom, clientFor, REDIRECT, SCOPES };
+module.exports = { Google, authorizeUrl, toEvents, clientFor, REDIRECT, SCOPES };

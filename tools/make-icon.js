@@ -41,5 +41,7 @@ function ico(sizes) {
 
 const root = path.join(__dirname, '..');
 fs.writeFileSync(path.join(root, 'assets', 'icon.png'), png(256));
-fs.writeFileSync(path.join(root, 'build', 'peep.ico'), ico([16, 20, 24, 32, 40, 48, 64, 128, 256]));
-console.log('wrote assets/icon.png and build/peep.ico');
+const icoFile = ico([16, 20, 24, 32, 40, 48, 64, 128, 256]);
+fs.writeFileSync(path.join(root, 'build', 'peep.ico'), icoFile);  // the exe and the installer
+fs.writeFileSync(path.join(root, 'assets', 'icon.ico'), icoFile); // Peep's windows and tray, so they match the exe exactly
+console.log('wrote assets/icon.png, assets/icon.ico and build/peep.ico');

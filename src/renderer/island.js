@@ -11,7 +11,7 @@ const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips', 'calendar', 'mail'
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#e8e8ee'];
 const AGENT = { claude: 'Claude Code', codex: 'Codex' };
 // Lists of words are built by functions so they follow the chosen language.
-const tabList = () => [['home', t('Home')], ['ai', t('Agents')], ['ask', t('Ask')], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')], ['mail', t('Mail')]];
+const tabList = () => [['home', t('Home')], ['pip', 'Pip'], ['ai', t('Agents')], ['ask', t('Ask')], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')], ['mail', t('Mail')]];
 const MODES = () => [['work', t('Work')], ['study', t('Study')], ['sleep', t('Sleep')], ['game', t('Game')]];
 const SITE_NAMES = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', reddit: 'Reddit', 'x.com': 'X', facebook: 'Facebook', netflix: 'Netflix' };
 const stateName = s => ({ idle: t('Idle'), working: t('Working'), asking: t('Needs you'), done: t('Done'), error: t('Error') }[s] || s);
@@ -20,11 +20,11 @@ const verb = v => ({ Reading: t('Reading'), Writing: t('Writing'), Editing: t('E
 const weatherName = c => (c === 0 ? t('Clear') : c <= 3 ? t('Cloudy') : c <= 48 ? t('Fog') : c <= 67 ? t('Rain') : c <= 77 ? t('Snow') : c <= 82 ? t('Showers') : t('Storm'));
 
 const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: 'idle', history: [], usage: null }, agents: {}, win: { media: null, volume: null, net: null }, tray: [], clips: [],
-  weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
+  weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', lyricsAt: 0, share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
   platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false,
   mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {},
-  google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0, list: null, listError: '', consent: false }, menuView: 'main', update: null };
+  google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0 }, menuView: 'main', update: null };
 
 // ---------- small helpers ----------
 const locale = () => (S.settings?.lang === 'sw' ? 'sw-TZ' : undefined);
@@ -60,14 +60,18 @@ function drawPill() {
   pip.className = 'pip ' + mood + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
   let text = S.open ? (S.settings?.mascot.name || 'Peep') : '', side = clock();
-  if (top && top.state === 'asking') text = t('{agent} needs you', { agent: AGENT[top.agent] });
+  const pillAsk = !S.open && top?.state === 'asking' && top.ask?.canAnswer ? top : null; // a permission: answer it right in the pill
+  if (pillAsk) text = `${t('Allow')}: ${top.ask.detail || verb(top.ask.verb)}?`;
+  else if (top && top.state === 'asking') text = t('{agent} needs you', { agent: AGENT[top.agent] });
   else if (top && top.state === 'working') text = top.activity ? `${verb(top.activity.verb)} ${top.activity.detail}`.trim() : t('Working');
   else if (top && top.state === 'done') text = t('{agent} is done', { agent: AGENT[top.agent] });
   else if (top && top.state === 'error') text = t('{agent} hit an error', { agent: AGENT[top.agent] });
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist ? `${m.title} · ${m.artist}` : m.title;
   if (top?.state === 'working' && top.startedAt) side = time(Date.now() - top.startedAt);
-  $('#pill-text').textContent = text; $('#pill-side').textContent = S.open ? clock() : side;
+  $('#pill-text').textContent = text;
+  island.classList.toggle('asking-pill', Boolean(pillAsk)); $('#pill-ask').hidden = !pillAsk;
+  if (pillAsk) for (const b of $('#pill-ask').children) b.dataset.id = pillAsk.id; $('#pill-side').textContent = S.open ? clock() : side;
   if (S.open) {
     $('#pill-date').textContent = dateLabel(); drawNet();
     const u = S.ai.usage?.fiveHour; // the five-hour window is the one that runs out during a working day
@@ -79,7 +83,7 @@ function drawPill() {
   document.documentElement.style.setProperty('--bright', S.settings?.island.brightness ?? 0.1);
   island.classList.toggle('bare', !S.open && !text && S.settings?.island.mode !== 'detach'); // attached and idle: only Pip in the notch
   // the shell's width is set in pixels so the change between sizes can be animated
-  shell.style.width = S.open ? '' : Math.max(84, Math.min(440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
+  shell.style.width = S.open ? '' : Math.max(84, Math.min(pillAsk ? 620 : 440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
   const dot = tabs.querySelector('[data-tab=ai]'); if (dot) dot.classList.toggle('dot', S.ai.top === 'asking');
 }
 
@@ -120,6 +124,12 @@ const pages = {
     if (S.platform !== 'win32') return `<div class="cl-empty">${esc(t('Music controls need Windows.'))}</div>`;
     if (!m) return `<div class="mu"><span class="mu-art">${icon('music')}</span><div class="mu-info"><span class="label">${esc(t('Playing'))}</span><h3>${esc(t('Nothing is playing.'))}</h3></div></div>`;
     const song = songOf(m), art = S.art?.key === m.title + '|' + m.artist ? S.art.data : '', year = S.years[song.title + '|' + song.artist];
+    const controls = `<button class="mu-btn" data-media="prev" aria-label="${esc(t('Previous'))}">${icon('prev')}</button>
+            <button class="mu-btn play" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${icon(m.playing ? 'pause' : 'play')}</button>
+            <button class="mu-btn" data-media="next" aria-label="${esc(t('Next'))}">${icon('next')}</button>`;
+    if (on && S.lyrics?.length) return `<div class="mu lyr">${art ? `<img class="mu-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="mu-art">${icon('music')}</span>`}
+      <div class="lyr-side"><div class="lyr-lines" id="lyr" title="${esc(song.title)} · ${esc(song.artist || '')}"><p data-l="-1"></p><p data-l="0" class="now"></p><p data-l="1"></p><p data-l="2"></p></div>
+        <div class="lyr-foot">${controls}<span class="grow"></span><button class="mu-chip on" data-lyrics>${icon('lyrics')}${esc(t('Lyrics'))}</button></div></div></div>`;
     const meta = [m.album || year?.album, year?.year].filter(Boolean).join(' · '); // the player's album first; iTunes fills a missing one
     return `<div class="mu">${art ? `<img class="mu-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="mu-art">${icon('music')}</span>`}
       <div class="mu-info"><span class="label">${esc(t('Playing'))}${m.app ? ' · ' + esc(appName(m.app)) : ''}</span>
@@ -137,8 +147,9 @@ const pages = {
   },
   tray() {
     const sh = S.share;
-    if (sh?.on) return `<div class="tr"><img class="tr-qr" alt="QR" src="${esc(sh.qr)}"><div class="tr-side"><p>${esc(t('Scan with your phone on the same Wi-Fi.'))}<br><span class="mono">${esc(sh.url)}</span><br>${esc(t('Stops by itself after an hour.'))}</p>
-      <button class="wbtn wide" data-share="stop">${esc(t('Stop sharing'))}</button></div></div>`;
+    if (sh?.on) return `<div class="tr"><div class="tr-qr"><img alt="QR" src="${esc(sh.qr)}"></div><div class="tr-side"><p>${esc(t('Scan with your phone on the same Wi-Fi.'))} ${esc(t('Stops by itself after an hour.'))}<br><span class="mono">${esc(sh.url.replace(/^http:\/\//, '').replace(/\/[^/]+\/$/, ''))}</span></p>
+      ${sh.firewall === false ? `<button class="wbtn wide" data-share="firewall">${esc(t('Allow phones on this Wi-Fi'))}</button><p class="tr-hint">${esc(t('Windows Firewall is blocking phones. You approve this once.'))}</p>`
+        : `<button class="wbtn wide" data-share="stop">${esc(t('Stop sharing'))}</button><p class="tr-hint">${esc(t('Page not loading? The phone must be on this Wi-Fi, not mobile data or a guest network.'))}</p>`}</div></div>`;
     const left = S.tray.length
       ? `<div class="tr-files" id="drop">${S.tray.map(f => `<div class="tr-file item" draggable="true" data-drag="${esc(f.path)}" data-open="${esc(f.path)}"><span class="grow cut">${esc(f.name)}</span><span class="dim">${size(f.size)}</span><button class="x" data-remove="${esc(f.path)}" aria-label="${esc(t('Remove'))}">✕</button></div>`).join('')}</div>`
       : `<div class="tr-drop" id="drop">${esc(t('Drop here'))}</div>`;
@@ -198,13 +209,16 @@ const pages = {
   },
   mail() {
     const m = S.mail;
-    if (!S.google) return `<div class="ml"><span class="ml-ico">${icon('mail')}</span><p>${esc(t('See how many emails are waiting and who the newest are from.'))}</p><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button></div>`;
-    const rows = m.consent ? `<div class="ml-empty"><p>${esc(t('Sign in again to let Peep show your newest emails.'))}</p><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button></div>`
-      : m.list === null ? `<div class="ml-empty dim">${esc(m.listError || '')}</div>`
-      : !m.list.length ? `<div class="ml-empty dim">${esc(t('Your inbox is empty.'))}</div>`
-      : m.list.map(x => `<button class="ml-row ${x.unread ? 'unread' : ''}" data-mail="${esc(x.id)}" title="${esc(x.from.address)}"><i></i><span class="ml-who cut">${esc(x.from.name)}</span><span class="ml-when">${esc(mailAge(x.at))}</span><span class="ml-subj cut">${esc(x.subject || t('(no subject)'))}</span></button>`).join('');
-    return `<div class="ml2"><div class="ml-side"><span class="label">${esc(t('Inbox'))}</span><div class="ml-count">${m.count === null ? '–' : m.count}</div><p>${esc(m.error || (m.count === 1 ? t('unread email in your inbox') : t('unread emails in your inbox')))}</p></div>
-      <div class="ml-list">${rows}</div></div>`;
+    if (!S.google) return `<div class="ml"><span class="ml-ico">${icon('mail')}</span><p>${esc(t('{name} only sees how many. Not who, and not what.', { name: 'Peep' }))}</p><button class="gbtn" data-google-in>${googleG()}${esc(t('Sign in with Google'))}</button></div>`;
+    return `<div class="ml"><div class="ml-count">${m.count === null ? '–' : m.count}</div><p>${esc(m.error || (m.count === 1 ? t('unread email in your inbox') : t('unread emails in your inbox')))}</p>
+      <button class="gbtn" data-inbox>${icon('mail')}${esc(t('Open Gmail'))}</button><p class="ml-note">${esc(t('{name} only sees how many. Not who, and not what.', { name: 'Peep' }))}</p></div>`;
+  },
+  pip() {
+    const quick = [['explain', t('Explain what I copied')], ['spell', t('Check my spelling')], ['translate', t('Translate to English')], ['sw', t('Translate to Swahili')]];
+    return `<div class="pa"><div class="pa-head"><span class="pa-pip"><i></i><i></i></span><div><b>${esc(S.settings.mascot.name)}</b><span>${esc(t('Start a new chat in Claude or ChatGPT'))}</span></div></div>
+      <textarea id="pa-q" rows="2" placeholder="${esc(t('Ask Pip anything…'))}"></textarea>
+      <div class="pa-row"><div class="pa-quick">${quick.map(([id, name]) => `<button class="chip" data-quick="${id}">${esc(name)}</button>`).join('')}</div>
+        <div class="pa-go"><button class="wbtn sm" data-agent="claude">Claude</button><button class="wbtn sm ghost" data-agent="chatgpt">ChatGPT</button></div></div></div>`;
   },
   ask() {
     const a = S.ask;
@@ -215,7 +229,7 @@ const pages = {
   }
 };
 
-const FILL = new Set(['home', 'music', 'mail', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
+const FILL = new Set(['home', 'pip', 'music', 'mail', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
 function draw(force) {
   drawPill();
   if (!S.open || S.dragging || (!force && (!LIVE.has(S.tab) || typing()))) return;
@@ -237,7 +251,7 @@ function drawTabs() {
   const gear = $('#bar-bright'), vol = $('#bar-vol');
   gear.innerHTML = icon('sun'); gear.dataset.tip = t('Background brightness'); gear.setAttribute('aria-label', t('Background brightness')); $('#bright-ico').innerHTML = icon('sun');
   vol.innerHTML = icon('volume'); vol.dataset.tip = t('Volume'); vol.setAttribute('aria-label', t('Volume'));
-  $('#vol-ico').innerHTML = icon('volume'); $('#pill-more').innerHTML = icon('dots'); $('#pill-more').setAttribute('aria-label', t('Menu'));
+  $('#vol-ico').innerHTML = icon('volume'); $('#pill-ask .pa-allow').textContent = t('Allow'); $('#pill-ask .pa-deny').textContent = t('Deny'); $('#pill-more').innerHTML = icon('dots'); $('#pill-more').setAttribute('aria-label', t('Menu'));
   drawPill();
 }
 function go(tab) {
@@ -337,10 +351,15 @@ function tick() {
     const pos = mediaPosition(), sk = $('#seek'), n = $('#pos');
     if (sk && !seeking) { sk.value = pos; sk.style.setProperty('--fill', (m.durationMs ? Math.min(100, 100 * pos / m.durationMs) : 0) + '%'); }
     if (n && !seeking) n.textContent = time(pos);
+    const lines = S.lyrics || [], at = pos + 250; // a quarter second early, so the line is there as it is sung
+    let i = -1; while (i + 1 < lines.length && lines[i + 1].t <= at) i++;
     const now = $('#ly-now');
-    if (now) {
-      const lines = S.lyrics || []; let i = -1; while (i + 1 < lines.length && lines[i + 1].t <= pos) i++;
-      now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? '' : t('No lyrics for this song.'));
+    if (now) now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? '' : t('No lyrics for this song.'));
+    const box = $('#lyr');
+    if (box && box.dataset.i !== String(i)) { // the lines move up one when the next one starts
+      const moved = box.dataset.i !== undefined; box.dataset.i = i;
+      for (const p of box.children) { const l = lines[i + Number(p.dataset.l)]; p.textContent = l ? (l.text || '♪') : ''; }
+      if (moved) { box.classList.remove('step'); void box.offsetWidth; box.classList.add('step'); }
     }
   }
   const fl = $('#focus-left'), fd = $('#focus-done'), mark = $('#ruler-mark'), ml = $('#mode-left');
@@ -405,16 +424,7 @@ async function refreshCalendar() {
 }
 async function refreshMail() {
   if (!S.google || Date.now() - S.mail.at < 60e3) return draw(); // at most once a minute
-  const [c, l] = await Promise.all([api.googleUnread(), api.googleRecent()]);
-  S.mail = { count: c.ok ? c.count : S.mail.count, error: c.ok ? '' : c.error, at: Date.now(),
-    list: l.ok ? l.mails : null, listError: l.ok ? '' : l.error, consent: Boolean(l.needsConsent) };
-  draw();
-}
-/** "14:05" today, "Mon" this week, "3 Nov" before that */
-function mailAge(ms) {
-  const d = new Date(ms), now = new Date();
-  if (sameDay(ms, now)) return clock(d);
-  return now - d < 6 * 86400e3 ? d.toLocaleDateString(locale(), { weekday: 'short' }) : d.toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+  const r = await api.googleUnread(); S.mail = { count: r.ok ? r.count : S.mail.count, error: r.ok ? '' : r.error, at: Date.now() }; draw();
 }
 async function signInGoogle() {
   S.cal.error = t('Finish the login in your browser…'); draw(true);
@@ -472,8 +482,14 @@ async function refreshHome() { const [w, e] = await Promise.all([api.weather(), 
 async function refreshDevices() { const r = await api.spotifyDevices(); S.spotify = { on: r.ok || r.connected !== false, devices: r.devices || [], error: r.ok ? '' : r.error }; draw(); }
 async function refreshLyrics() {
   const m = S.win.media, key = m ? m.title + '|' + m.artist : '';
-  if (key === S.lyricsFor) return; S.lyricsFor = key; S.lyrics = null;
-  if (m && S.settings.lyrics) { const lines = await api.lyrics({ title: m.title, artist: m.artist, durationSec: Math.round((m.durationMs || 0) / 1000) }); if (S.lyricsFor === key) S.lyrics = lines || []; }
+  if (key === S.lyricsFor && !(S.lyrics === null && key && Date.now() - S.lyricsAt > 60e3)) return; // a failed lookup is tried again after a minute
+  S.lyricsFor = key; S.lyrics = null; S.lyricsAt = Date.now();
+  if (m && S.settings.lyrics) {
+    const lines = await api.lyrics({ title: m.title, artist: m.artist, durationSec: Math.round((m.durationMs || 0) / 1000) });
+    if (S.lyricsFor !== key) return;
+    S.lyrics = Array.isArray(lines) ? lines : null; // null: lrclib could not be reached
+    if (S.tab === 'music' && !typing()) draw(true); // show them as soon as they arrive, not at the next update
+  }
 }
 async function refreshSongInfo() {
   const m = S.win.media; if (!m || !S.settings.songInfo) return;
@@ -491,6 +507,8 @@ async function sendReply(id) {
 // ---------- events ----------
 // a click on the strip pins the island open; another click (or Esc) lets it fold away again
 pill.addEventListener('click', e => {
+  const pd = e.target.closest('[data-pill-decide]');
+  if (pd) { e.stopPropagation(); api.decide(pd.dataset.id, pd.dataset.pillDecide); return; }
   if (e.target.closest('#pill-more')) { e.stopPropagation(); showVolume(false); return showMenu(!S.menu); }
   const r = e.target.closest('[data-radio-kind]');
   if (r) { // show the change at once; the helper reports the real state a moment later
@@ -561,11 +579,18 @@ page.addEventListener('click', async e => {
   else if (d.clipsClear !== undefined) { S.clips = await api.clearClips(); draw(true); }
   else if (d.share === 'start') { S.share = await api.shareStart(); draw(); }
   else if (d.share === 'stop') { await api.shareStop(); S.share = null; draw(); }
+  else if (d.share === 'firewall') { const r = await api.shareFirewall(); if (S.share) S.share.firewall = r.ok; draw(true); }
   else if (d.focus === 'toggle') { S.focus.running = !S.focus.running; draw(true); }
   else if (d.tabGo) go(d.tabGo);
+  else if (d.agent) { const q = $('#pa-q')?.value.trim(); api.agentOpen(d.agent, q || ''); }
+  else if (d.quick) {
+    const clip = await api.lastClip(), box = $('#pa-q');
+    const ask = { explain: t('Explain this simply:'), spell: t('Check the spelling and grammar of this and show the corrected text:'), translate: t('Translate this into English:'), sw: t('Translate this into Tanzanian Swahili:') }[d.quick];
+    box.value = clip ? `${ask}\n\n${clip}` : ask + ' '; box.focus();
+  }
   else if (d.calView) { S.cal.view = d.calView; S.cal.events = null; draw(true); refreshCalendar(); }
   else if (d.googleIn !== undefined) signInGoogle();
-  else if (d.mail) api.openMail(d.mail);
+  else if (d.inbox !== undefined) api.openInbox();
   else if (d.connect !== undefined) { const r = await api.connectAgent('claude', true); if (r?.agents) S.agents = r.agents; if (!r?.ok) openSettings(); else draw(true); }
   else if (d.modePick) { S.modePick = d.modePick; draw(true); }
   else if (d.modeGo) { if (S.mode?.id === d.modeGo) await stopMode(); else await startMode(d.modeGo); }
@@ -588,6 +613,7 @@ page.addEventListener('click', async e => {
   }
 });
 let seeking = false; // while the seek bar is held, the second-by-second update leaves it alone
+page.addEventListener('keydown', e => { if (e.target.id === 'pa-q' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); api.agentOpen(e.shiftKey ? 'chatgpt' : 'claude', e.target.value.trim()); } });
 page.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'seek') { seeking = true; $('#pos').textContent = time(+el.value); el.style.setProperty('--fill', (100 * el.value / (el.max || 1)) + '%'); return; }
@@ -618,7 +644,8 @@ island.addEventListener('drop', async e => {
 
 api.onAi(snap => {
   const was = S.ai.top; S.ai = snap;
-  if (snap.top === 'asking' && was !== 'asking') { chime(true); if (!S.open) { S.tab = 'ai'; S.auto = true; setOpen(true); } } // a question opens the island by itself
+  // a permission waits in the folded pill with Allow / Deny; a question that needs typing opens the island by itself
+  if (snap.top === 'asking' && was !== 'asking') { chime(true); if (!S.open && !snap.sessions[0]?.ask?.canAnswer) { S.tab = 'ai'; S.auto = true; setOpen(true); } }
   else if (was === 'asking' && snap.top !== 'asking' && S.auto) { S.auto = false; setTimeout(maybeClose, 900); }
   draw();
 });

@@ -29,7 +29,7 @@ async function fetchLyrics({ title, artist, durationSec }, { cacheDir, fetchImpl
   if (!title) return null;
   const key = createHash('sha1').update([title, artist, Math.round(durationSec || 0)].join('|').toLowerCase()).digest('hex');
   const file = cacheDir ? path.join(cacheDir, key + '.json') : null;
-  if (file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')).lines; } catch {} }
+  if (file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')).lines || []; } catch {} }
   const headers = { 'User-Agent': 'Peep (https://github.com/mkumbwajr/peep)' };
   ({ title, artist } = splitTitle(title, artist));
   const ask = async params => {
@@ -40,7 +40,7 @@ async function fetchLyrics({ title, artist, durationSec }, { cacheDir, fetchImpl
   let hits = await ask({ track_name: simple(title), artist_name: String(artist || '').split(/,|&| feat/i)[0].trim() });
   if (!hits.length) hits = await ask({ q: [artist, simple(title)].filter(Boolean).join(' ') }); // looser: one free-text search
   const hit = hits.find(h => !durationSec || Math.abs((h.duration || 0) - durationSec) <= 3) || hits[0];
-  const lines = hit ? parseLrc(hit.syncedLyrics) : null;
+  const lines = hit ? parseLrc(hit.syncedLyrics) : []; // [] = this song has no timed lyrics (cached); a thrown error = ask again later
   if (file) { try { fs.mkdirSync(cacheDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify({ lines })); } catch {} }
   return lines;
 }

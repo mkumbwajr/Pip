@@ -1,6 +1,8 @@
 'use strict';
-// Update check: the newest release on GitHub against the running version. Peep is installed with a plain NSIS
-// installer, so an update is simply the newer installer, downloaded from the release page by the user.
+// Update check: the newest version on peep.bang.co.tz (latest.json), or on GitHub Releases if the site cannot be
+// reached. Peep is installed with a plain NSIS installer, so an update is simply the newer installer, which the user
+// downloads from the page Peep opens.
+const SITE = 'https://peep.bang.co.tz';
 
 /** True when version a ("0.5.0", "v1.2") is newer than b. */
 function isNewer(a, b) {
@@ -9,13 +11,28 @@ function isNewer(a, b) {
   for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
   return false;
 }
+/** Only these pages may be opened from the Updates view. */
+const isReleaseUrl = url => /^https:\/\/(peep\.bang\.co\.tz\/|github\.com\/mkumbwajr\/Peep\/releases\/)/.test(String(url));
 
-async function latestRelease({ current, fetchImpl = fetch }) {
-  const r = await fetchImpl('https://api.github.com/repos/mkumbwajr/Peep/releases/latest', { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });
-  if (r.status === 404) return { current, latest: current, newer: false }; // no release published yet
+async function fromSite(fetchImpl) {
+  const r = await fetchImpl(SITE + '/latest.json', { signal: AbortSignal.timeout(8000) });
   if (!r.ok) throw new Error('HTTP ' + r.status);
-  const j = await r.json(), latest = String(j.tag_name || '').replace(/^v/i, '');
-  return { current, latest, newer: isNewer(latest, current), url: j.html_url };
+  const j = await r.json(); if (!j.version) throw new Error('no version');
+  return { latest: String(j.version).replace(/^v/i, ''), url: isReleaseUrl(j.url) ? j.url : SITE + '/' };
+}
+async function fromGitHub(fetchImpl) {
+  const r = await fetchImpl('https://api.github.com/repos/mkumbwajr/Peep/releases/latest', { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });
+  if (r.status === 404) return null; // no release published yet
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  return { latest: String(j.tag_name || '').replace(/^v/i, ''), url: j.html_url };
 }
 
-module.exports = { isNewer, latestRelease };
+async function latestRelease({ current, fetchImpl = fetch }) {
+  let found;
+  try { found = await fromSite(fetchImpl); } catch { found = await fromGitHub(fetchImpl); }
+  if (!found) return { current, latest: current, newer: false };
+  return { current, latest: found.latest, newer: isNewer(found.latest, current), url: found.url };
+}
+
+module.exports = { isNewer, latestRelease, isReleaseUrl, SITE };

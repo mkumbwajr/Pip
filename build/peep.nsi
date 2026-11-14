@@ -3,7 +3,7 @@
 ; Installs for the current user only, no admin rights. The uninstaller removes Peep's hooks from the agents' configs.
 Unicode true
 SetCompressor /SOLID lzma
-!define VERSION "0.4.0"
+!define VERSION "0.4.1"
 !define UNINST "Software\Microsoft\Windows\CurrentVersion\Uninstall\Peep"
 
 Name "Peep"
@@ -78,5 +78,6 @@ Section "Uninstall"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Peep"
   RMDir /r "$INSTDIR"
   DeleteRegKey HKCU "${UNINST}"
-  DeleteRegKey HKCU "Software\Classes\AppUserModelId\dev.peep.app" ; the name and icon Windows shows on notifications
+  DeleteRegKey HKCU "Software\Classes\AppUserModelId\tz.co.bang.peep" ; the name and icon Windows shows on notifications
+  DeleteRegKey HKCU "Software\Classes\AppUserModelId\dev.peep.app"     ; the same, from Peep 0.4.0 builds before this change
 SectionEnd
