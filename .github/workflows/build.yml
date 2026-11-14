@@ -1,0 +1,25 @@
+name: build
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - name: Windows helper (media, volume, front window, Wi-Fi and Bluetooth)
+        run: node tools/check-helper.js
+      - name: Installer
+        run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with: { name: Peep-Setup, path: dist/*.exe }

@@ -1,0 +1,8 @@
+html, body { margin: 0; height: 100%; background: rgba(8, 8, 12, .92); color: #ececf1; font: 16px "Segoe UI", system-ui, sans-serif; display: flex; align-items: center; justify-content: center; user-select: none; }
+.box { text-align: center; }
+.ring { width: 120px; height: 120px; margin: 0 auto 28px; border-radius: 50%; background: #7c5cff; animation: breathe 8s ease-in-out infinite; }
+@keyframes breathe { 0%, 100% { transform: scale(.6); opacity: .6; } 50% { transform: scale(1); opacity: 1; } }
+h1 { font-size: 28px; font-weight: 600; margin: 0 0 8px; } p { color: #8c8c9a; margin: 0 0 28px; }
+.buttons { display: flex; gap: 12px; justify-content: center; }
+button { font: inherit; color: inherit; padding: 10px 22px; border-radius: 10px; border: 1px solid #33333d; background: #17171d; cursor: pointer; }
+button.primary { background: #7c5cff; border-color: #7c5cff; color: #fff; }

@@ -1,0 +1,22 @@
+'use strict';
+// The only bridge between Peep's pages and the main process: a fixed list of calls, nothing generic.
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
+
+const call = channel => (...args) => ipcRenderer.invoke(channel, ...args);
+const on = channel => fn => { const h = (_e, payload) => fn(payload); ipcRenderer.on(channel, h); return () => ipcRenderer.removeListener(channel, h); };
+
+contextBridge.exposeInMainWorld('peep', {
+  init: call('app:init'), hubError: call('hub:error'), strings: call('app:strings'),
+  setSettings: call('settings:set'), setAutostart: call('autostart:set'),
+  connectAgent: call('agents:connect'), decide: call('ai:decide'), reply: call('ai:reply'), setRadio: call('radio:set'),
+  spotifyLogin: call('spotify:login'), spotifyLogout: call('spotify:logout'), spotifyDevices: call('spotify:devices'), spotifyTransfer: call('spotify:transfer'),
+  media: call('media:cmd'), setVolume: call('volume:set'), lyrics: call('lyrics:get'),
+  weather: call('weather:get'), calendar: call('calendar:get'), stats: call('stats:get'),
+  trayAdd: call('tray:add'), trayRemove: call('tray:remove'), trayOpen: call('tray:open'), copyClip: call('clips:copy'),
+  shareStart: call('share:start'), shareStop: call('share:stop'),
+  ask: call('buddy:ask'), windows: call('buddy:windows'), guardChoice: call('guard:choice'),
+  mouse: inside => ipcRenderer.send('island:mouse', Boolean(inside)), focus: onOff => ipcRenderer.send('island:focus', Boolean(onOff)),
+  pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
+  onAi: on('ai:state'), onFinish: on('ai:finish'), onWin: on('win:state'), onTray: on('tray:changed'), onClips: on('clips:changed'),
+  onToggle: on('island:toggle'), onPage: on('island:page')
+});

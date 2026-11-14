@@ -1,0 +1,51 @@
+{
+  "name": "peep",
+  "productName": "Peep",
+  "version": "0.2.0",
+  "description": "Kisiwa cha bure na open source kwa Windows kinachokuonyesha ma-agent wako wa AI wanafanya nini. A free, open-source status island for Windows.",
+  "main": "src/main/main.js",
+  "license": "MIT",
+  "author": "Peep contributors",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "dist": "electron-builder --win dir --x64 --publish never && makensis build/peep.nsi"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "dev.peep.app",
+    "productName": "Peep",
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "LICENSE"
+    ],
+    "asarUnpack": [
+      "src/helpers/**",
+      "src/hooks/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "signAndEditExecutable": false
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mkumbwajr/peep.git"
+  },
+  "homepage": "https://github.com/mkumbwajr/peep"
+}

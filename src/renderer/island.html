@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="sw">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:">
+<title>Peep</title>
+<link rel="stylesheet" href="island.css">
+</head>
+<body>
+<div id="island" class="idle">
+  <button id="pill" type="button" aria-label="Peep">
+    <span class="pip" id="pip"><span class="hat"></span><span class="eye"></span><span class="eye"></span><span class="mouth"></span></span>
+    <span id="pill-text">Peep</span>
+    <span id="pill-side"></span>
+  </button>
+  <div id="panel" hidden>
+    <nav id="tabs"></nav>
+    <main id="page"></main>
+  </div>
+</div>
+<script src="../shared/i18n.js"></script>
+<script src="island.js"></script>
+</body>
+</html>
