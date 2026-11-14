@@ -6,7 +6,7 @@ const path = require('node:path');
 const { EventEmitter } = require('node:events');
 
 class WinHelper extends EventEmitter {
-  constructor() { super(); this.child = null; this.state = { media: null, volume: null, front: null, net: null, at: 0 }; this.buffer = ''; this.restarts = 0; this.stopped = false; }
+  constructor() { super(); this.child = null; this.state = { media: null, volume: null, front: null, net: null, at: 0 }; this.art = null; this.buffer = ''; this.restarts = 0; this.stopped = false; }
   start() {
     if (process.platform !== 'win32' || this.child || this.stopped) return;
     const script = path.join(__dirname, '..', 'helpers', 'win-helper.ps1').replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
@@ -19,7 +19,7 @@ class WinHelper extends EventEmitter {
       while ((i = this.buffer.indexOf('\n')) >= 0) {
         const line = this.buffer.slice(0, i).trim(); this.buffer = this.buffer.slice(i + 1);
         if (!line) continue;
-        try { const m = JSON.parse(line); if (m.type === 'state') { this.state = { media: m.media || null, volume: m.volume || null, front: m.front || null, net: m.net || null, at: Date.now() }; this.emit('state', this.state); } } catch {}
+        try { const m = JSON.parse(line); if (m.type === 'art') { this.art = { key: m.key, data: m.data || '' }; this.emit('art', this.art); } else if (m.type === 'state') { this.state = { media: m.media || null, volume: m.volume || null, front: m.front || null, net: m.net || null, at: Date.now() }; this.emit('state', this.state); } } catch {}
       }
     });
     const gone = () => { this.child = null; if (!this.stopped && this.restarts++ < 5) setTimeout(() => this.start(), 3000); };

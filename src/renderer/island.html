@@ -7,15 +7,19 @@
 <link rel="stylesheet" href="island.css">
 </head>
 <body>
-<div id="island" class="idle">
-  <button id="pill" type="button" aria-label="Peep">
-    <span class="pip" id="pip"><span class="hat"></span><span class="eye"></span><span class="eye"></span><span class="mouth"></span></span>
-    <span id="pill-text">Peep</span>
-    <span id="pill-side"></span>
-  </button>
-  <div id="panel" hidden>
-    <nav id="tabs"></nav>
-    <main id="page"></main>
+<div id="island" class="idle attach">
+  <div id="shell">
+    <button id="pill" type="button" aria-label="Peep">
+      <span id="pill-inner">
+        <span class="pip" id="pip"><span class="hat"></span><span class="eye"></span><span class="eye"></span><span class="mouth"></span></span>
+        <span id="pill-text"></span>
+        <span id="pill-side"></span>
+      </span>
+    </button>
+    <div id="panel">
+      <nav id="tabs"></nav>
+      <main id="page"></main>
+    </div>
   </div>
 </div>
 <script src="../shared/i18n.js"></script>

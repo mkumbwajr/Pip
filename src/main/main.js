@@ -1,6 +1,6 @@
 'use strict';
 // Peep: main process. Owns the island window, the tray icon, the hook hub and every bridge to the system.
-const { app, BrowserWindow, Tray, Menu, ipcMain, globalShortcut, Notification, clipboard, shell, screen, nativeImage, desktopCapturer, safeStorage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, globalShortcut, Notification, clipboard, shell, screen, nativeImage, desktopCapturer, safeStorage, net } = require('electron');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -28,7 +28,7 @@ const RENDERER = path.join(__dirname, '..', 'renderer');
 const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
 const ISLAND = { width: 620, height: 470 };
 
-let store, hub, island = null, guardWin = null, tray = null, share = null, spotify = null, quitting = false;
+let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, quitting = false;
 let strings = {}, t = makeT(strings);
 
 // ---------- language ----------
@@ -59,12 +59,14 @@ function token() {
   const t = randomBytes(24).toString('hex'); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, t); return t;
 }
 const send = (channel, payload) => { if (island && !island.isDestroyed()) island.webContents.send(channel, payload); };
+// Chromium's own network stack: it follows the Windows proxy and certificate settings, which Node's fetch does not
+const webFetch = (url, options) => net.fetch(url, options);
 
 // ---------- the island window ----------
 function displayFor() { const all = screen.getAllDisplays(); return all[store.get('island.display')] || screen.getPrimaryDisplay(); }
 function placeIsland() {
   if (!island) return;
-  const { x, y, width } = displayFor().workArea;
+  const { x, y, width } = displayFor().bounds; // the very top of the screen: "attach" sits flush against it
   island.setBounds({ x: Math.round(x + (width - ISLAND.width) / 2), y, width: ISLAND.width, height: ISLAND.height });
 }
 function createIsland() {
@@ -83,13 +85,25 @@ function createIsland() {
   island.on('close', e => { if (!quitting) e.preventDefault(); });
 }
 
+// ---------- the settings window ----------
+function openSettings() {
+  if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
+  settingsWin = new BrowserWindow({ width: 1000, height: 700, minWidth: 760, minHeight: 520, title: t('Peep settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: ICON,
+    webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
+  settingsWin.setMenu(null);
+  settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  settingsWin.loadFile(path.join(RENDERER, 'settings.html'));
+  settingsWin.on('closed', () => { settingsWin = null; });
+}
+const changed = () => send('app:changed');
+
 // ---------- tray ----------
 function buildTray() {
   let image = nativeImage.createFromPath(ICON); if (!image.isEmpty()) image = image.resize({ width: 16, height: 16 });
   tray = new Tray(image); tray.setToolTip('Peep');
   const menu = () => Menu.buildFromTemplate([
     { label: t('Open island'), click: () => send('island:toggle', true) },
-    { label: t('Settings'), click: () => send('island:page', 'settings') },
+    { label: t('Settings'), click: openSettings },
     { type: 'separator' },
     { label: t('Start with Windows'), type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin, click: item => app.setLoginItemSettings({ openAtLogin: item.checked }) },
     { type: 'separator' },
@@ -132,7 +146,7 @@ function watchClipboard() {
     send('clips:changed', clips);
   }, 1500);
 }
-const getJson = async url => { const r = await fetch(url, { signal: AbortSignal.timeout(10000) }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); };
+const getJson = async url => { const r = await webFetch(url, { signal: AbortSignal.timeout(10000) }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); };
 let weatherCache = { at: 0, value: null };
 async function weather() {
   const w = store.get('weather'); if (!w.place) return null;
@@ -151,7 +165,7 @@ let calendarCache = { at: 0, url: '', text: '' };
 async function calendar() {
   const url = store.get('calendarUrl'); if (!/^https:\/\//.test(url)) return null;
   if (calendarCache.url !== url || Date.now() - calendarCache.at > 10 * 60e3) {
-    const r = await fetch(url.replace(/^webcal:/, 'https:'), { signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new Error('HTTP ' + r.status);
+    const r = await webFetch(url.replace(/^webcal:/, 'https:'), { signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new Error('HTTP ' + r.status);
     calendarCache = { at: Date.now(), url, text: await r.text() };
   }
   const e = nextEvent(calendarCache.text); return e ? { title: e.title, start: e.start.getTime(), allDay: e.allDay } : null;
@@ -186,7 +200,7 @@ const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e)
 
 function wireIpc() {
   handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
-    tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
+    art: helper.art, tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
     strings, languages: languages(), node: hasNode(), spotify: spotify.connected }));
   handle('app:strings', () => strings);
   handle('settings:set', patch => {
@@ -196,16 +210,17 @@ function wireIpc() {
     if (before.island.display !== after.island.display) placeIsland();
     if (before.weather.place !== after.weather.place) { store.set({ weather: { lat: null, lon: null } }); weatherCache.at = 0; }
     if (before.lang !== after.lang) { loadLanguage(); tray?.refresh(); }
-    hub.context = agentContext();
+    hub.context = agentContext(); changed();
     return store.all();
   });
+  handle('settings:open', () => openSettings());
   handle('autostart:set', on => { app.setLoginItemSettings({ openAtLogin: Boolean(on) }); return app.getLoginItemSettings().openAtLogin; });
-  handle('agents:connect', (agent, on) => connect(String(agent), Boolean(on)));
+  handle('agents:connect', (agent, on) => { const r = connect(String(agent), Boolean(on)); changed(); return r; });
   handle('ai:decide', (id, behavior) => hub.decide(String(id), String(behavior)));
   handle('ai:reply', (id, text) => hub.reply(String(id), String(text || '')));
   handle('radio:set', (kind, on) => ['WiFi', 'Bluetooth'].includes(kind) && helper.send({ cmd: 'radio', kind, on: Boolean(on) }));
-  handle('spotify:login', async () => { try { await spotify.login(store.get('spotifyClientId')); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  handle('spotify:logout', () => { spotify.logout(); return { ok: true }; });
+  handle('spotify:login', async () => { try { await spotify.login(store.get('spotifyClientId')); changed(); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('spotify:logout', () => { spotify.logout(); changed(); return { ok: true }; });
   handle('spotify:devices', async () => { try { return { ok: true, devices: await spotify.devices() }; } catch (e) { return { ok: false, error: String(e.message || e), connected: spotify.connected }; } });
   handle('spotify:transfer', async id => { try { await spotify.transfer(id); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('buddy:windows', async () => {
@@ -214,8 +229,8 @@ function wireIpc() {
   });
   handle('media:cmd', action => ['toggle', 'next', 'prev'].includes(action) && helper.send({ cmd: 'media', action }));
   handle('volume:set', level => helper.send({ cmd: 'volume', level: Math.max(0, Math.min(100, Math.round(Number(level) || 0))) }));
-  handle('lyrics:get', song => (store.get('lyrics') ? fetchLyrics(song || {}, { cacheDir: data('lyrics') }).catch(() => null) : null));
-  handle('weather:get', () => weather().catch(() => null));
+  handle('lyrics:get', song => (store.get('lyrics') ? fetchLyrics(song || {}, { cacheDir: data('lyrics'), fetchImpl: webFetch }).catch(() => null) : null));
+  handle('weather:get', () => weather().catch(e => ({ error: String(e.message || e) })));
   handle('calendar:get', () => calendar().catch(() => null));
   handle('stats:get', () => stats());
   handle('tray:add', paths => { addToTray(Array.isArray(paths) ? paths.slice(0, 50) : []); return trayView(); });
@@ -258,7 +273,7 @@ app.whenReady().then(async () => {
   store = new Store(data('settings.json')); loadLanguage();
   const vault = data('spotify.bin');
   spotify = new Spotify({
-    t: (...a) => t(...a),
+    t: (...a) => t(...a), fetchImpl: webFetch,
     open: url => shell.openExternal(url),
     load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(vault))); } catch { return null; } },
     save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(vault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(vault, { force: true }); } catch {} }
@@ -280,10 +295,19 @@ app.whenReady().then(async () => {
 
   wireIpc(); handle('hub:error', () => hubError);
   createIsland(); buildTray(); bindShortcut(); watchClipboard();
+  if (!store.get('firstRunDone')) { store.set({ firstRunDone: true }); openSettings(); } // first start: connect an agent
   helper.on('state', s => { send('win:state', s); checkGuard(s.front); });
+  helper.on('art', art => send('win:art', art));
+  // Pip's eyes follow the pointer wherever it is on the screen, so its position is sent while it moves (30 times a second at most)
+  let lastPoint = '';
+  setInterval(() => {
+    if (!island || island.isDestroyed()) return;
+    const p = screen.getCursorScreenPoint(), key = p.x + ',' + p.y; if (key === lastPoint) return;
+    lastPoint = key; const b = island.getBounds(); send('cursor', { x: p.x - b.x, y: p.y - b.y });
+  }, 33);
   helper.start();
   screen.on('display-metrics-changed', placeIsland); screen.on('display-added', placeIsland); screen.on('display-removed', placeIsland);
-  app.on('second-instance', () => send('island:toggle', true));
+  app.on('second-instance', openSettings); // starting Peep again from the Start menu shows its settings
 });
 app.on('before-quit', () => { quitting = true; helper.stop(); hub?.stop(); share?.stop(); });
 app.on('will-quit', () => globalShortcut.unregisterAll());

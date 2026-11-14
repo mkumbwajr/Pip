@@ -54,9 +54,23 @@ function Session { if (-not $script:manager) { $script:manager = Await ($mgrType
 function MediaState {
   $s = Session; if (-not $s) { return $null }
   $p = Await ($s.TryGetMediaPropertiesAsync()) $propsType; if (-not $p -or -not $p.Title) { return $null }
-  $t = $s.GetTimelineProperties(); $i = $s.GetPlaybackInfo()
-  @{ title = $p.Title; artist = $p.Artist; album = $p.AlbumTitle; app = $s.SourceAppUserModelId
-     playing = ("$($i.PlaybackStatus)" -eq 'Playing'); positionMs = [long]$t.Position.TotalMilliseconds; durationMs = [long]$t.EndTime.TotalMilliseconds }
+  $t = $s.GetTimelineProperties(); $i = $s.GetPlaybackInfo(); $playing = ("$($i.PlaybackStatus)" -eq 'Playing')
+  # Windows reports the position as it was at LastUpdatedTime, so add the time played since then
+  $pos = $t.Position.TotalMilliseconds; $end = $t.EndTime.TotalMilliseconds
+  if ($playing -and $t.LastUpdatedTime.Year -gt 2000) { $pos += ([DateTimeOffset]::UtcNow - $t.LastUpdatedTime).TotalMilliseconds }
+  if ($end -gt 0 -and $pos -gt $end) { $pos = $end }
+  $script:props = $p
+  @{ title = $p.Title; artist = $p.Artist; album = $p.AlbumTitle; app = $s.SourceAppUserModelId; playing = $playing; positionMs = [long]$pos; durationMs = [long]$end }
+}
+# The song's cover picture as base64 (empty when the player gives none). Sent once per song.
+$streamType = [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime]
+function Artwork {
+  try {
+    $ref = $script:props.Thumbnail; if (-not $ref) { return '' }
+    $stream = Await ($ref.OpenReadAsync()) $streamType; if (-not $stream -or $stream.Size -gt 3MB) { return '' }
+    $in = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($stream); $mem = New-Object System.IO.MemoryStream
+    $in.CopyTo($mem); $in.Dispose(); [Convert]::ToBase64String($mem.ToArray())
+  } catch { '' }
 }
 function FrontState {
   $h = [PeepWin]::Front(); if ($h -eq 0) { return $null }
@@ -80,7 +94,7 @@ function NetState {
 }
 function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 4)); [Console]::Out.Flush() }
 
-$line = [Console]::In.ReadLineAsync(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null
+$line = [Console]::In.ReadLineAsync(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0
 while ($true) {
   if ($line.IsCompleted) {
     if ($null -eq $line.Result) { break }
@@ -98,10 +112,11 @@ while ($true) {
         }
       }
     } catch {}
-    $line = [Console]::In.ReadLineAsync(); $lastKey = ''
+    $line = [Console]::In.ReadLineAsync(); $lastKey = ''; $soon = 3 # look again a few times right after a command
   }
-  if ($tick % 40 -eq 0) { $net = NetState }
-  if ($tick % 4 -eq 0) {
+  if ($tick % 50 -eq 0) { $net = NetState }
+  if ($tick % 2 -eq 0 -or $soon -gt 0) {
+    if ($soon -gt 0) { $soon-- }
     $media = MediaState; $front = FrontState
     $vol = $null; try { $vol = @{ level = [PeepAudio]::Level(); muted = [PeepAudio]::Muted() } } catch {}
     $key = "$($media.title)|$($media.artist)|$($media.playing)|$($vol.level)|$($vol.muted)|$($front.hwnd)|$($front.title)|$($net.wifi.on)|$($net.wifi.ssid)|$($net.bt.on)"
@@ -109,6 +124,7 @@ while ($true) {
       Emit @{ type = 'state'; media = $media; volume = $vol; front = $front; net = $net }
       $lastKey = $key; $lastAt = [DateTime]::UtcNow
     }
+    if ($media) { $k = "$($media.title)|$($media.artist)"; if ($k -ne $artKey) { $artKey = $k; Emit @{ type = 'art'; key = $k; data = (Artwork) } } }
   }
-  $tick++; Start-Sleep -Milliseconds 250
+  $tick++; Start-Sleep -Milliseconds 200
 }

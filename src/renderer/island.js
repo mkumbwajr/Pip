@@ -4,24 +4,23 @@
 const api = window.peep;
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const island = $('#island'), pill = $('#pill'), panel = $('#panel'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip');
+const island = $('#island'), shell = $('#shell'), pill = $('#pill'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip');
 let t = window.makeT({});
 
 const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips']); // redrawn when data changes; the others hold what you are typing
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#e8e8ee'];
 const AGENT = { claude: 'Claude Code', codex: 'Codex' };
 // Lists of words are built by functions so they follow the chosen language.
-const tabList = () => [['home', t('Home')], ['ai', t('Agents')], ['music', t('Music')], ['tray', t('Files')], ['clips', t('Copied')], ['note', t('Note')], ['focus', t('Focus')], ['ask', t('Ask')], ['settings', t('Settings')]];
+const tabList = () => [['home', t('Home')], ['ai', t('Agents')], ['music', t('Music')], ['tray', t('Files')], ['clips', t('Copied')], ['note', t('Note')], ['focus', t('Focus')], ['ask', t('Ask')]];
 const stateName = s => ({ idle: t('Idle'), working: t('Working'), asking: t('Needs you'), done: t('Done'), error: t('Error') }[s] || s);
 const verb = v => ({ Reading: t('Reading'), Writing: t('Writing'), Editing: t('Editing'), Running: t('Running'), Searching: t('Searching'), Fetching: t('Fetching'),
   'Searching the web': t('Searching the web'), Delegating: t('Delegating'), Using: t('Using'), Thinking: t('Thinking'), Failed: t('Failed'), 'Needs you': t('Needs you') }[v] || v);
-const hatName = h => ({ none: t('No hat'), cap: t('Cap'), crown: t('Crown'), bow: t('Bow') }[h]);
 const weatherName = c => (c === 0 ? t('Clear') : c <= 3 ? t('Cloudy') : c <= 48 ? t('Fog') : c <= 67 ? t('Rain') : c <= 77 ? t('Snow') : c <= 82 ? t('Showers') : t('Storm'));
 
 const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: 'idle', history: [], usage: null }, agents: {}, win: { media: null, volume: null, net: null }, tray: [], clips: [],
   weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
-  platform: '', version: '', displays: 1, autostart: false, hubError: '', dragging: false, languages: [], node: true };
+  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false };
 
 // ---------- small helpers ----------
 const locale = () => (S.settings?.lang === 'sw' ? 'sw-TZ' : undefined);
@@ -45,10 +44,11 @@ function mediaPosition() { const m = S.win.media; if (!m) return 0; return Math.
 // ---------- the pill ----------
 function drawPill() {
   const top = S.ai.sessions[0], m = S.win.media;
-  island.className = S.ai.top + (S.open ? ' open' : '');
+  island.className = [S.ai.top, S.settings?.island.mode === 'detach' ? 'detach' : 'attach', S.open ? 'open' : '', S.pinned ? 'pinned' : ''].join(' ');
   const mood = S.ai.top !== 'idle' ? S.ai.top : (m?.playing ? 'music' : 'idle');
   pip.className = 'pip ' + mood + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
-  let text = S.settings?.mascot.name || 'Peep', side = clock();
+  // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
+  let text = S.open ? (S.settings?.mascot.name || 'Peep') : '', side = clock();
   if (top && top.state === 'asking') text = t('{agent} needs you', { agent: AGENT[top.agent] });
   else if (top && top.state === 'working') text = top.activity ? `${verb(top.activity.verb)} ${top.activity.detail}`.trim() : t('Working');
   else if (top && top.state === 'done') text = t('{agent} is done', { agent: AGENT[top.agent] });
@@ -57,6 +57,10 @@ function drawPill() {
   else if (m?.playing) text = m.artist ? `${m.title} · ${m.artist}` : m.title;
   if (top?.state === 'working' && top.startedAt) side = time(Date.now() - top.startedAt);
   $('#pill-text').textContent = text; $('#pill-side').textContent = side;
+  island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
+  island.classList.toggle('bare', !S.open && !text && S.settings?.island.mode !== 'detach'); // attached and idle: only Pip in the notch
+  // the shell's width is set in pixels so the change between sizes can be animated
+  shell.style.width = S.open ? '' : Math.max(84, Math.min(440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
   const dot = tabs.querySelector('[data-tab=ai]'); if (dot) dot.classList.toggle('dot', S.ai.top === 'asking');
 }
 
@@ -67,7 +71,7 @@ const pages = {
     const top = S.ai.sessions[0], m = S.win.media, now = new Date(), u = S.ai.usage, net = S.win.net;
     const agentLine = top ? `<span class="badge ${top.state}">${esc(stateName(top.state))}</span> <b>${esc(AGENT[top.agent])}</b> <span class="dim">${esc(top.project)}</span>` : `<span class="dim">${esc(t('No agent session yet.'))}</span>`;
     return `${S.hubError ? `<div class="card" data-kind="error">${esc(S.hubError)}</div>` : ''}
-      ${S.agents.claude || S.agents.codex ? '' : `<div class="card row"><div class="grow">${esc(t('Connect Claude Code or Codex to see what they are doing.'))}</div><button class="btn primary" data-go="settings">${esc(t('Connect'))}</button></div>`}
+      ${S.agents.claude || S.agents.codex ? '' : `<div class="card row"><div class="grow">${esc(t('Connect Claude Code or Codex to see what they are doing.'))}</div><button class="btn primary" data-settings>${esc(t('Connect'))}</button></div>`}
       <div class="card"><div class="row">${agentLine}</div>${top?.activity ? `<div class="cut mono dim">${esc(verb(top.activity.verb))} ${esc(top.activity.detail)}</div>` : ''}</div>
       ${u ? `<div class="card"><h2>${esc(t('Claude usage'))}</h2><div class="row small dim">${usageBar(esc(t('5 hours')), u.fiveHour)}</div><div class="row small dim">${usageBar(esc(t('Week')), u.sevenDay)}</div></div>` : ''}
       <div class="grid">
@@ -93,10 +97,13 @@ const pages = {
     return `<h2>${esc(t('Sessions'))}</h2>${cards || `<div class="card dim">${esc(t('Nothing running. Start Claude Code or Codex in a terminal.'))}</div>`}<h2>${esc(t('History'))}</h2>${history || `<div class="dim">${esc(t('Finished jobs appear here.'))}</div>`}`;
   },
   music() {
-    const m = S.win.media, v = S.win.volume, sp = S.spotify;
+    const m = S.win.media, v = S.win.volume, sp = S.spotify, art = m && S.art?.key === m.title + '|' + m.artist ? S.art.data : '', on = S.settings.lyrics;
     if (S.platform !== 'win32') return `<div class="card dim">${esc(t('Music controls need Windows.'))}</div>`;
-    return `${m ? `<div class="card"><div class="cut"><b>${esc(m.title)}</b></div><div class="dim cut">${esc(m.artist)}${m.album ? ' · ' + esc(m.album) : ''}</div>
-        <div class="lyric" id="lyric"></div><div class="bar"><i id="progress"></i></div><div class="row small dim"><span id="pos"></span><span class="grow"></span><span>${m.durationMs ? time(m.durationMs) : ''}</span></div></div>` : `<div class="card dim">${esc(t('Nothing is playing.'))}</div>`}
+    return `${m ? `<div class="card"><div class="row">${art ? `<img class="art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : '<div class="art"></div>'}
+          <div class="grow"><div class="cut"><b>${esc(m.title)}</b></div><div class="dim cut">${esc(m.artist)}${m.album ? ' · ' + esc(m.album) : ''}</div></div>
+          <button class="btn toggle ${on ? 'on' : ''}" data-lyrics>${esc(t('Lyrics'))}</button></div>
+        ${on ? '<div class="lyrics"><div id="ly-prev"></div><div id="ly-now" class="now"></div><div id="ly-next"></div></div>' : '<br>'}
+        <div class="bar"><i id="progress"></i></div><div class="row small dim"><span id="pos"></span><span class="grow"></span><span>${m.durationMs ? time(m.durationMs) : ''}</span></div></div>` : `<div class="card dim">${esc(t('Nothing is playing.'))}</div>`}
       <div class="row" data-center><button class="btn icon" data-media="prev" aria-label="${esc(t('Previous'))}">⏮</button><button class="btn icon primary" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${m?.playing ? '⏸' : '▶'}</button><button class="btn icon" data-media="next" aria-label="${esc(t('Next'))}">⏭</button></div>
       ${v ? `<h2>${esc(t('Volume'))}</h2><div class="row"><input type="range" id="volume" min="0" max="100" value="${v.level}"><span class="dim" id="vol-n">${v.level}</span></div>` : ''}
       ${sp.on ? `<h2>${esc(t('Play on'))}</h2>${sp.devices.map(d => `<div class="item" data-device="${esc(d.id)}"><span class="grow cut">${esc(d.name)}</span>${d.active ? `<span class="badge done">${esc(t('Playing'))}</span>` : ''}</div>`).join('') || `<div class="dim">${esc(sp.error || t('Open Spotify on a device to see it here.'))}</div>`}` : ''}`;
@@ -122,26 +129,6 @@ const pages = {
       <div class="shots"><button class="shot ${a.pick ? '' : 'on'}" data-pick=""><span>${esc(t('Whole screen'))}</span></button>${a.windows.map(w => `<button class="shot ${a.pick === w.id ? 'on' : ''}" data-pick="${esc(w.id)}"><img alt="" src="${esc(w.thumb)}"><span class="cut">${esc(w.name)}</span></button>`).join('')}</div>
       <textarea id="question" rows="2" placeholder="${esc(t('What does this error mean?'))}"></textarea><br><br><button class="btn primary" id="ask-go" ${a.busy ? 'disabled' : ''}>${esc(a.busy ? t('Looking…') : t('Ask'))}</button>
       ${a.error ? `<div class="card" data-kind="error">${esc(a.error)}</div>` : ''}${a.text ? `<div class="card answer">${esc(a.text)}</div>` : ''}`;
-  },
-  settings() {
-    const s = S.settings, check = (id, on, label) => `<label class="check"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span>${label}</span></label>`;
-    return `<h2>${esc(t('Agents'))}</h2>${check('ag-claude', S.agents.claude, esc(t('Follow Claude Code')) + ` <span class="dim small">(~/.claude/settings.json)</span>`)}${check('ag-codex', S.agents.codex, esc(t('Follow Codex')) + ` <span class="dim small">(~/.codex/hooks.json)</span>`)}
-      ${check('s-agentlang', s.agentLanguage, esc(t('Agents answer me in this language')))}
-      ${S.node ? '' : `<div class="dim small">${esc(t('Answering from here and the usage bars need Node.js on this PC.'))}</div>`}<div class="small" id="ag-error" data-kind="error"></div>
-      <h2>${esc(t('Language'))}</h2><select id="s-lang">${S.languages.map(l => `<option value="${esc(l.code)}" ${l.code === s.lang ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}</select>
-      <h2>${esc(s.mascot.name)}</h2><label class="field"><span>${esc(t('Name'))}</span><input type="text" id="m-name" maxlength="20" value="${esc(s.mascot.name)}"></label>
-      <div class="row"><div class="swatches" id="m-colors">${COLORS.map(c => `<button data-color="${c}" class="${c === s.mascot.color ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div>
-        <select id="m-hat" data-narrow>${['none', 'cap', 'crown', 'bow'].map(h => `<option value="${h}" ${h === s.mascot.hat ? 'selected' : ''}>${esc(hatName(h))}</option>`).join('')}</select></div>
-      <h2>${esc(t('General'))}</h2>${check('s-sounds', s.sounds, esc(t('Chime when an agent finishes')))}${check('s-lyrics', s.lyrics, esc(t('Show song lyrics (asks lrclib.net for the song)')))}${check('s-auto', S.autostart, esc(t('Start with Windows')))}
-      <label class="field"><span>${esc(t('Ask about your screen with'))}</span><select id="s-buddy"><option value="claude" ${s.buddyAgent === 'claude' ? 'selected' : ''}>Claude Code</option><option value="codex" ${s.buddyAgent === 'codex' ? 'selected' : ''}>Codex</option></select></label>
-      <label class="field"><span>${esc(t('Town for the weather'))}</span><input type="text" id="s-place" value="${esc(s.weather.place)}"></label>
-      <label class="field"><span>${esc(t('Calendar link (private iCal address, https)'))}</span><input type="url" id="s-cal" value="${esc(s.calendarUrl)}"></label>
-      ${S.displays > 1 ? `<label class="field"><span>${esc(t('Screen'))}</span><select id="s-display">${Array.from({ length: S.displays }, (_, i) => `<option value="${i}" ${i === s.island.display ? 'selected' : ''}>${esc(t('Screen {n}', { n: i + 1 }))}</option>`).join('')}</select></label>` : ''}
-      <h2>Spotify</h2><div class="dim small">${esc(t('Only for choosing which device plays. Needs your own free client ID from developer.spotify.com, with this redirect address:'))} <span class="mono">http://127.0.0.1:48612/callback</span></div>
-      <div class="row" data-gap><input type="text" class="grow" id="sp-id" placeholder="Client ID" value="${esc(s.spotifyClientId)}"><button class="btn ${S.spotify.on ? '' : 'primary'}" id="sp-go">${esc(S.spotify.on ? t('Disconnect') : t('Connect'))}</button></div><div class="small" id="sp-error" data-kind="error"></div>
-      <h2>${esc(t('Focus guard'))}</h2>${check('g-on', s.guard.on, esc(t('Pause me before these open')))}
-      <label class="field"><span>${esc(t('Words to watch for in window titles, separated by commas'))}</span><input type="text" id="g-sites" value="${esc(s.guard.sites.join(', '))}"></label>
-      <div class="dim small">Peep ${esc(S.version)} · MIT · ${esc(s.shortcut)}</div>`;
   }
 };
 
@@ -153,22 +140,40 @@ function draw(force) {
   for (const el of page.querySelectorAll('[data-color]')) el.style.background = el.dataset.color;
   for (const el of page.querySelectorAll('[data-center]')) { el.style.justifyContent = 'center'; el.style.textAlign = 'center'; el.style.margin = '10px 0'; }
   for (const el of page.querySelectorAll('[data-kind=error]')) el.style.color = 'var(--error)';
-  for (const el of page.querySelectorAll('[data-narrow]')) el.style.width = '120px';
   for (const el of page.querySelectorAll('[data-flat]')) el.style.margin = '0';
-  for (const el of page.querySelectorAll('[data-gap]')) el.style.margin = '8px 0';
   tick();
 }
-function drawTabs() { tabs.innerHTML = tabList().map(([id, name]) => `<button type="button" data-tab="${id}" class="${id === S.tab ? 'on' : ''}">${esc(name)}</button>`).join(''); }
+function drawTabs() {
+  tabs.innerHTML = tabList().map(([id, name]) => `<button type="button" data-tab="${id}" class="${id === S.tab ? 'on' : ''}">${esc(name)}</button>`).join('')
+    + `<button type="button" class="gear" data-settings aria-label="${esc(t('Settings'))}" title="${esc(t('Settings'))}">⚙</button>`;
+}
 function go(tab) {
   S.tab = tab; drawTabs(); draw(true);
+  page.classList.remove('in'); void page.offsetWidth; page.classList.add('in'); // replay the short entrance of the page
   if (tab === 'home') refreshHome();
   if (tab === 'ask') api.windows().then(list => { S.ask.windows = list || []; if (S.tab === 'ask' && !typing()) draw(true); });
   if (tab === 'music' && S.spotify.on) refreshDevices();
 }
+/** Opens the preview or folds back to the pill. The page is drawn before opening and left in place while closing,
+    so the morph never shows an empty panel. */
 function setOpen(open) {
-  S.open = open; panel.hidden = !open; api.focus(open);
-  if (open) go(S.tab); else { drawPill(); api.mouse(false); }
+  if (open === S.open) return;
+  S.open = open;
+  if (open) go(S.tab);
+  else { S.pinned = false; S.auto = false; if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
 }
+function openSettings() { api.openSettings(); setOpen(false); }
+
+// ---------- hover: the island opens under the pointer and folds away when it leaves ----------
+let openTimer = 0, closeTimer = 0;
+function pointer(inside) {
+  api.mouse(inside); // clicks fall through to the app underneath unless the pointer is on the island
+  if (inside === S.hover) return;
+  S.hover = inside; clearTimeout(openTimer); clearTimeout(closeTimer);
+  if (inside) { if (!S.open) openTimer = setTimeout(() => setOpen(true), 70); }
+  else closeTimer = setTimeout(maybeClose, 280);
+}
+function maybeClose() { if (S.open && !S.hover && !S.pinned && !S.dragging && !typing() && !(S.auto && S.ai.top === 'asking')) setOpen(false); }
 
 function second() {
   if (S.focus.running) { S.focus.left--; if (S.focus.left <= 0) { S.focus.running = false; S.focus.left = S.focus.total; chime(true); if (S.tab === 'focus') draw(true); } }
@@ -180,20 +185,25 @@ function tick() {
   const c = $('#clock'); if (c) c.textContent = clock();
   const m = S.win.media;
   if (m && S.tab === 'music') {
-    const pos = mediaPosition(), p = $('#progress'), n = $('#pos'), l = $('#lyric');
+    const pos = mediaPosition(), p = $('#progress'), n = $('#pos');
     if (p) p.style.width = (m.durationMs ? Math.min(100, 100 * pos / m.durationMs) : 0) + '%';
     if (n) n.textContent = time(pos);
-    if (l) { let cur = null; for (const line of S.lyrics || []) { if (line.t <= pos) cur = line; else break; } l.textContent = cur?.text || ''; }
+    const now = $('#ly-now');
+    if (now) {
+      const lines = S.lyrics || []; let i = -1; while (i + 1 < lines.length && lines[i + 1].t <= pos) i++;
+      $('#ly-prev').textContent = lines[i - 1]?.text || ''; $('#ly-next').textContent = lines[i + 1]?.text || '';
+      now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? '' : t('No lyrics for this song.'));
+    }
   }
   const fl = $('#focus-left'), fb = $('#focus-bar');
   if (fl) fl.textContent = time(S.focus.left * 1000); if (fb) fb.style.width = (100 * (1 - S.focus.left / S.focus.total)) + '%';
 }
-async function refreshHome() { const [w, e, st] = await Promise.all([api.weather(), api.calendar(), api.stats()]); S.weather = w; S.event = e; S.stats = st; draw(); }
+async function refreshHome() { const [w, e, st] = await Promise.all([api.weather(), api.calendar(), api.stats()]); S.weather = w && !w.error ? w : null; S.event = e; S.stats = st; draw(); }
 async function refreshDevices() { const r = await api.spotifyDevices(); S.spotify = { on: r.ok || r.connected !== false, devices: r.devices || [], error: r.ok ? '' : r.error }; draw(); }
 async function refreshLyrics() {
   const m = S.win.media, key = m ? m.title + '|' + m.artist : '';
   if (key === S.lyricsFor) return; S.lyricsFor = key; S.lyrics = null;
-  if (m && S.settings.lyrics) S.lyrics = await api.lyrics({ title: m.title, artist: m.artist, durationSec: Math.round((m.durationMs || 0) / 1000) });
+  if (m && S.settings.lyrics) { const lines = await api.lyrics({ title: m.title, artist: m.artist, durationSec: Math.round((m.durationMs || 0) / 1000) }); if (S.lyricsFor === key) S.lyrics = lines || []; }
 }
 function applyMascot() { document.documentElement.style.setProperty('--pip', S.settings.mascot.color); }
 async function save(patch) { S.settings = await api.setSettings(patch); applyMascot(); drawPill(); }
@@ -203,23 +213,29 @@ async function sendReply(id) {
 }
 
 // ---------- events ----------
-pill.addEventListener('click', () => setOpen(!S.open));
-tabs.addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) go(b.dataset.tab); });
+// a click on the pill pins the island open; another click (or Esc) lets it fold away again
+pill.addEventListener('click', () => { if (S.open && S.pinned) setOpen(false); else { S.pinned = true; if (S.open) drawPill(); else setOpen(true); } });
+tabs.addEventListener('click', e => { if (e.target.closest('[data-settings]')) return openSettings(); const b = e.target.closest('[data-tab]'); if (b) go(b.dataset.tab); });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') setOpen(false);
   else if (e.key === 'Enter' && e.target.dataset?.replyFor) sendReply(e.target.dataset.replyFor);
 });
-// clicks fall through to the app underneath unless the pointer is on the island
-document.addEventListener('mousemove', e => api.mouse(Boolean(e.target.closest && e.target.closest('#island'))));
-document.addEventListener('mouseleave', () => { if (!S.dragging) api.mouse(false); });
+document.addEventListener('mousemove', e => pointer(Boolean(e.target.closest && e.target.closest('#shell'))));
+document.addEventListener('mouseleave', () => pointer(false));
+page.addEventListener('focusout', () => setTimeout(maybeClose, 300));
 
 page.addEventListener('click', async e => {
   const b = e.target.closest('button, .item'); if (!b) return;
   const d = b.dataset;
-  if (d.go) go(d.go);
+  if (d.settings !== undefined) openSettings();
+  else if (d.lyrics !== undefined) { await save({ lyrics: !S.settings.lyrics }); S.lyricsFor = ''; refreshLyrics(); draw(true); }
   else if (d.decide) await api.decide(d.id, d.decide);
   else if (d.reply) sendReply(d.reply);
-  else if (d.media) api.media(d.media);
+  else if (d.media) {
+    api.media(d.media);
+    // show the change at once; the helper confirms the real state a moment later
+    const m = S.win.media; if (m && d.media === 'toggle') { m.positionMs = mediaPosition(); S.win.at = Date.now(); m.playing = !m.playing; draw(true); }
+  }
   else if (d.device) { await api.spotifyTransfer(d.device); setTimeout(refreshDevices, 1200); }
   else if (d.remove) { e.stopPropagation(); S.tray = await api.trayRemove(d.remove); draw(); }
   else if (d.open) api.trayOpen(d.open);
@@ -229,13 +245,7 @@ page.addEventListener('click', async e => {
   else if (d.focus === 'toggle') { S.focus.running = !S.focus.running; draw(true); }
   else if (d.focus === 'reset') { S.focus.running = false; S.focus.left = S.focus.total; draw(true); }
   else if (d.focusMin) { S.focus = { running: false, total: d.focusMin * 60, left: d.focusMin * 60 }; draw(true); }
-  else if (d.color) { await save({ mascot: { color: d.color } }); draw(true); }
   else if (d.pick !== undefined) { const q = $('#question').value; S.ask.pick = d.pick; draw(true); $('#question').value = q; }
-  else if (b.id === 'sp-go') {
-    if (S.spotify.on) { await api.spotifyLogout(); S.spotify = { on: false, devices: [], error: '' }; draw(true); return; }
-    await save({ spotifyClientId: $('#sp-id').value.trim() }); $('#sp-error').textContent = t('Finish the login in your browser…');
-    const r = await api.spotifyLogin(); S.spotify.on = r.ok; if (S.tab === 'settings') { draw(true); if (!r.ok) $('#sp-error').textContent = r.error; }
-  }
   else if (b.id === 'ask-go') {
     const question = $('#question').value; Object.assign(S.ask, { busy: true, text: '', error: '' }); draw(true); $('#question').value = question;
     const r = await api.ask(question, S.ask.pick || null); Object.assign(S.ask, { busy: false, text: r?.ok ? r.text : '', error: r?.ok ? '' : (r?.error || t('No answer.')) });
@@ -251,23 +261,6 @@ page.addEventListener('change', async e => {
   const el = e.target;
   if (el.id === 'volume') S.dragging = false;
   else if (el.dataset.radio) api.setRadio(el.dataset.radio, el.checked);
-  else if (el.id === 'ag-claude' || el.id === 'ag-codex') {
-    const r = await api.connectAgent(el.id.slice(3), el.checked); S.agents = r.agents || S.agents;
-    draw(true); if (!r.ok) $('#ag-error').textContent = t('Could not change that: {error}', { error: r.error });
-  }
-  else if (el.id === 's-lang') { await save({ lang: el.value }); location.reload(); }
-  else if (el.id === 's-agentlang') save({ agentLanguage: el.checked });
-  else if (el.id === 'm-name') { await save({ mascot: { name: el.value.trim() || 'Pip' } }); }
-  else if (el.id === 'm-hat') save({ mascot: { hat: el.value } });
-  else if (el.id === 's-sounds') save({ sounds: el.checked });
-  else if (el.id === 's-lyrics') save({ lyrics: el.checked });
-  else if (el.id === 's-auto') S.autostart = await api.setAutostart(el.checked);
-  else if (el.id === 's-buddy') save({ buddyAgent: el.value });
-  else if (el.id === 's-place') save({ weather: { place: el.value.trim() } });
-  else if (el.id === 's-cal') save({ calendarUrl: el.value.trim() });
-  else if (el.id === 's-display') save({ island: { display: +el.value } });
-  else if (el.id === 'g-on') save({ guard: { on: el.checked } });
-  else if (el.id === 'g-sites') save({ guard: { sites: el.value.split(',').map(s => s.trim()).filter(Boolean).slice(0, 40) } });
 });
 // files dropped anywhere on the island go to the files tab
 island.addEventListener('dragover', e => { e.preventDefault(); if (!S.open) setOpen(true); if (S.tab !== 'tray') go('tray'); $('#drop')?.classList.add('over'); });
@@ -278,20 +271,35 @@ island.addEventListener('drop', async e => {
   if (paths.length) { S.tray = await api.trayAdd(paths); draw(); }
 });
 
-api.onAi(snap => { const was = S.ai.top; S.ai = snap; if (snap.top === 'asking' && was !== 'asking') chime(true); draw(); });
+api.onAi(snap => {
+  const was = S.ai.top; S.ai = snap;
+  if (snap.top === 'asking' && was !== 'asking') { chime(true); if (!S.open) { S.tab = 'ai'; S.auto = true; setOpen(true); } } // a question opens the island by itself
+  else if (was === 'asking' && snap.top !== 'asking' && S.auto) { S.auto = false; setTimeout(maybeClose, 900); }
+  draw();
+});
 api.onFinish(entry => chime(entry.state === 'done'));
 api.onWin(state => { S.win = state; refreshLyrics(); draw(); });
+api.onArt(art => { S.art = art; if (S.tab === 'music') draw(); });
+// Pip looks at the pointer: the eyes shift a few pixels towards it, less when it is close
+api.onCursor(p => {
+  const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);
+  pip.style.setProperty('--ex', (S.open ? 0 : dx / d * 3.2 * pull).toFixed(2) + 'px'); pip.style.setProperty('--ey', (S.open ? 0 : dy / d * 2.4 * pull).toFixed(2) + 'px');
+});
 api.onTray(list => { S.tray = list; draw(); });
 api.onClips(list => { S.clips = list; draw(); });
-api.onToggle(open => setOpen(open === true ? true : !S.open));
-api.onPage(tab => { S.tab = tab; setOpen(true); });
+api.onToggle(open => { if (open === true || !S.open) { S.pinned = true; setOpen(true); drawPill(); } else setOpen(false); });
+// something was changed in the settings window: take the new settings (a new language needs a fresh page)
+api.onChanged(async () => {
+  const init = await api.init(), lang = S.settings.lang;
+  Object.assign(S, { settings: init.settings, agents: init.agents }); S.spotify.on = init.spotify;
+  if (init.settings.lang !== lang) return location.reload();
+  applyMascot(); S.lyricsFor = ''; refreshLyrics(); if (S.open && S.tab === 'home') refreshHome(); else draw();
+});
 
 (async () => {
   const init = await api.init();
   t = window.makeT(init.strings); document.documentElement.lang = init.settings.lang;
-  Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, version: init.version,
-    displays: init.displays, autostart: init.autostart, languages: init.languages, node: init.node });
+  Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art });
   S.spotify.on = init.spotify; S.hubError = await api.hubError();
   applyMascot(); drawTabs(); drawPill(); setInterval(second, 1000);
-  if (!init.settings.firstRunDone) { await save({ firstRunDone: true }); S.tab = 'settings'; setOpen(true); }
 })();

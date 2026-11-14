@@ -9,7 +9,7 @@ const DEFAULTS = {
   agentLanguage: true,   // ask the agents to answer in the app's language
   spotifyClientId: '',
   agents: { claude: false, codex: false },
-  island: { display: 0, scale: 1 },
+  island: { display: 0, mode: 'attach', opacity: 1 }, // attach: joined to the top edge; detach: floating just below it
   mascot: { name: 'Pip', color: '#7c5cff', hat: 'none' },
   sounds: true,
   lyrics: true,

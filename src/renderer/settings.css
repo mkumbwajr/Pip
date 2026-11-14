@@ -1,0 +1,26 @@
+/* Peep's settings window: a sidebar of sections, and on the right a header that carries a live copy of the island
+   (so Attach / Detach, the colour and the hat show as you change them) above the cards of the chosen section. */
+body.window { display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
+#side { flex: none; width: 216px; display: flex; flex-direction: column; padding: 16px 10px 12px; border-right: 1px solid var(--line); background: #09090c; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 14px; } .brand b { display: block; font-size: 14px; } .brand span#brand-sub { color: var(--dim); font-size: 12px; }
+.brand .pip { width: 30px; height: 27px; border-radius: 10px; gap: 6px; } .brand .pip .eye { width: 5px; height: 8px; }
+#nav { flex: 1; overflow-y: auto; }
+#nav h3 { margin: 14px 8px 6px; font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+#nav button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; margin-bottom: 2px; border: 0; border-radius: 9px; background: transparent; color: var(--dim); font-weight: 600; cursor: pointer; text-align: left; }
+#nav button:hover { color: var(--text); } #nav button.on { background: var(--card); color: var(--text); }
+#nav button i { flex: none; width: 8px; height: 8px; border-radius: 3px; background: var(--line); } #nav button.on i { background: var(--pip); }
+.foot { padding: 10px 8px 0; border-top: 1px solid var(--line); color: var(--dim); font-size: 12px; }
+
+#main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#hero { position: relative; flex: none; padding: 64px 32px 22px; border-bottom: 1px solid var(--line);
+  background: radial-gradient(120% 140% at 50% -40%, color-mix(in srgb, var(--pip) 55%, transparent), transparent 70%), repeating-linear-gradient(90deg, rgba(255, 255, 255, .025) 0 1px, transparent 1px 28px); }
+#hero h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.01em; } #hero p { margin: 4px 0 0; color: var(--dim); }
+#preview { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 9px; height: 36px; padding: 0 14px 0 8px; background: var(--bg);
+  border: 1px solid var(--line); border-top-color: transparent; border-radius: 0 0 18px 18px; color: var(--dim); font-variant-numeric: tabular-nums; transition: top .45s cubic-bezier(.32, .72, 0, 1), border-radius .45s cubic-bezier(.32, .72, 0, 1); }
+#preview:not(.detach) { background: #000; border-color: transparent; padding: 0 34px; } #preview:not(.detach) #pv-clock { display: none; }
+#preview.detach { top: 8px; border-radius: 18px; border-top-color: var(--line); }
+body.window #page { flex: 1; overflow-y: auto; max-width: none; margin: 0; padding: 20px 32px 28px; }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; margin-bottom: 12px; max-width: 760px; }
+.panel > h2 { margin-bottom: 12px; } .panel label.field:last-child, .panel label.check:last-child { margin-bottom: 0; }
+.fact { display: flex; align-items: center; gap: 10px; padding: 7px 0; } .fact + .fact { border-top: 1px solid var(--line); }
+.fact i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--dim); } .fact i.ok { background: var(--done); } .fact i.bad { background: var(--error); }

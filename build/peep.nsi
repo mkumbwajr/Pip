@@ -3,7 +3,7 @@
 ; Installs for the current user only, no admin rights. The uninstaller removes Peep's hooks from the agents' configs.
 Unicode true
 SetCompressor /SOLID lzma
-!define VERSION "0.2.0"
+!define VERSION "0.3.0"
 !define UNINST "Software\Microsoft\Windows\CurrentVersion\Uninstall\Peep"
 
 Name "Peep"
@@ -14,7 +14,13 @@ RequestExecutionLevel user
 ShowInstDetails nevershow
 ShowUninstDetails nevershow
 AutoCloseWindow true
-BrandingText "Peep ${VERSION}"
+BrandingText "BANG DIGITAL LTD"
+VIProductVersion "${VERSION}.0"
+VIAddVersionKey "ProductName" "Peep"
+VIAddVersionKey "CompanyName" "BANG DIGITAL LTD"
+VIAddVersionKey "FileDescription" "Peep Setup"
+VIAddVersionKey "FileVersion" "${VERSION}"
+VIAddVersionKey "LegalCopyright" "BANG DIGITAL LTD"
 Page instfiles
 UninstPage uninstConfirm
 UninstPage instfiles
@@ -29,7 +35,7 @@ Section "Peep"
   CreateShortcut "$DESKTOP\Peep.lnk" "$INSTDIR\Peep.exe"
   WriteRegStr HKCU "${UNINST}" "DisplayName" "Peep"
   WriteRegStr HKCU "${UNINST}" "DisplayVersion" "${VERSION}"
-  WriteRegStr HKCU "${UNINST}" "Publisher" "Peep contributors"
+  WriteRegStr HKCU "${UNINST}" "Publisher" "BANG DIGITAL LTD"
   WriteRegStr HKCU "${UNINST}" "DisplayIcon" "$INSTDIR\Peep.exe"
   WriteRegStr HKCU "${UNINST}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${UNINST}" "UninstallString" '"$INSTDIR\Uninstall Peep.exe"'

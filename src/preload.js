@@ -7,7 +7,7 @@ const on = channel => fn => { const h = (_e, payload) => fn(payload); ipcRendere
 
 contextBridge.exposeInMainWorld('peep', {
   init: call('app:init'), hubError: call('hub:error'), strings: call('app:strings'),
-  setSettings: call('settings:set'), setAutostart: call('autostart:set'),
+  setSettings: call('settings:set'), openSettings: call('settings:open'), setAutostart: call('autostart:set'),
   connectAgent: call('agents:connect'), decide: call('ai:decide'), reply: call('ai:reply'), setRadio: call('radio:set'),
   spotifyLogin: call('spotify:login'), spotifyLogout: call('spotify:logout'), spotifyDevices: call('spotify:devices'), spotifyTransfer: call('spotify:transfer'),
   media: call('media:cmd'), setVolume: call('volume:set'), lyrics: call('lyrics:get'),
@@ -18,5 +18,5 @@ contextBridge.exposeInMainWorld('peep', {
   mouse: inside => ipcRenderer.send('island:mouse', Boolean(inside)), focus: onOff => ipcRenderer.send('island:focus', Boolean(onOff)),
   pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
   onAi: on('ai:state'), onFinish: on('ai:finish'), onWin: on('win:state'), onTray: on('tray:changed'), onClips: on('clips:changed'),
-  onToggle: on('island:toggle'), onPage: on('island:page')
+  onToggle: on('island:toggle'), onArt: on('win:art'), onCursor: on('cursor'), onChanged: on('app:changed')
 });
