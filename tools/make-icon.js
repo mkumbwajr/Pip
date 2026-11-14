@@ -1,12 +1,15 @@
 'use strict';
 // Draws Pip's icon (Pip's head: a rounded violet square with two eyes) with no dependencies:
-//   node tools/make-icon.js   ->  assets/icon.png (256 px) and build/pip.ico (16 to 256 px, for the app and the installer)
+//   node tools/make-icon.js   ->  assets/icon.png (256 px), build/pip.ico (16 to 256 px, for the app and the installer),
+//                                 build/icon-mac.png (1024 px) and assets/trayTemplate(@2x).png (the Mac menu bar)
 // Every size is drawn on its own with smoothed edges, so the small ones in the taskbar stay crisp.
 const zlib = require('node:zlib'), fs = require('node:fs'), path = require('node:path');
 
 const inRound = (x, y, x0, y0, w, h, r) => { if (x < x0 || y < y0 || x >= x0 + w || y >= y0 + h) return false; const cx = Math.max(x0 + r, Math.min(x0 + w - r, x)), cy = Math.max(y0 + r, Math.min(y0 + h - r, y)); return (x - cx) ** 2 + (y - cy) ** 2 <= r * r; };
 // Pip on a 256 grid: the head, then the eyes
+let shape = 'head'; // 'eyes': only Pip's two eyes, in black, for the Mac menu bar (a template image macOS tints itself)
 function sample(x, y) {
+  if (shape === 'eyes') return inRound(x, y, 62, 50, 48, 156, 24) || inRound(x, y, 146, 50, 48, 156, 24) ? [0, 0, 0, 255] : [0, 0, 0, 0];
   if (inRound(x, y, 82, 96, 30, 52, 15) || inRound(x, y, 144, 96, 30, 52, 15)) return [255, 255, 255, 255];
   if (inRound(x, y, 24, 36, 208, 190, 62)) return [124, 92, 255, 255];
   return [0, 0, 0, 0];
@@ -44,4 +47,7 @@ fs.writeFileSync(path.join(root, 'assets', 'icon.png'), png(256));
 const icoFile = ico([16, 20, 24, 32, 40, 48, 64, 128, 256]);
 fs.writeFileSync(path.join(root, 'build', 'pip.ico'), icoFile);  // the exe and the installer
 fs.writeFileSync(path.join(root, 'assets', 'icon.ico'), icoFile); // Pip's windows and tray, so they match the exe exactly
-console.log('wrote assets/icon.png, assets/icon.ico and build/pip.ico');
+fs.writeFileSync(path.join(root, 'build', 'icon-mac.png'), png(1024)); // the Mac app icon (electron-builder makes the .icns from it)
+shape = 'eyes';
+fs.writeFileSync(path.join(root, 'assets', 'trayTemplate.png'), png(18)); fs.writeFileSync(path.join(root, 'assets', 'trayTemplate@2x.png'), png(36));
+console.log('wrote assets/icon.png, assets/icon.ico, build/pip.ico, build/icon-mac.png and the Mac menu-bar icons');

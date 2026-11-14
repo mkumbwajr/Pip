@@ -1,7 +1,7 @@
 {
   "name": "pip",
   "productName": "Pip",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Kisiwa cha bure na open source kwa Windows kinachokuonyesha ma-agent wako wa AI wanafanya nini. A free, open-source status island for Windows.",
   "main": "src/main/main.js",
   "license": "MIT",
@@ -10,7 +10,8 @@
     "start": "electron .",
     "test": "node --test test/*.test.cjs",
     "dist": "electron-builder --win dir --x64 --publish never && makensis build/pip.nsi",
-    "dist:win": "electron-builder --win dir --x64 --publish never -c.win.signAndEditExecutable=true && makensis build/pip.nsi"
+    "dist:win": "electron-builder --win dir --x64 --publish never -c.win.signAndEditExecutable=true && makensis build/pip.nsi",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never"
   },
   "dependencies": {
     "qrcode": "^1.5.4"
@@ -22,7 +23,9 @@
   "build": {
     "appId": "tz.co.bang.pip",
     "productName": "Pip",
-    "extraMetadata": { "description": "Pip" },
+    "extraMetadata": {
+      "description": "Pip"
+    },
     "files": [
       "src/**/*",
       "assets/**/*",
@@ -43,6 +46,25 @@
       ],
       "icon": "build/pip.ico",
       "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.developer-tools",
+      "artifactName": "Pip-${version}-mac.${ext}",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Pip shows what Spotify or Music is playing and lets you control it from the island."
+      }
+    },
+    "dmg": {
+      "title": "Pip ${version}"
     }
   },
   "repository": {

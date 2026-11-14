@@ -18,7 +18,8 @@ async function fromSite(fetchImpl) {
   const r = await fetchImpl(SITE + '/latest.json', { signal: AbortSignal.timeout(8000) });
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const j = await r.json(); if (!j.version) throw new Error('no version');
-  return { latest: String(j.version).replace(/^v/i, ''), url: isReleaseUrl(j.url) ? j.url : SITE + '/' };
+  const url = process.platform === 'darwin' ? j.mac : j.url; // latest.json names the Windows installer, and the Mac disk image once there is one
+  return { latest: String(j.version).replace(/^v/i, ''), url: isReleaseUrl(url) ? url : SITE + '/' };
 }
 async function fromGitHub(fetchImpl) {
   const r = await fetchImpl('https://api.github.com/repos/mkumbwajr/Pip/releases/latest', { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(10000) });

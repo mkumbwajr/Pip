@@ -77,8 +77,8 @@ function installClaude({ token, port = PORT, file = claudeFile(), scripts = {} }
 }
 function installCodex({ token, port = PORT, file = codexFile() }) {
   const config = readJson(file); strip(config, port); config.hooks ||= {};
-  // curl.exe ships with Windows 10 and 11; the event JSON arrives on stdin
-  const command = `curl.exe -s -m 3 -H "X-Pip-Token: ${token}" -H "Content-Type: application/json" --data-binary @- "${marker(port)}?agent=codex"`;
+  // curl.exe ships with Windows 10 and 11 (curl on the Mac); the event JSON arrives on stdin
+  const command = `${process.platform === 'win32' ? 'curl.exe' : 'curl'} -s -m 3 -H "X-Pip-Token: ${token}" -H "Content-Type: application/json" --data-binary @- "${marker(port)}?agent=codex"`;
   for (const event of CODEX_EVENTS) (config.hooks[event] ||= []).push({ hooks: [{ type: 'command', command, timeout: 5 }] });
   writeJson(file, config);
 }

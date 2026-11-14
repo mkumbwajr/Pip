@@ -23,3 +23,20 @@ jobs:
         run: npm run dist:win
       - uses: actions/upload-artifact@v4
         with: { name: Pip-Setup, path: dist/*.exe }
+  mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      # the built-in Google sign-in client lives outside git; with this secret set, the Mac build has it too
+      - name: Google client (optional)
+        env: { GOOGLE_CLIENT_JSON: "${{ secrets.GOOGLE_CLIENT_JSON }}" }
+        run: '[ -n "$GOOGLE_CLIENT_JSON" ] && printf "%s" "$GOOGLE_CLIENT_JSON" > src/main/google-client.json || echo "no GOOGLE_CLIENT_JSON secret: users bring their own Google client"'
+      - name: DMG (Intel and Apple silicon, not signed)
+        run: npm run dist:mac
+        env: { CSC_IDENTITY_AUTO_DISCOVERY: "false" }
+      - uses: actions/upload-artifact@v4
+        with: { name: Pip-mac, path: dist/*.dmg }
