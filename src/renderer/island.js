@@ -247,8 +247,11 @@ bar.addEventListener('mouseleave', hideTip);
 
 // ---------- hover: the island opens under the pointer and folds away when it leaves ----------
 let openTimer = 0, closeTimer = 0;
+let mouseSent = null;
 function pointer(inside) {
-  api.mouse(inside); // clicks fall through to the app underneath unless the pointer is on the island
+  // clicks fall through to the app underneath unless the pointer is on the island. Only tell the main process when
+  // that changes: switching click-through repaints the window on Windows, and doing it on every move made it flicker.
+  if (inside !== mouseSent) { mouseSent = inside; api.mouse(inside); }
   if (inside === S.hover) return;
   S.hover = inside; clearTimeout(openTimer); clearTimeout(closeTimer);
   if (inside) { if (!S.open) openTimer = setTimeout(() => setOpen(true), 70); }

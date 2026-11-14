@@ -70,6 +70,13 @@ function placeIsland() {
   const { x, y, width } = displayFor().bounds; // the very top of the screen: "attach" sits flush against it
   island.setBounds({ x: Math.round(x + (width - ISLAND.width) / 2), y, width: ISLAND.width, height: ISLAND.height });
 }
+// Windows lets a newly opened topmost window (a browser pop-up, a full-screen video, another overlay) sit above Peep.
+// Peep puts itself back in front whenever the window in front changes, and every few seconds as a safety net.
+// moveTop does not take the keyboard focus, so typing in the other window is not interrupted.
+function keepOnTop() {
+  if (!island || island.isDestroyed() || !island.isVisible() || guardWin) return; // the focus guard's pause screen stays above
+  island.setAlwaysOnTop(true, 'screen-saver'); island.moveTop();
+}
 function createIsland() {
   island = new BrowserWindow({
     ...ISLAND, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
@@ -82,7 +89,8 @@ function createIsland() {
   island.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   island.webContents.on('will-navigate', e => e.preventDefault());
   island.loadFile(path.join(RENDERER, 'island.html'));
-  island.once('ready-to-show', () => { placeIsland(); island.showInactive(); });
+  island.once('ready-to-show', () => { placeIsland(); island.showInactive(); keepOnTop(); });
+  island.on('blur', keepOnTop);
   island.on('close', e => { if (!quitting) e.preventDefault(); });
 }
 
@@ -307,7 +315,9 @@ app.whenReady().then(async () => {
   wireIpc(); handle('hub:error', () => hubError);
   createIsland(); buildTray(); bindShortcut(); watchClipboard();
   if (!store.get('firstRunDone')) { store.set({ firstRunDone: true }); openSettings(); } // first start: connect an agent
-  helper.on('state', s => { send('win:state', s); checkGuard(s.front); });
+  let lastFront = null;
+  helper.on('state', s => { send('win:state', s); checkGuard(s.front); if (s.front?.hwnd !== lastFront) { lastFront = s.front?.hwnd; keepOnTop(); } });
+  setInterval(keepOnTop, 3000);
   helper.on('art', art => send('win:art', art));
   // Pip's eyes follow the pointer wherever it is on the screen, so its position is sent while it moves (30 times a second at most)
   let lastPoint = '';
