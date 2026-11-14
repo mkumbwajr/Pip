@@ -120,16 +120,15 @@ const pages = {
     const meta = [m.album || year?.album, year?.year].filter(Boolean).join(' · '); // the player's album first; iTunes fills a missing one
     return `<div class="mu">${art ? `<img class="mu-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="mu-art">${icon('music')}</span>`}
       <div class="mu-info"><span class="label">${esc(t('Playing'))}${m.app ? ' · ' + esc(appName(m.app)) : ''}</span>
-        <h3 class="cut" title="${esc(song.title)}">${esc(song.title)}</h3>
-        <div class="mu-artist cut">${esc(song.artist || '')}</div>
+        <div class="mu-head"><div class="grow"><h3 class="cut" title="${esc(song.title)}">${esc(song.title)}</h3><div class="mu-artist cut">${esc(song.artist || '')}</div></div>
+          <div class="mu-ctl"><button class="mu-btn" data-media="prev" aria-label="${esc(t('Previous'))}">${icon('prev')}</button>
+            <button class="mu-btn play" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${icon(m.playing ? 'pause' : 'play')}</button>
+            <button class="mu-btn" data-media="next" aria-label="${esc(t('Next'))}">${icon('next')}</button></div></div>
         <div class="mu-meta cut">${esc(meta)}</div>
         ${on ? '<div class="mu-lyric cut" id="ly-now"></div>' : ''}
         <input type="range" id="seek" min="0" max="${m.durationMs || 0}" value="0" ${m.canSeek && m.durationMs ? '' : 'disabled'} aria-label="${esc(t('Position'))}">
         <div class="mu-times"><span id="pos"></span><span>${m.durationMs ? time(m.durationMs) : ''}</span></div>
-        <div class="mu-ctl"><button class="mu-btn" data-media="prev" aria-label="${esc(t('Previous'))}">${icon('prev')}</button>
-          <button class="mu-btn play" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${icon(m.playing ? 'pause' : 'play')}</button>
-          <button class="mu-btn" data-media="next" aria-label="${esc(t('Next'))}">${icon('next')}</button><span class="grow"></span>
-          ${sp.on && sp.devices.length ? `<select id="device" aria-label="${esc(t('Play on'))}">${sp.devices.map(d => `<option value="${esc(d.id)}" ${d.active ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`
+        <div class="mu-foot">${sp.on && sp.devices.length ? `<select id="device" aria-label="${esc(t('Play on'))}">${sp.devices.map(d => `<option value="${esc(d.id)}" ${d.active ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select>`
             : sp.on ? `<select id="device" disabled title="${esc(sp.error || t('Open Spotify on a device to see it here.'))}"><option>${esc(t('Play on'))}</option></select>` : ''}
           <button class="mu-chip ${on ? 'on' : ''}" data-lyrics>${icon('lyrics')}${esc(t('Lyrics'))}</button></div></div></div>`;
   },

@@ -262,3 +262,9 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 .mu-chip svg { width: 14px; height: 14px; } .mu-chip.on { border-color: #fff; color: #fff; }
 #device { width: auto; max-width: 130px; height: 28px; padding: 0 6px; font-size: 12px; background: transparent; border-color: #2e2e34; }
 .num { font-variant-numeric: tabular-nums; }
+
+/* music: song and artist on the left of the first row, the three controls on its right */
+.mu-head { display: flex; align-items: center; gap: 12px; min-width: 0; margin-top: 4px; }
+.mu-head .grow { min-width: 0; } .mu-head h3 { margin: 0 0 3px; }
+.mu-head .mu-ctl { flex: none; margin: 0; padding: 0; gap: 4px; }
+.mu-foot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: auto; padding-bottom: 6px; }
