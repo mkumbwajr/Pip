@@ -25,8 +25,14 @@ function splitTitle(title, artist) {
 }
 const simple = s => String(s || '').replace(/\s*[-–(\[].*(remaster|live|feat|version|edit|mono|stereo).*$/i, '').trim();
 
-async function fetchLyrics({ title, artist, durationSec }, { cacheDir, fetchImpl = fetch } = {}) {
-  if (!title) return null;
+const inflight = new Map();
+function fetchLyrics(song, opts = {}) {
+  if (!song?.title) return Promise.resolve(null);
+  const id = [song.title, song.artist, Math.round(song.durationSec || 0), opts.cacheDir].join('|').toLowerCase();
+  if (!inflight.has(id)) inflight.set(id, lookup(song, opts).finally(() => inflight.delete(id)));
+  return inflight.get(id);
+}
+async function lookup({ title, artist, durationSec }, { cacheDir, fetchImpl = fetch } = {}) {
   const key = createHash('sha1').update([title, artist, Math.round(durationSec || 0)].join('|').toLowerCase()).digest('hex');
   const file = cacheDir ? path.join(cacheDir, key + '.json') : null;
   if (file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')).lines || []; } catch {} }
@@ -37,8 +43,10 @@ async function fetchLyrics({ title, artist, durationSec }, { cacheDir, fetchImpl
     if (!res.ok) throw new Error('lrclib ' + res.status); // not cached: asked again next time
     return (await res.json()).filter(h => h.syncedLyrics);
   };
-  let hits = await ask({ track_name: simple(title), artist_name: String(artist || '').split(/,|&| feat/i)[0].trim() });
-  if (!hits.length) hits = await ask({ q: [artist, simple(title)].filter(Boolean).join(' ') }); // looser: one free-text search
+  const loose = ask({ q: [artist, simple(title)].filter(Boolean).join(' ') }); // looser, one free-text search, sent at the same time
+  loose.catch(() => {});
+  let hits = await ask({ track_name: simple(title), artist_name: String(artist || '').split(/,|&| feat/i)[0].trim() }).catch(() => []);
+  if (!hits.length) hits = await loose;
   const hit = hits.find(h => !durationSec || Math.abs((h.duration || 0) - durationSec) <= 3) || hits[0];
   const lines = hit ? parseLrc(hit.syncedLyrics) : []; // [] = this song has no timed lyrics (cached); a thrown error = ask again later
   if (file) { try { fs.mkdirSync(cacheDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify({ lines })); } catch {} }

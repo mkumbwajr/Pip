@@ -38,9 +38,10 @@ function freeName(dir, name) {
 }
 
 class Share {
-  /** files: () => [absolute paths]; saveDir: where uploads go; onReceive(path): told about each upload. */
-  constructor({ files, saveDir, onReceive = () => {}, host = null, port = PORT, t = s => s }) {
-    Object.assign(this, { files, saveDir, onReceive, fixedHost: host, port, t, host: null });
+  /** files: () => [absolute paths]; saveDir: where uploads go; onReceive(path): told about each upload;
+      onProgress({ name, got, total, failed }): while an upload comes in, a few times a second. */
+  constructor({ files, saveDir, onReceive = () => {}, onProgress = () => {}, host = null, port = PORT, t = s => s }) {
+    Object.assign(this, { files, saveDir, onReceive, onProgress, fixedHost: host, port, t, host: null });
     this.server = null; this.secret = ''; this.timer = null; this.until = 0;
   }
   get url() { return this.server ? `http://${this.host}:${this.server.address().port}/${this.secret}/` : ''; }
@@ -85,8 +86,10 @@ class Share {
       if (Number(req.headers['content-length'] || 0) > UPLOAD_MAX) { res.writeHead(413).end(); return; }
       fs.mkdirSync(this.saveDir, { recursive: true });
       const target = freeName(this.saveDir, safeName(decodeURIComponent(parts[2] || ''))), out = fs.createWriteStream(target);
-      let size = 0;
-      req.on('data', c => { size += c.length; if (size > UPLOAD_MAX) { req.destroy(); out.destroy(); fs.rm(target, () => {}); } });
+      let size = 0, told = 0; const total = Number(req.headers['content-length'] || 0), name = path.basename(target);
+      req.on('data', c => { size += c.length; if (size > UPLOAD_MAX) { req.destroy(); out.destroy(); fs.rm(target, () => {}); this.onProgress({ name, got: size, total, failed: true }); return; }
+        if (Date.now() - told > 150) { told = Date.now(); this.onProgress({ name, got: size, total }); } });
+      req.on('aborted', () => this.onProgress({ name, got: size, total, failed: true }));
       req.pipe(out);
       out.on('finish', () => { res.writeHead(200).end('ok'); this.onReceive(target); });
       out.on('error', () => { try { res.writeHead(500).end(); } catch {} });

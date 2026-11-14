@@ -403,3 +403,102 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 .lyr-lines.step { animation: lyrstep .45s var(--ease); } @keyframes lyrstep { from { transform: translateY(14px); opacity: .55; } }
 .lyr-foot { display: flex; align-items: center; gap: 4px; padding-bottom: 6px; }
 @media (prefers-reduced-motion: reduce) { .lyr-lines.step { animation: none; } }
+
+/* Home cards: each one glows faintly in its own colour, the way its tab does */
+.tile { position: relative; overflow: hidden; }
+.tile.t-agent { background: linear-gradient(115deg, color-mix(in srgb, #f5a524 24%, transparent), rgba(255, 255, 255, .05) 70%); }
+.tile.t-agent.asking { background: linear-gradient(115deg, color-mix(in srgb, var(--asking) 32%, transparent), rgba(255, 255, 255, .05) 70%); }
+.tile.t-agent.error { background: linear-gradient(115deg, color-mix(in srgb, var(--error) 32%, transparent), rgba(255, 255, 255, .05) 70%); }
+.tile.t-agent.done { background: linear-gradient(115deg, color-mix(in srgb, var(--done) 26%, transparent), rgba(255, 255, 255, .05) 70%); }
+.tile.t-music { background: linear-gradient(115deg, color-mix(in srgb, var(--art, #ff5c8a) 30%, transparent), rgba(255, 255, 255, .05) 70%); }
+.tile.t-focus { background: linear-gradient(115deg, color-mix(in srgb, var(--pip) 30%, transparent), rgba(255, 255, 255, .05) 70%); }
+.tile.t-focus.run { background: linear-gradient(115deg, color-mix(in srgb, var(--pip) 46%, transparent), rgba(255, 255, 255, .06) 75%); }
+
+/* An agent that hit an error: the folded island glows red and Pip's eyes turn red */
+#island.error { --glow: var(--error); }
+#island.error:not(.open) .pip .eye { background: #ff6b78; box-shadow: 0 0 4px 1px var(--error), 0 0 10px 2px color-mix(in srgb, var(--error) 75%, transparent); }
+#island.error:not(.open) #shell { animation: breathe 1.4s ease-in-out infinite; }
+#island.error:not(.open) #pill-text { color: #ff8d97; }
+#island.open.error .pip { background: var(--error); }
+
+/* A file on its way from the phone: a thin bar under the pill, in Pip's colour */
+#recv { position: absolute; left: 14px; right: 14px; top: 32px; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .12); overflow: hidden; z-index: 2; }
+#island.open #recv { top: 38px; }
+#recv[hidden] { display: none; }
+#recv i { display: block; height: 100%; width: 0; background: var(--pip); box-shadow: 0 0 8px var(--pip); transition: width .25s linear; }
+#shell { position: relative; }
+#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; }
+#confetti[hidden] { display: none; }
+
+/* Lyrics: the whole song in a list you can scroll; the line being sung is bright, a click jumps there */
+.lyr-list { flex: 1; min-height: 0; overflow-y: auto; padding: 34px 6px 34px 0; scrollbar-width: none; overscroll-behavior: contain;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 26%, #000 74%, transparent); mask-image: linear-gradient(to bottom, transparent, #000 26%, #000 74%, transparent); }
+.lyr-list::-webkit-scrollbar { display: none; }
+.lyr-list p { margin: 0; padding: 4px 8px; border-radius: 8px; font: 600 16px/1.3 var(--display); color: rgba(255, 255, 255, .3); cursor: pointer; transition: color .35s, background .2s, transform .35s var(--ease); transform-origin: left center; }
+.lyr-list p:hover { color: rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .05); }
+.lyr-list p.now { color: #fff; transform: scale(1.12); }
+.lyr-foot { gap: 10px; padding: 6px 0 8px; }
+.lyr-t { flex: none; min-width: 32px; font-size: 11px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.lyr-bar { flex: 1; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.lyr-bar i { display: block; height: 100%; width: 0; border-radius: 2px; background: #fff; transition: width 1s linear; }
+
+/* Pip's chat */
+.pc { display: flex; flex-direction: column; height: 100%; gap: 10px; padding-top: 4px; }
+.pc-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px 4px 2px 0;
+  scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.pc-log:hover { scrollbar-color: rgba(255, 255, 255, .2) transparent; }
+.pc-log::-webkit-scrollbar { width: 4px; } .pc-log::-webkit-scrollbar-thumb { border-radius: 2px; background: transparent; } .pc-log:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .2); }
+.pc-log.empty { justify-content: center; gap: 14px; }
+.pa-hello { display: flex; align-items: center; gap: 12px; } .pa-hello b { display: block; font: 600 17px/1.2 var(--display); } .pa-hello div span { display: block; margin-top: 3px; font-size: 12px; color: var(--mute); }
+.pa-note { margin: 0; font-size: 12px; color: var(--mute); }
+.msg { display: flex; align-items: flex-end; gap: 8px; max-width: 88%; } .msg.me { align-self: flex-end; }
+.bubble { padding: 8px 12px; border-radius: 14px; background: rgba(255, 255, 255, .07); font-size: 13px; line-height: 1.5; user-select: text; overflow-wrap: anywhere; }
+.msg.me .bubble { background: color-mix(in srgb, var(--pip) 55%, #1a1a20); border-bottom-right-radius: 5px; }
+.msg.bot .bubble { border-bottom-left-radius: 5px; } .msg.bad .bubble { color: #ff8d97; }
+.bubble code { padding: 1px 5px; border-radius: 5px; background: rgba(0, 0, 0, .35); font: 12px/1.4 Consolas, monospace; }
+.bubble .label { display: block; margin-bottom: 3px; opacity: .75; }
+.pa-pip.sm { width: 24px; height: 22px; border-radius: 8px; gap: 4px; } .pa-pip.sm i { width: 3.5px; height: 6px; border-radius: 2px; }
+.typing { display: flex; gap: 4px; padding: 12px; } .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--soft); animation: dot 1s infinite ease-in-out; }
+.typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; } @keyframes dot { 40% { transform: translateY(-4px); opacity: 1; } 0%, 80%, 100% { opacity: .35; } }
+.pc-in { display: flex; align-items: flex-end; gap: 6px; padding: 5px; border: 1px solid #2a2a30; border-radius: 18px; background: #121215; transition: border-color .2s; }
+.pc-in:focus-within { border-color: color-mix(in srgb, var(--pip) 70%, #2a2a30); }
+#pa-q { flex: 1; min-height: 30px; max-height: 96px; height: 30px; padding: 6px 4px; border: 0; border-radius: 0; background: transparent; resize: none; outline: 0; font-size: 13.5px; line-height: 1.35; overflow-y: auto;
+  scrollbar-width: none; }
+#pa-q::-webkit-scrollbar { display: none; }
+.pc-icon, .pc-send { flex: none; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--mute); cursor: pointer; }
+.pc-icon svg, .pc-send svg { width: 16px; height: 16px; } .pc-icon:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.pc-icon.on { background: color-mix(in srgb, var(--pip) 30%, transparent); color: #fff; }
+.pc-send { background: var(--pip); color: #fff; } .pc-send:disabled { opacity: .4; cursor: default; }
+.mu.lyr { grid-template-rows: minmax(0, 1fr); min-height: 0; } .mu.lyr .lyr-side { min-height: 0; height: 100%; }
+.pc-log > :first-child { margin-top: auto; } .pc-log.empty > :first-child { margin-top: 0; }
+.msg { align-self: flex-start; flex: none; } .msg.me { align-self: flex-end; }
+.bubble { min-width: 0; overflow-wrap: break-word; }
+
+/* Home layouts: dials, colours, all apps */
+.hm-clock.sm { font-size: 54px; }
+.hd { display: grid; grid-template-columns: 1fr auto; gap: 18px; height: 100%; align-items: center; }
+.hd-left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hd-agent { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 12.5px; color: var(--soft); }
+.hd-dials { display: flex; gap: 14px; }
+.dial { position: relative; display: grid; justify-items: center; width: 96px; }
+.dial svg { width: 96px; height: 96px; }
+.dial-track { fill: none; stroke: rgba(255, 255, 255, .09); stroke-width: 7; }
+.dial-arc { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 6px rgba(255, 255, 255, .12)); }
+.dial b { position: absolute; top: 37px; font: 600 15px/1 var(--display); font-variant-numeric: tabular-nums; }
+.dial .label { margin-top: 4px; }
+.hc { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; height: 100%; padding: 2px 0 10px; }
+.hc-tile { position: relative; display: flex; flex-direction: column; justify-content: flex-end; min-width: 0; padding: 10px 14px; border: 0; border-radius: 14px; overflow: hidden; color: #fff; text-align: left; cursor: pointer; transition: transform .2s var(--ease), filter .2s; }
+.hc-tile:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.hc-tile .label { position: absolute; top: 9px; left: 14px; color: rgba(255, 255, 255, .75); }
+.hc-tile b { font: 650 17px/1.2 var(--display); } .hc-tile small { font-size: 11.5px; color: rgba(255, 255, 255, .78); min-height: 14px; }
+.hc-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .35; filter: blur(6px) saturate(1.3); }
+.hc-tile > :not(img) { position: relative; }
+.c-agent { background: linear-gradient(135deg, #f5a524, #b8560b); } .c-music { background: linear-gradient(135deg, var(--art, #ff5c8a), color-mix(in srgb, var(--art, #ff5c8a) 45%, #000)); }
+.c-focus { background: linear-gradient(135deg, var(--pip), color-mix(in srgb, var(--pip) 45%, #000)); } .c-cal { background: linear-gradient(135deg, #14a3a8, #0b5457); }
+.ha { display: grid; grid-template-columns: 170px 1fr; gap: 14px; height: 100%; align-items: center; }
+.ha-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.ha-grid button { display: grid; justify-items: center; gap: 6px; padding: 10px 2px 8px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, .05); color: var(--soft); cursor: pointer; transition: background .2s, color .2s; }
+.ha-grid button:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+.ha-grid span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255, 255, 255, .08); }
+.ha-grid svg { width: 17px; height: 17px; } .ha-grid b { font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.dial-arc.a-use { stroke: #ff5c6c; } .dial-arc.a-focus { stroke: var(--pip); } .dial-arc.a-song { stroke: var(--art, #ff5c8a); }

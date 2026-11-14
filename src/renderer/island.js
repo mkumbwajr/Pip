@@ -11,7 +11,7 @@ const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips', 'calendar', 'mail'
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#e8e8ee'];
 const AGENT = { claude: 'Claude Code', codex: 'Codex' };
 // Lists of words are built by functions so they follow the chosen language.
-const tabList = () => [['home', t('Home')], ['pip', 'Pip'], ['ai', t('Agents')], ['ask', t('Ask')], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')], ['mail', t('Mail')]];
+const tabList = () => [['home', t('Home')], ['pip', 'Pip'], ['ai', t('Agents')], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')], ['mail', t('Mail')]];
 const MODES = () => [['work', t('Work')], ['study', t('Study')], ['sleep', t('Sleep')], ['game', t('Game')]];
 const SITE_NAMES = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', reddit: 'Reddit', 'x.com': 'X', facebook: 'Facebook', netflix: 'Netflix' };
 const stateName = s => ({ idle: t('Idle'), working: t('Working'), asking: t('Needs you'), done: t('Done'), error: t('Error') }[s] || s);
@@ -24,11 +24,13 @@ const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: '
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
   platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false,
   mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {},
-  google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0 }, menuView: 'main', update: null };
+  google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0 }, menuView: 'main', update: null,
+  chat: { log: [], busy: false, screen: false }, recv: null };
 
 // ---------- small helpers ----------
 const locale = () => (S.settings?.lang === 'sw' ? 'sw-TZ' : undefined);
-const clock = (d = new Date()) => d.toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
+const clockFmt = () => { const c = S.settings?.island.clock; return c === '12' ? { hour12: true } : c === '24' ? { hour12: false } : {}; }; // Settings: the language's own, 12 or 24 hours
+const clock = (d = new Date()) => d.toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit', ...clockFmt() });
 const dateLabel = (d = new Date()) => [d.toLocaleDateString(locale(), { weekday: 'short' }), d.getDate(), d.toLocaleDateString(locale(), { month: 'short' })].join(' ').replace(/[.,]/g, '');
 const hms = ms => { const s = Math.max(0, Math.floor(ms / 1000)); return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(n => String(n).padStart(2, '0')).join(':'); };
 const age = at => { const m = Math.floor((Date.now() - at) / 60000); return m < 1 ? t('just now') : m < 60 ? t('{n} min', { n: m }) : t('{n} h', { n: Math.floor(m / 60) }); };
@@ -50,6 +52,8 @@ function songOf(m) { const x = !m.artist && String(m.title).match(/^(.+?)\s+[-�
 const APPS = { spotify: 'Spotify', zunemusic: 'Media Player', chrome: 'Chrome', msedge: 'Edge', firefox: 'Firefox', vlc: 'VLC' };
 const appName = id => { const s = String(id).toLowerCase(), k = Object.keys(APPS).find(k => s.includes(k)); return k ? APPS[k] : String(id).split(/[!\\]/).pop().replace(/\.exe$/i, ''); };
 const sameDay = (ms, d) => { const x = new Date(ms); return x.getFullYear() === d.getFullYear() && x.getMonth() === d.getMonth() && x.getDate() === d.getDate(); };
+const richText = s => esc(s).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+let lyrUserAt = 0; // when you last scrolled the lyrics yourself: they stop following the song for a moment
 function mediaPosition() { const m = S.win.media; if (!m) return 0; return Math.min(m.durationMs || Infinity, m.positionMs + (m.playing ? Date.now() - S.win.at : 0)); }
 
 // ---------- the pill ----------
@@ -66,6 +70,7 @@ function drawPill() {
   else if (top && top.state === 'working') text = top.activity ? `${verb(top.activity.verb)} ${top.activity.detail}`.trim() : t('Working');
   else if (top && top.state === 'done') text = t('{agent} is done', { agent: AGENT[top.agent] });
   else if (top && top.state === 'error') text = t('{agent} hit an error', { agent: AGENT[top.agent] });
+  else if (S.recv) { text = t('Receiving {name}', { name: S.recv.name }); side = S.recv.pct + '%'; }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist ? `${m.title} · ${m.artist}` : m.title;
   if (top?.state === 'working' && top.startedAt) side = time(Date.now() - top.startedAt);
@@ -90,6 +95,7 @@ function drawPill() {
 // ---------- pages ----------
 const pages = {
   home() {
+    const style = S.settings.homeStyle; if (style && style !== 'clock' && homes[style]) return homes[style]();
     const top = S.ai.sessions[0], m = S.win.media, f = S.focus, connected = S.agents.claude || S.agents.codex;
     const art = m && S.art?.key === m.title + '|' + m.artist ? S.art.data : '';
     const w = S.weather, e = S.event;
@@ -101,10 +107,10 @@ const pages = {
         <div class="hm-sub">${w ? `${w.temp}${esc(w.unit)} · ${esc(weatherName(w.code))} · ${esc(w.place)}` : esc(t('Add your town in Settings for the weather.'))}</div>
         ${S.hubError ? `<div class="hm-err">${esc(S.hubError)}</div>` : ''}
         <div class="hm-next"><span class="label">${esc(t('Next'))}</span>${e ? `<b class="cut">${esc(e.title)}</b><span>${esc(new Date(e.start).toLocaleString(locale(), e.allDay ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}</span>` : `<b>${esc(/^https:\/\//.test(S.settings.calendarUrl || '') ? t('Nothing planned') : t('No calendar linked.'))}</b>`}</div></div>
-      <div class="hm-tiles"><div class="tile">${agent}</div>
-        <div class="tile">${art ? `<img class="tile-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="tile-art">${icon('music')}</span>`}<div class="grow"><b>${esc(m ? songOf(m).title : t('Nothing is playing.'))}</b>${m && songOf(m).artist ? `<div class="sub">${esc(songOf(m).artist)}</div>` : ''}</div>
+      <div class="hm-tiles"><div class="tile t-agent ${top ? top.state : ''}">${agent}</div>
+        <div class="tile t-music">${art ? `<img class="tile-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="tile-art">${icon('music')}</span>`}<div class="grow"><b>${esc(m ? songOf(m).title : t('Nothing is playing.'))}</b>${m && songOf(m).artist ? `<div class="sub">${esc(songOf(m).artist)}</div>` : ''}</div>
           ${m ? `<button class="round" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${m.playing ? '❚❚' : '▶'}</button>` : ''}</div>
-        <div class="tile"><span class="tile-art">${icon('focus')}</span><div class="grow"><span class="label">${esc(t('Focus'))}</span><b class="num" id="hm-focus">${time(f.left * 1000)}</b></div><button class="wbtn sm" data-focus="toggle">${esc(f.running ? t('Pause') : t('Start'))}</button></div></div></div>`;
+        <div class="tile t-focus${f.running ? ' run' : ''}"><span class="tile-art">${icon('focus')}</span><div class="grow"><span class="label">${esc(t('Focus'))}</span><b class="num" id="hm-focus">${time(f.left * 1000)}</b></div><button class="wbtn sm" data-focus="toggle">${esc(f.running ? t('Pause') : t('Start'))}</button></div></div></div>`;
   },
   ai() {
     const cards = S.ai.sessions.map(s => `<div class="card">
@@ -127,9 +133,10 @@ const pages = {
     const controls = `<button class="mu-btn" data-media="prev" aria-label="${esc(t('Previous'))}">${icon('prev')}</button>
             <button class="mu-btn play" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${icon(m.playing ? 'pause' : 'play')}</button>
             <button class="mu-btn" data-media="next" aria-label="${esc(t('Next'))}">${icon('next')}</button>`;
+    void controls;
     if (on && S.lyrics?.length) return `<div class="mu lyr">${art ? `<img class="mu-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="mu-art">${icon('music')}</span>`}
-      <div class="lyr-side"><div class="lyr-lines" id="lyr" title="${esc(song.title)} · ${esc(song.artist || '')}"><p data-l="-1"></p><p data-l="0" class="now"></p><p data-l="1"></p><p data-l="2"></p></div>
-        <div class="lyr-foot">${controls}<span class="grow"></span><button class="mu-chip on" data-lyrics>${icon('lyrics')}${esc(t('Lyrics'))}</button></div></div></div>`;
+      <div class="lyr-side"><div class="lyr-list" id="lyr" title="${esc(t('Click a line to jump there'))}">${S.lyrics.map((l, i) => `<p data-seek-ms="${l.t}" data-n="${i}">${esc(l.text || '♪')}</p>`).join('')}</div>
+        <div class="lyr-foot"><span class="lyr-t" id="pos"></span><div class="lyr-bar"><i id="lyr-fill"></i></div><span class="lyr-t">${m.durationMs ? time(m.durationMs) : ''}</span><button class="mu-chip on" data-lyrics>${icon('lyrics')}${esc(t('Lyrics'))}</button></div></div></div>`;
     const meta = [m.album || year?.album, year?.year].filter(Boolean).join(' · '); // the player's album first; iTunes fills a missing one
     return `<div class="mu">${art ? `<img class="mu-art" alt="" src="data:image/jpeg;base64,${esc(art)}">` : `<span class="mu-art">${icon('music')}</span>`}
       <div class="mu-info"><span class="label">${esc(t('Playing'))}${m.app ? ' · ' + esc(appName(m.app)) : ''}</span>
@@ -214,11 +221,18 @@ const pages = {
       <button class="gbtn" data-inbox>${icon('mail')}${esc(t('Open Gmail'))}</button><p class="ml-note">${esc(t('{name} only sees how many. Not who, and not what.', { name: 'Pip' }))}</p></div>`;
   },
   pip() {
+    const c = S.chat, name = S.settings.mascot.name || 'Pip', connected = S.agents.claude || S.agents.codex;
     const quick = [['explain', t('Explain what I copied')], ['spell', t('Check my spelling')], ['translate', t('Translate to English')], ['sw', t('Translate to Swahili')]];
-    return `<div class="pa"><div class="pa-head"><span class="pa-pip"><i></i><i></i></span><div><b>${esc(S.settings.mascot.name)}</b><span>${esc(t('Start a new chat in Claude or ChatGPT'))}</span></div></div>
-      <textarea id="pa-q" rows="2" placeholder="${esc(t('Ask Pip anything…'))}"></textarea>
-      <div class="pa-row"><div class="pa-quick">${quick.map(([id, name]) => `<button class="chip" data-quick="${id}">${esc(name)}</button>`).join('')}</div>
-        <div class="pa-go"><button class="wbtn sm" data-agent="claude">Claude</button><button class="wbtn sm ghost" data-agent="chatgpt">ChatGPT</button></div></div></div>`;
+    const log = c.log.length ? c.log.map(m => `<div class="msg ${m.role === 'pip' ? 'bot' : 'me'}${m.error ? ' bad' : ''}">${m.role === 'pip' ? '<span class="pa-pip sm"><i></i><i></i></span>' : ''}<div class="bubble">${m.screen ? `<span class="label">${esc(t('With my screen'))}</span>` : ''}${richText(m.text)}</div></div>`).join('')
+        + (c.busy ? '<div class="msg bot"><span class="pa-pip sm"><i></i><i></i></span><div class="bubble typing"><i></i><i></i><i></i></div></div>' : '')
+      : `<div class="pa-hello"><span class="pa-pip"><i></i><i></i></span><div><b>${esc(t('Hi, I am {name}.', { name }))}</b><span>${esc(t('Ask me anything. {agent} answers, through your own login, right here.', { agent: AGENT[S.settings.buddyAgent] || 'Claude Code' }))}</span></div></div>
+        <div class="pa-quick">${quick.map(([id, label]) => `<button class="chip" data-quick="${id}">${esc(label)}</button>`).join('')}</div>
+        ${connected ? '' : `<p class="pa-note">${esc(t('No agent connected yet.'))} <button class="linkbtn" data-connect>${esc(t('Connect Claude Code'))}</button></p>`}`;
+    return `<div class="pc"><div class="pc-log${c.log.length ? '' : ' empty'}" id="pc-log">${log}</div>
+      <div class="pc-in"><button class="pc-icon${c.screen ? ' on' : ''}" data-chat-screen title="${esc(t('Include my screen'))}" aria-label="${esc(t('Include my screen'))}">${icon('ask')}</button>
+        <textarea id="pa-q" rows="1" placeholder="${esc(t('Ask Pip anything…'))}"></textarea>
+        ${c.log.length ? `<button class="pc-icon" data-chat-new title="${esc(t('New chat'))}" aria-label="${esc(t('New chat'))}">${icon('plus')}</button>` : ''}
+        <button class="pc-send" data-chat-send ${c.busy ? 'disabled' : ''} aria-label="${esc(t('Send'))}">${icon('send')}</button></div></div>`;
   },
   ask() {
     const a = S.ask;
@@ -229,12 +243,48 @@ const pages = {
   }
 };
 
+// ---------- Home's other layouts (picked in the welcome or in Settings) ----------
+const R = 34, CIRC = 2 * Math.PI * R;
+/** A round dial: a faint ring with an arc for 0..1, the value in the middle. */
+const dial = (id, frac, value, label, color) => `<div class="dial"><svg viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="${R}" class="dial-track"/>
+  <circle cx="42" cy="42" r="${R}" class="dial-arc ${color}" id="${id}" stroke-dasharray="${CIRC.toFixed(1)}" stroke-dashoffset="${(CIRC * (1 - Math.max(0, Math.min(1, frac)))).toFixed(1)}" transform="rotate(-90 42 42)"/></svg>
+  <b id="${id}-n">${esc(value)}</b><span class="label">${esc(label)}</span></div>`;
+function homeBits() {
+  const top = S.ai.sessions[0], m = S.win.media, f = S.focus, u = S.ai.usage?.fiveHour, w = S.weather, e = S.event;
+  return { top, m, f, u, w, e, song: m ? songOf(m) : null, art: m && S.art?.key === m.title + '|' + m.artist ? S.art.data : '' };
+}
+const homes = {
+  dials() {
+    const { top, m, f, u, w } = homeBits();
+    return `<div class="hd"><div class="hd-left"><div class="hm-clock sm" id="hm-clock"></div><div class="hm-sub">${esc(dateLabel())}${w ? ` · ${w.temp}${esc(w.unit)} ${esc(weatherName(w.code))}` : ''}</div>
+        <div class="hd-agent"><span class="dotst ${top ? top.state : ''}"></span>${esc(top ? `${AGENT[top.agent]} · ${stateName(top.state)}` : t('No agent session yet.'))}</div></div>
+      <div class="hd-dials">${dial('d-use', u ? u.pct / 100 : 0, u ? u.pct + '%' : '–', t('Usage'), 'a-use')}
+        ${dial('d-focus', f.total ? f.left / f.total : 0, time(f.left * 1000), t('Focus'), 'a-focus')}
+        ${dial('d-song', m?.durationMs ? mediaPosition() / m.durationMs : 0, m ? time(mediaPosition()) : '–', t('Music'), 'a-song')}</div></div>`;
+  },
+  colours() {
+    const { top, f, e, song, art } = homeBits();
+    return `<div class="hc"><button class="hc-tile c-agent" data-tab-go="ai"><span class="label">${esc(t('Agents'))}</span><b>${esc(top ? stateName(top.state) : t('Idle'))}</b><small class="cut">${esc(top ? (top.activity ? `${verb(top.activity.verb)} ${top.activity.detail}` : top.project) : t('Nothing running.'))}</small></button>
+      <button class="hc-tile c-music" data-tab-go="music">${art ? `<img alt="" src="data:image/jpeg;base64,${esc(art)}">` : ''}<span class="label">${esc(t('Music'))}</span><b class="cut">${esc(song ? song.title : t('Nothing is playing.'))}</b><small class="cut">${esc(song?.artist || '')}</small></button>
+      <button class="hc-tile c-focus" data-tab-go="focus"><span class="label">${esc(t('Focus'))}</span><b class="num" id="hm-focus">${time(f.left * 1000)}</b><small>${esc(f.running ? t('Running') : t('Ready'))}</small></button>
+      <button class="hc-tile c-cal" data-tab-go="calendar"><span class="label">${esc(t('Next'))}</span><b class="cut">${esc(e ? e.title : t('Nothing planned'))}</b><small>${e ? esc(new Date(e.start).toLocaleString(locale(), { weekday: 'short', hour: 'numeric', minute: '2-digit', ...clockFmt() })) : ''}</small></button></div>`;
+  },
+  apps() {
+    const hidden = new Set(S.settings.hiddenTabs || []);
+    return `<div class="ha"><div class="ha-left"><div class="hm-clock sm" id="hm-clock"></div><div class="hm-sub">${esc(dateLabel())}</div></div>
+      <div class="ha-grid">${tabList().filter(([id]) => id !== 'home' && !hidden.has(id)).map(([id, name]) => `<button data-tab-go="${id}"><span>${icon(id)}</span><b>${esc(name)}</b></button>`).join('')}</div></div>`;
+  }
+};
+
 const FILL = new Set(['home', 'pip', 'music', 'mail', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
+let lastHtml = '';
 function draw(force) {
   drawPill();
   if (!S.open || S.dragging || (!force && (!LIVE.has(S.tab) || typing()))) return;
   page.classList.toggle('fill', FILL.has(S.tab));
-  page.innerHTML = pages[S.tab]();
+  const html = pages[S.tab]();
+  if (html === lastHtml && page.childElementCount) { tick(); return; } // same page as on screen: rebuilding it only made it flicker
+  lastHtml = html; page.innerHTML = html;
   for (const el of page.querySelectorAll('[data-w]')) el.style.width = el.dataset.w + '%';
   for (const el of page.querySelectorAll('[data-left]')) el.style.left = el.dataset.left + '%';
   for (const el of page.querySelectorAll('[data-color]')) el.style.background = el.dataset.color;
@@ -242,6 +292,7 @@ function draw(force) {
   for (const el of page.querySelectorAll('[data-kind=error]')) el.style.color = 'var(--error)';
   for (const el of page.querySelectorAll('[data-flat]')) el.style.margin = '0';
   if (S.tab === 'note') drawNoteSide();
+  if (S.tab === 'pip') { const lg = $('#pc-log'); if (lg) lg.scrollTop = lg.scrollHeight; growChat(); }
   if (S.tab === 'ask') shotFades();
   tick();
 }
@@ -255,8 +306,10 @@ function drawTabs() {
   drawPill();
 }
 function go(tab) {
+  lastHtml = '';
   S.tab = tab; showMenu(false); drawTabs(); draw(true); hideTip();
-  page.classList.remove('in'); void page.offsetWidth; page.classList.add('in'); // replay the short entrance of the page
+  page.classList.remove('in'); void page.offsetWidth; page.classList.add('in'); // the short entrance, only when the tab changes
+  clearTimeout(go.t); go.t = setTimeout(() => page.classList.remove('in'), 450); // gone before any redraw, which would replay it
   if (tab === 'home') refreshHome();
   if (tab === 'calendar') refreshCalendar();
   if (tab === 'mail') refreshMail();
@@ -324,7 +377,7 @@ function pointer(inside) {
   if (inside !== mouseSent) { mouseSent = inside; api.mouse(inside); }
   if (inside === S.hover) return;
   S.hover = inside; clearTimeout(openTimer); clearTimeout(closeTimer);
-  if (inside) { if (!S.open) openTimer = setTimeout(() => setOpen(true), 70); }
+  if (inside) { if (!S.open && S.settings?.island.openOn !== 'click') openTimer = setTimeout(() => setOpen(true), 70); } // 'click': only a click opens it
   else closeTimer = setTimeout(maybeClose, 280);
 }
 function maybeClose() { if (S.open && !S.hover && !S.pinned && !S.dragging && !S.menu && !typing() && !(S.auto && S.ai.top === 'asking')) setOpen(false); }
@@ -346,6 +399,8 @@ function tick() {
   const hc = $('#hm-clock');
   if (hc) { const [hm, ...rest] = clock().split(/\s+/); hc.textContent = hm; if (rest.length) { const s = document.createElement('small'); s.textContent = rest.join(' '); hc.append(s); } }
   const hf = $('#hm-focus'); if (hf) hf.textContent = time(S.focus.left * 1000);
+  const df = $('#d-focus'); if (df) { df.setAttribute('stroke-dashoffset', (CIRC * (1 - (S.focus.total ? S.focus.left / S.focus.total : 0))).toFixed(1)); $('#d-focus-n').textContent = time(S.focus.left * 1000); }
+  const ds = $('#d-song'), mm = S.win.media; if (ds && mm?.durationMs) { const p = mediaPosition(); ds.setAttribute('stroke-dashoffset', (CIRC * (1 - p / mm.durationMs)).toFixed(1)); $('#d-song-n').textContent = time(p); }
   const m = S.win.media;
   if (m && S.tab === 'music') {
     const pos = mediaPosition(), sk = $('#seek'), n = $('#pos');
@@ -356,11 +411,13 @@ function tick() {
     const now = $('#ly-now');
     if (now) now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? '' : t('No lyrics for this song.'));
     const box = $('#lyr');
-    if (box && box.dataset.i !== String(i)) { // the lines move up one when the next one starts
-      const moved = box.dataset.i !== undefined; box.dataset.i = i;
-      for (const p of box.children) { const l = lines[i + Number(p.dataset.l)]; p.textContent = l ? (l.text || '♪') : ''; }
-      if (moved) { box.classList.remove('step'); void box.offsetWidth; box.classList.add('step'); }
+    if (box && box.dataset.i !== String(i)) {
+      const first = box.dataset.i === undefined; box.dataset.i = i;
+      box.querySelector('p.now')?.classList.remove('now');
+      const p = box.children[i]; if (p) p.classList.add('now');
+      if (Date.now() - lyrUserAt > 3500) { const el = p || box.children[0]; if (el) box.scrollTo({ top: el.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2, behavior: first ? 'auto' : 'smooth' }); }
     }
+    const lf = $('#lyr-fill'); if (lf && m.durationMs) lf.style.width = Math.min(100, 100 * pos / m.durationMs) + '%';
   }
   const fl = $('#focus-left'), fd = $('#focus-done'), mark = $('#ruler-mark'), ml = $('#mode-left');
   if (fl) fl.textContent = time(S.focus.left * 1000);
@@ -467,13 +524,13 @@ function artColor(b64) {
 }
 async function applyArtColor() {
   const m = S.win.media, art = m && S.art?.key === m.title + '|' + m.artist ? S.art.data : '';
-  const col = art ? await artColor(art) : '';
+  const col = art && S.settings?.island.artGlow !== false ? await artColor(art) : '';
   if (col) island.style.setProperty('--art', col); else island.style.removeProperty('--art');
 }
 // Wi-Fi and Bluetooth after the date: lit when on, dim when off; a click switches the radio
 let netKey = '';
 function drawNet() {
-  const n = S.win.net, box = $('#pill-net'), key = JSON.stringify(n || null); if (key === netKey) return; netKey = key;
+  const n = S.settings?.island.radios === false ? null : S.win.net, box = $('#pill-net'), key = JSON.stringify(n || null); if (key === netKey) return; netKey = key;
   const b = (kind, ico, on, tip) => `<button type="button" class="net ${on ? 'on' : ''}" data-radio-kind="${kind}" data-on="${on ? 1 : 0}" title="${esc(tip)}" aria-label="${esc(tip)}">${icon(ico)}</button>`;
   box.innerHTML = (n?.wifi ? b('WiFi', 'wifi', n.wifi.on, n.wifi.on ? (n.wifi.ssid ? 'Wi-Fi · ' + n.wifi.ssid : 'Wi-Fi') : t('Wi-Fi is off')) : '')
     + (n?.bt ? b('Bluetooth', 'bt', n.bt.on, n.bt.on ? 'Bluetooth' : t('Bluetooth is off')) : '');
@@ -488,6 +545,7 @@ async function refreshLyrics() {
     const lines = await api.lyrics({ title: m.title, artist: m.artist, durationSec: Math.round((m.durationMs || 0) / 1000) });
     if (S.lyricsFor !== key) return;
     S.lyrics = Array.isArray(lines) ? lines : null; // null: lrclib could not be reached
+    if (S.lyrics?.length && !(S.art?.key === key && S.art.data && S.art.data.length > 3000)) api.fillArt(key); // a song with lyrics is a real song: find its cover
     if (S.tab === 'music' && !typing()) draw(true); // show them as soon as they arrive, not at the next update
   }
 }
@@ -504,6 +562,42 @@ async function sendReply(id) {
   box.value = ''; box.blur(); await api.reply(id, text);
 }
 
+// ---------- Pip's chat: the agent you already use answers here, through its own program and your login ----------
+function growChat() { const q = $('#pa-q'); if (!q) return; q.style.height = 'auto'; q.style.height = Math.min(96, q.scrollHeight) + 'px'; }
+function redrawChat() {
+  const q = $('#pa-q'), text = q?.value || '', focused = document.activeElement === q;
+  draw(true); const n = $('#pa-q'); if (n) { n.value = text; growChat(); if (focused) n.focus(); }
+}
+async function sendChat() {
+  const q = $('#pa-q'), text = q?.value.trim(); if (!text || S.chat.busy) return;
+  const screen = S.chat.screen;
+  S.chat.log.push({ role: 'me', text, screen }); S.chat.busy = true; S.chat.screen = false; q.value = ''; redrawChat();
+  const r = screen ? await api.ask(text, null) : await api.chat(S.chat.log.filter(m => !m.error).slice(-12).map(m => ({ role: m.role, text: m.text })));
+  S.chat.busy = false;
+  S.chat.log.push(r?.ok ? { role: 'pip', text: r.text } : { role: 'pip', text: r?.error || t('No answer.'), error: true });
+  if (S.tab === 'pip') redrawChat();
+}
+
+// ---------- a file coming in from the phone: progress in the pill, confetti when it lands ----------
+function drawRecv() {
+  const bar = $('#recv'); bar.hidden = !S.recv; if (S.recv) $('#recv-fill').style.width = S.recv.pct + '%';
+  drawPill();
+}
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = $('#confetti'), g = c.getContext('2d'), W = c.width = innerWidth, H = c.height = innerHeight;
+  const r = shell.getBoundingClientRect(), ox = r.left + r.width / 2, oy = r.top + Math.min(r.height, 36) / 2;
+  const cols = [getComputedStyle(document.documentElement).getPropertyValue('--pip').trim() || '#7c5cff', '#ffd23f', '#2fbf71', '#ff5c8a', '#2f9bff', '#ffffff'];
+  const bits = [...Array(90)].map(() => { const a = Math.PI * (-0.2 + Math.random() * 1.4), v = 3 + Math.random() * 6; // a wide burst, sideways and down (the window ends at the top of the screen)
+    return { x: ox, y: oy, vx: Math.cos(a) * v * 1.3, vy: Math.sin(a) * v * 0.55, s: 3 + Math.random() * 4, r: Math.random() * 6, vr: (Math.random() - .5) * .4, c: cols[Math.floor(Math.random() * cols.length)] }; });
+  c.hidden = false; const t0 = performance.now();
+  (function frame(now) {
+    const k = (now - t0) / 2200; g.clearRect(0, 0, W, H);
+    for (const b of bits) { b.x += b.vx; b.y += b.vy; b.vy += 0.09; b.vx *= 0.975; b.r += b.vr; g.save(); g.globalAlpha = Math.max(0, 1 - k); g.translate(b.x, b.y); g.rotate(b.r); g.fillStyle = b.c; g.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2); g.restore(); }
+    if (k < 1) requestAnimationFrame(frame); else { g.clearRect(0, 0, W, H); c.hidden = true; }
+  })(t0);
+}
+
 // ---------- events ----------
 // a click on the strip pins the island open; another click (or Esc) lets it fold away again
 pill.addEventListener('click', e => {
@@ -515,6 +609,7 @@ pill.addEventListener('click', e => {
     e.stopPropagation(); const on = r.dataset.on !== '1', n = S.win.net, k = r.dataset.radioKind === 'WiFi' ? 'wifi' : 'bt';
     api.setRadio(r.dataset.radioKind, on); if (n?.[k]) { n[k].on = on; drawNet(); } return;
   }
+  if (S.settings?.island.openOn === 'click' && !S.open) return setOpen(true); // opened by a click: it still folds away when the pointer leaves
   if (S.open && S.pinned) setOpen(false); else { S.pinned = true; if (S.open) drawPill(); else setOpen(true); }
 });
 pill.addEventListener('keydown', e => { if (e.target === pill && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pill.click(); } });
@@ -582,11 +677,13 @@ page.addEventListener('click', async e => {
   else if (d.share === 'firewall') { const r = await api.shareFirewall(); if (S.share) S.share.firewall = r.ok; draw(true); }
   else if (d.focus === 'toggle') { S.focus.running = !S.focus.running; draw(true); }
   else if (d.tabGo) go(d.tabGo);
-  else if (d.agent) { const q = $('#pa-q')?.value.trim(); api.agentOpen(d.agent, q || ''); }
+  else if (d.chatSend !== undefined) sendChat();
+  else if (d.chatScreen !== undefined) { S.chat.screen = !S.chat.screen; redrawChat(); }
+  else if (d.chatNew !== undefined) { S.chat.log = []; redrawChat(); }
   else if (d.quick) {
     const clip = await api.lastClip(), box = $('#pa-q');
     const ask = { explain: t('Explain this simply:'), spell: t('Check the spelling and grammar of this and show the corrected text:'), translate: t('Translate this into English:'), sw: t('Translate this into Tanzanian Swahili:') }[d.quick];
-    box.value = clip ? `${ask}\n\n${clip}` : ask + ' '; box.focus();
+    box.value = clip ? `${ask}\n\n${clip}` : ask + ' '; box.focus(); growChat();
   }
   else if (d.calView) { S.cal.view = d.calView; S.cal.events = null; draw(true); refreshCalendar(); }
   else if (d.googleIn !== undefined) signInGoogle();
@@ -613,10 +710,17 @@ page.addEventListener('click', async e => {
   }
 });
 let seeking = false; // while the seek bar is held, the second-by-second update leaves it alone
-page.addEventListener('keydown', e => { if (e.target.id === 'pa-q' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); api.agentOpen(e.shiftKey ? 'chatgpt' : 'claude', e.target.value.trim()); } });
+page.addEventListener('keydown', e => { if (e.target.id === 'pa-q' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+// a lyric line you click: the song jumps to it
+page.addEventListener('click', e => {
+  const p = e.target.closest?.('[data-seek-ms]'); if (!p) return;
+  const ms = +p.dataset.seekMs, m = S.win.media; api.seek(ms); if (m) { m.positionMs = ms; S.win.at = Date.now(); } lyrUserAt = 0; tick();
+});
+for (const ev of ['wheel', 'pointerdown']) page.addEventListener(ev, e => { if (e.target.closest?.('#lyr')) lyrUserAt = Date.now(); }, { passive: true });
 page.addEventListener('input', e => {
   const el = e.target;
   if (el.id === 'seek') { seeking = true; $('#pos').textContent = time(+el.value); el.style.setProperty('--fill', (100 * el.value / (el.max || 1)) + '%'); return; }
+  if (el.id === 'pa-q') { growChat(); return; }
   if (el.id === 'volume') { S.dragging = true; $('#vol-n').textContent = el.value; api.setVolume(el.value); }
   else if (el.id === 'note') { S.settings.note = el.value; drawNoteSide(); clearTimeout(page._note); page._note = setTimeout(() => save({ note: el.value }), 500); }
 });
@@ -658,6 +762,11 @@ api.onCursor(p => {
   pip.style.setProperty('--ex', (dx / d * (S.open ? 1.6 : 3.2) * pull).toFixed(2) + 'px'); pip.style.setProperty('--ey', (dy / d * (S.open ? 1.2 : 2.4) * pull).toFixed(2) + 'px');
 });
 api.onTray(list => { S.tray = list; draw(); });
+api.onShareProgress(p => {
+  if (p.done) { S.recv = null; drawRecv(); chime(true); confetti(); return; }
+  if (p.failed) { S.recv = null; return drawRecv(); }
+  S.recv = { name: p.name, pct: p.total ? Math.min(99, Math.round(100 * p.got / p.total)) : 0 }; drawRecv();
+});
 api.onClips(list => { S.clips = list; draw(); });
 api.onToggle(open => { if (open === true || !S.open) { S.pinned = true; setOpen(true); drawPill(); } else setOpen(false); });
 // something was changed in the settings window: take the new settings (a new language needs a fresh page)
@@ -665,7 +774,7 @@ api.onChanged(async () => {
   const init = await api.init(), lang = S.settings.lang;
   Object.assign(S, { settings: init.settings, agents: init.agents }); S.spotify.on = init.spotify; S.google = init.google; drawTabs();
   if (init.settings.lang !== lang) return location.reload();
-  applyMascot(); S.lyricsFor = ''; refreshLyrics(); if (S.open && S.tab === 'home') refreshHome(); else draw();
+  applyMascot(); applyArtColor(); netKey = ''; S.lyricsFor = ''; refreshLyrics(); lastHtml = ''; if (S.open && S.tab === 'home') refreshHome(); else draw(true);
 });
 
 (async () => {
