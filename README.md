@@ -1,6 +1,6 @@
 # Pip
 
-**One Island to Rule All Agents.** Kisiwa kidogo juu ya screen yako ya Windows kinachokuonyesha ma-agent wako wa AI
+**Agents wako wote, juu ya screen.** Kisiwa kidogo juu ya screen yako ya Windows kinachokuonyesha ma-agent wako wa AI
 (Claude Code na Codex) wanafanya nini, sasa hivi. Pip, kale ka-mascot, anakushtua agent akikuhitaji au akimaliza kazi.
 
 ![Pip ikiwa imefunguka: saa, agent kazini, muziki na focus](site/img/pip-home.png)
