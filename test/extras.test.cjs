@@ -167,5 +167,6 @@ test('mac helper: the AppleScript it runs is valid JavaScript, and unknown comma
   assert.doesNotThrow(() => new Function(READ + '\nreturn run;'));
   const h = new MacHelper();
   assert.equal(h.send({ cmd: 'media', action: 'explode' }), false); assert.equal(h.send({ cmd: 'radio' }), false);
-  h.start(); assert.equal(h.timer, null); // does nothing off the Mac
+  if (process.platform !== 'darwin') { h.start(); assert.equal(h.timer, null); } // does nothing off the Mac (on a Mac it would poll for ever and keep the test run open)
+  h.stop();
 });

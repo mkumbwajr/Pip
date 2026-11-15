@@ -30,6 +30,7 @@ jobs:
         with: { name: Pip-Setup, path: dist/*.exe }
   mac:
     runs-on: macos-latest
+    permissions: { contents: write } # to put the disk image on the release
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -45,3 +46,16 @@ jobs:
         env: { CSC_IDENTITY_AUTO_DISCOVERY: "false" }
       - uses: actions/upload-artifact@v4
         with: { name: Pip-mac, path: dist/*.dmg }
+      # on main: the disk image goes on the GitHub release for this version (public), where the website deploy picks it up
+      - name: Version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: v
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ steps.v.outputs.version }}
+          name: Pip ${{ steps.v.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          files: dist/*.dmg
+          fail_on_unmatched_files: true

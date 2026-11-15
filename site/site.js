@@ -14,8 +14,13 @@ fetch('/latest.json', { cache: 'no-store' }).then(r => r.json()).then(j => {
   const v = document.getElementById('ver'); if (v) v.textContent = j.version;
   const v2 = document.getElementById('ver2'); if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Bure';
   if (j.url) for (const a of document.querySelectorAll('[data-download]')) a.href = j.url;
-  // on a Mac, and once there is a Mac build: the download buttons give the disk image
-  if (j.mac && /Mac/.test(navigator.platform || navigator.userAgent)) for (const a of document.querySelectorAll('[data-download]')) { a.href = j.mac; a.textContent = a.textContent.replace('Windows', 'Mac'); }
+  // once there is a Mac build: its own button next to the Windows one (first on a Mac), and the line under the last one
+  if (j.mac) {
+    const onMac = /Mac/.test(navigator.platform || navigator.userAgent);
+    for (const a of document.querySelectorAll('[data-mac]')) { a.href = j.mac; a.hidden = false; if (onMac) { a.classList.remove('ghost'); a.parentNode.querySelector('[data-download]')?.classList.add('ghost'); a.parentNode.prepend(a); } }
+    const p = document.getElementById('platforms'); if (p) p.textContent = 'Pip kwa Windows na Mac';
+    if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Mac (beta) · Bure';
+  }
 }).catch(() => {});
 
 // people who ask for less motion see the still image instead of the looping video

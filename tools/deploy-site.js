@@ -2,6 +2,7 @@
 // Publishes pip.bang.co.tz on the existing Vultr server (aaPanel Nginx, shared with other sites):
 //   node tools/deploy-site.js            upload the site, Pip's icon, the newest installer and latest.json
 //   node tools/deploy-site.js --site     only the pages, styles, scripts and screenshots (not the installer)
+//   node tools/deploy-site.js --mac      only the Mac disk image, taken from this version's GitHub release
 //   node tools/deploy-site.js --nginx    only update the Nginx file for the site
 //   node tools/deploy-site.js --cert     (or --cert-only, without uploading the site) the first time, once pip.bang.co.tz points at the server: get the HTTPS
 //                                        certificate (Let's Encrypt, webroot, renewed by the server's certbot timer)
@@ -28,6 +29,14 @@ const installVhost = file => {
     if ${NGINX} -t; then ${NGINX} -s reload; else echo "nginx test failed: putting the previous file back"; if [ -f ${VHOST}.prev ]; then mv ${VHOST}.prev ${VHOST}; else rm -f ${VHOST}; fi; exit 1; fi`);
 };
 
+if (process.argv.includes('--mac')) { // the Mac disk image from this version's GitHub release (built there by Actions)
+  const file = path.join(root, 'dist', `Pip-${version}-mac.dmg`), url = `https://github.com/mkumbwajr/Pip/releases/download/v${version}/Pip-${version}-mac.dmg`;
+  if (!fs.existsSync(file)) { fs.mkdirSync(path.dirname(file), { recursive: true }); const r = spawnSync('curl', ['-fL', '--retry', '3', '-o', file, url], { stdio: 'inherit' }); if (r.status !== 0) { fs.rmSync(file, { force: true }); console.error('no Mac build on GitHub yet: ' + url); process.exit(1); } }
+  copy(file, `/srv/pip/download/Pip-${version}-mac.dmg`);
+  const latest = JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg` });
+  sh(`set -e; cd /srv/pip/download; ln -sf Pip-${version}-mac.dmg Pip-mac.dmg; printf '%s\n' '${latest}' > /srv/pip/latest.json; chmod -R a+rX /srv/pip`);
+  console.log('published the Mac build of Pip ' + version); process.exit(0);
+}
 if (process.argv.includes('--nginx')) { // only the Nginx file for pip.bang.co.tz (tested, rolled back if the test fails)
   installVhost(path.join(root, 'site', 'nginx-pip.conf')); console.log('nginx updated'); process.exit(0);
 }
