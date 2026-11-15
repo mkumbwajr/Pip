@@ -89,7 +89,7 @@ const views = {
       + group(t('How to pay'), [
         row('phone', t('Mobile money'), 'M-Pesa · Mixx by Yas · Airtel Money · HaloPesa'),
         row('card', t('Card'), 'Visa · Mastercard'),
-        row('help', t('Refunds'), t('Email info@bang.co.tz within 14 days of paying, and we sort it out or refund you.'))
+        row('help', t('No refunds'), t('Payment is final, so try every tab in the free 7 days first. Paid but still locked? Email info@bang.co.tz.'))
       ]);
   },
   chat() {
