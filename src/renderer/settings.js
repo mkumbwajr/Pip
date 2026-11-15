@@ -160,7 +160,7 @@ function draw() {
   let grp = '';
   $('#nav').innerHTML = list.map(([id, g, ico, name, , col]) => `${g !== grp ? `<h3>${esc(grp = g)}</h3>` : ''}<button type="button" data-go="${id}" data-col="${col}" class="${id === now[0] && !query ? 'on' : ''}"><span class="ni">${icon(ico)}</span>${esc(name)}</button>`).join('');
   for (const b of document.querySelectorAll('#nav [data-col]')) b.style.setProperty('--c', b.dataset.col);
-  $('#foot-ver').textContent = `Pip ${S.version}`; $('#foot-copy').textContent = `© ${new Date().getFullYear()} BANG DIGITAL LTD · ${t('Published by {name}', { name: 'BANG DIGITAL LTD' })}`;
+  $('#foot-ver').textContent = `Pip ${S.version}`; $('#foot-copy').textContent = `© ${new Date().getFullYear()} BANG DIGITAL LTD`;
   document.documentElement.style.setProperty('--pip', s.mascot.color);
   if (query) { // every section, then only the rows that match
     $('#title').textContent = t('Search'); $('#subtitle').textContent = t('Settings that match “{q}”', { q: query }); $('#hero-ico').innerHTML = icon('search');
