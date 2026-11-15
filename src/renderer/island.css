@@ -16,7 +16,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 #island[data-tab=tray], #island[data-tab=clips], #island[data-tab=note] { --tint: transparent; }
 #island[data-tab=calendar] { --tint: #0f8a8f; } #island[data-tab=mail] { --tint: #d6303f; }
 #island { position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
-#island.detach { top: 8px; }
+#island.detach { top: 3px; }
 /* the outer glow is always Pip's colour; what the agent is doing shows in Pip's face and in the breathing of the glow */
 #island { --glow: var(--pip); }
 
@@ -512,7 +512,7 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 #island.notched:not(.open) #shell, #island.notched:not(.open) #pill, #island.notched:not(.open) #pill-inner { height: var(--notch-h, 37px); }
 #island.notched:not(.open) #pill-inner { width: 100%; padding: 0; gap: 10px; }
 #island.notched:not(.open) #pill-gap { display: block; flex: none; width: var(--notch-w, 200px); margin-right: -2px; }
-#island.notched:not(.open) .pip { order: -1; flex: none; width: calc(var(--side, 56px) - 10px); justify-content: flex-start; padding-left: 14px; }
+#island.notched:not(.open) .pip { order: -1; flex: none; width: calc(var(--side, 56px) - 10px); justify-content: flex-start; padding-left: 24px; } /* clear of the rounded corner */
 #island.notched.bare:not(.open) #pill-inner { padding: 0; }
 #island.notched:not(.open) #pill-inner { flex: 1 1 auto; min-width: 0; }
 #island.notched:not(.open) #pill-text { flex: 0 1 auto; min-width: 0; max-width: none; }
@@ -524,3 +524,6 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 #island.has-update.open #pill-more::after, .mn-tile.new::after { content: ""; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 0 2px var(--bg); }
 .mn-tile.new { position: relative; color: #3ddc84; }
 .mn-tile.new::after { top: 8px; right: 10px; }
+/* open, on a notched Mac: the middle of the strip is behind the camera, so Pip moves to the left end and the date after him */
+#island.notched.open .pip { left: 19px; }
+#island.notched.open #pill-inner { padding-left: 54px; }
