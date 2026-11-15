@@ -422,7 +422,6 @@
   "Pip unlocks by itself as soon as it goes through.": "Pip inafunguka yenyewe malipo yakipita tu.",
   "Pay with mobile money": "Lipa kwa simu",
   "Pay {price}": "Lipa {price}",
-  "Pay by card instead": "Lipa kwa kadi badala yake",
   "Bought once, yours for good.": "Umenunua mara moja, ni yako milele.",
   "Unlock every tab for {price}, once. The island and your agents keep working either way.": "Fungua kila tab kwa {price}, mara moja tu. Island na ma-agent wako wanaendelea kufanya kazi vyovyote vile.",
   "The payment did not go through. Try again.": "Malipo hayakupita. Jaribu tena.",
@@ -436,5 +435,7 @@
   "After 7 days, the island and agent status keep working; the other tabs need the license ({price}, once).": "Baada ya siku 7, island na hali ya ma-agent vinaendelea kufanya kazi; tabs nyingine zinahitaji leseni ({price}, mara moja).",
   "Buy Pip": "Nunua Pip",
   "MIT licence. Free for 7 days, then a one-time license. No telemetry.": "Leseni ya MIT. Bure kwa siku 7, kisha leseni ya mara moja. Hakuna telemetry.",
-  "Cancel": "Ghairi"
+  "Cancel": "Ghairi",
+  "Pay by card": "Lipa kwa kadi",
+  "or": "au"
 }

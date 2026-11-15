@@ -299,7 +299,8 @@ function buyPage() {
   else right = `<label class="by-lab" for="by-phone">${esc(t('Pay with mobile money'))}</label>
       <div class="by-row"><input id="by-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="07XX XXX XXX" value="${esc(b.phone)}"><button class="wbtn" data-pay-mobile ${b.busy ? 'disabled' : ''}>${esc(b.busy ? t('Sending…') : t('Pay {price}', { price }))}</button></div>
       <p class="by-note">M-Pesa · Mixx by Yas · Airtel Money · HaloPesa</p>
-      <button class="linkbtn" data-pay-card ${b.busy ? 'disabled' : ''}>${icon('external')}${esc(t('Pay by card instead'))}</button>`;
+      <div class="by-or"><span>${esc(t('or'))}</span></div>
+      <button class="by-card" data-pay-card ${b.busy ? 'disabled' : ''}>${icon('card')}<b>${esc(t('Pay by card'))}</b><span>Visa · Mastercard</span>${icon('external')}</button>`;
   return `<div class="by"><div class="by-l"><span class="by-pip"><i></i><i></i></span><h3>${esc(title)}</h3>
       <p>${esc(L.licensed ? t('Bought once, yours for good.') : t('Unlock every tab for {price}, once. The island and your agents keep working either way.', { price }))}</p></div>
     <div class="by-r">${right}${b.error ? `<p class="by-err">${esc(b.error)}</p>` : ''}</div></div>`;
