@@ -649,10 +649,12 @@ app.whenReady().then(async () => {
   }, 33);
   helper.watch = Boolean(store.get('guard').on); helper.start();
   // iPhone messages and calls on a Mac (mac-alerts.js): shown in the island; settings shows whether macOS allows them
-  alerts.on('message', m => send('island:alert', { kind: 'message', ...m }));
-  alerts.on('call', c => send('island:alert', c ? { kind: 'call', ...c } : { kind: 'call-end' }));
-  alerts.on('access', () => { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('app:changed'); });
-  alerts.set(store.get('iphone').messages, store.get('iphone').calls);
+  try { // an optional extra: if it fails, the rest of Pip must still start
+    alerts.on('message', m => send('island:alert', { kind: 'message', ...m }));
+    alerts.on('call', c => send('island:alert', c ? { kind: 'call', ...c } : { kind: 'call-end' }));
+    alerts.on('access', () => { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('app:changed'); });
+    alerts.set(store.get('iphone').messages, store.get('iphone').calls);
+  } catch (e) { console.error('iPhone alerts:', e); }
   screen.on('display-metrics-changed', placeIsland); screen.on('display-added', placeIsland); screen.on('display-removed', placeIsland);
   // Starting Pip again from the Start menu shows its settings. If the one being started is a different copy (a newer
   // version or build, e.g. dragged over the old one on a Mac while it ran), this one restarts from disk as that copy.

@@ -60,15 +60,15 @@ const CALL_READ = `function run() {
 }`;
 
 class MacAlerts extends EventEmitter {
-  constructor() { super(); this.lastRow = null; this.names = null; this.namesAt = 0; this.access = { messages: 'unknown', calls: 'unknown' }; this.caller = ''; this.timers = []; this.on = { messages: false, calls: false }; this.busy = {}; }
+  constructor() { super(); this.lastRow = null; this.names = null; this.namesAt = 0; this.access = { messages: 'unknown', calls: 'unknown' }; this.caller = ''; this.timers = []; this.enabled = { messages: false, calls: false }; this.busy = {}; }
   /** Switch either part on or off (from the settings). */
   set(messages, calls) {
     if (process.platform !== 'darwin') return;
-    this.on = { messages: Boolean(messages), calls: Boolean(calls) };
+    this.enabled = { messages: Boolean(messages), calls: Boolean(calls) };
     this.timers.forEach(clearInterval); this.timers = [];
-    if (this.on.messages) { this.lastRow = null; this.timers.push(setInterval(() => this.readMessages(), 3000)); this.readMessages(); }
-    if (this.on.calls) this.timers.push(setInterval(() => this.readCalls(), 1500));
-    if (!this.on.calls && this.caller) { this.caller = ''; this.emit('call', null); }
+    if (this.enabled.messages) { this.lastRow = null; this.timers.push(setInterval(() => this.readMessages(), 3000)); this.readMessages(); }
+    if (this.enabled.calls) this.timers.push(setInterval(() => this.readCalls(), 1500));
+    if (!this.enabled.calls && this.caller) { this.caller = ''; this.emit('call', null); }
   }
   stop() { this.set(false, false); }
   sql(db, query) { return run(SQLITE, ['-readonly', '-json', db, query]); }

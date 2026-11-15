@@ -1,5 +1,5 @@
 const test = require('node:test'), assert = require('node:assert');
-const { textFromAttributed, firstLine, phoneKey, callerFrom } = require('../src/main/mac-alerts.js');
+const { MacAlerts, textFromAttributed, firstLine, phoneKey, callerFrom } = require('../src/main/mac-alerts.js');
 
 // a typedstream like the one Messages stores: class name, then 0x2B, a length and the UTF-8 text
 const body = (text, long = false) => {
@@ -31,4 +31,10 @@ test('calls: an alert with Accept/Decline is a call, and its caller is found', (
   assert.equal(callerFrom(['FaceTime Audio', 'Juma'], ['Decline', 'Accept']), 'Juma');
   assert.equal(callerFrom(['Reminders', 'Buy milk'], ['Close']), '');
   assert.equal(callerFrom(['Mama', 'Call me later'], ['Reply']), '');
+});
+
+test('alerts: still an event emitter after being switched (main.js listens with .on at start-up)', () => {
+  const a = new MacAlerts(); a.set(true, true); // does nothing off a Mac
+  assert.equal(typeof a.on, 'function'); let got = null; a.on('message', m => { got = m; }); a.emit('message', { from: 'x' });
+  assert.deepEqual(got, { from: 'x' }); a.stop();
 });
