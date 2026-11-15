@@ -19,7 +19,7 @@ fetch('/latest.json', { cache: 'no-store' }).then(r => r.json()).then(j => {
     const onMac = /Mac/.test(navigator.platform || navigator.userAgent);
     for (const a of document.querySelectorAll('[data-mac]')) { a.href = j.mac; a.hidden = false; if (onMac) { a.classList.remove('ghost'); a.parentNode.querySelector('[data-download]')?.classList.add('ghost'); a.parentNode.prepend(a); } }
     const p = document.getElementById('platforms'); if (p) p.textContent = 'Pip kwa Windows na Mac';
-    if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Mac (beta) · Bure';
+    if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Mac · Bure';
   }
 }).catch(() => {});
 
