@@ -27,6 +27,7 @@ const tabNames = () => [['ai', t('Agents')], ['pip', 'Pip'], ['music', t('Music'
 const sections = () => [
   ['home', 'Pip', 'home', t('Home'), t('Pip on this PC at a glance'), 'var(--pip)'],
   ['connections', 'Pip', 'link', t('Connections'), t('The agents and accounts Pip follows'), '#f5a524'],
+  ['license', 'Pip', 'key', t('Pip license'), t('Your trial and your license'), '#2fbf71'],
   ['chat', 'Pip', 'chat', t('AI & Chat'), t('How the agents and Pip answer you'), '#2f9bff'],
   ['mascot', 'Pip', 'pip', S.settings.mascot.name || 'Pip', t('Name and colour'), 'var(--pip)'],
   ['wardrobe', 'Pip', 'hat', t('Wardrobe'), t('Something for Pip to wear'), '#ff5c8a'],
@@ -66,11 +67,7 @@ const views = {
           ? row('mail', t('Or with email'), t('We email you a 6-digit code. No password.'), `<input type="email" id="mail-addr" placeholder="${esc(t('you@example.com'))}" value="${esc(mail.address)}">${button('mail-send', mail.busy ? t('Sending…') : t('Send code'))}`, 'wide')
           : row('mail', t('Type the code'), t('We sent a 6-digit code to {email}.', { email: mail.address }), `<input type="text" id="mail-code" inputmode="numeric" maxlength="6" placeholder="000000">${button('mail-verify', mail.busy ? t('Checking…') : t('Sign in'), 'primary')}${button('mail-back', t('Use another email'))}`, 'wide')
       ]) + `<div class="err" id="acct-error"></div>`;
-    const L = S.license || {}, price = 'TSh ' + Number(L.priceTzs || 5000).toLocaleString('en');
-    const licence = group(t('Pip license'), [row('star', L.licensed ? t('Bought') : L.locked ? t('The trial is over') : t('Trial: {n} days left', { n: L.daysLeft ?? 7 }),
-      L.licensed ? t('Every tab is open, on every PC and Mac with your Pip account.') : t('After 7 days, the island and agent status keep working; the other tabs need the license ({price}, once).', { price }),
-      L.licensed ? '' : button('lic-buy', t('Buy Pip'), 'primary'))]);
-    return account + (L.selling || L.licensed ? licence : '') + group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
+    return account + group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
       + `<div class="err" id="ag-error"></div>`
       + group(t('Accounts'), [
         row(googleG(), 'Google', t('For your calendar and the number of unread emails (never who or what).'), button('go-go', S.google ? t('Sign out') : t('Sign in with Google'), S.google ? '' : 'primary')),
@@ -78,6 +75,22 @@ const views = {
         row(spotifyLogo(), 'Spotify', t('Only for choosing which device plays. Needs your own free client ID from developer.spotify.com, with this redirect address:') + ' http://127.0.0.1:48612/callback',
           `<input type="text" id="sp-id" placeholder="Client ID" value="${esc(s.spotifyClientId)}">${button('sp-go', S.spotify ? t('Disconnect') : t('Connect'), S.spotify ? '' : 'primary')}`, 'wide')
       ]) + `<div class="err" id="acc-error"></div>`;
+  },
+  license() {
+    const L = S.license || {}, a = S.account || {}, price = 'TSh ' + Number(L.priceTzs || 5000).toLocaleString('en');
+    const status = L.licensed ? t('Bought') : !L.selling ? t('Free for now') : L.locked ? t('The trial is over') : t('Trial: {n} days left', { n: L.daysLeft ?? 7 });
+    return group(t('Pip license'), [
+        row(L.licensed ? 'check' : 'key', status,
+          L.licensed ? t('Every tab is open, on every PC and Mac with your Pip account.') : t('After 7 days, the island and agent status keep working; the other tabs need the license ({price}, once).', { price }),
+          L.licensed ? '' : button('lic-buy', t('Buy Pip'), 'primary')),
+        a.signedIn ? row('link', a.email, t('The license lives in your Pip account, so it works on every PC and Mac you sign in to.'), button('lic-check', t('Check again')))
+          : row('link', t('Pip account'), t('The license lives in your Pip account, so it works on every PC and Mac you sign in to.'), button('lic-signin', t('Sign in first')))
+      ])
+      + group(t('How to pay'), [
+        row('phone', t('Mobile money'), 'M-Pesa · Mixx by Yas · Airtel Money · HaloPesa'),
+        row('card', t('Card'), 'Visa · Mastercard'),
+        row('help', t('Refunds'), t('Email info@bang.co.tz within 14 days of paying, and we sort it out or refund you.'))
+      ]);
   },
   chat() {
     const s = S.settings;
@@ -268,6 +281,8 @@ page.addEventListener('click', async e => {
     case 'mail-back': mail.stage = 'enter'; return draw();
     case 'acct-out': S.account = await api.accountSignOut(); return draw();
     case 'lic-buy': return api.buy();
+    case 'lic-check': S.license = await api.licenseCheck(); return draw();
+    case 'lic-signin': current = 'connections'; return draw();
     case 'acct-del': {
       if (!confirmDelete) { confirmDelete = true; draw(); setTimeout(() => { confirmDelete = false; if (current === 'connections') draw(); }, 4000); return; }
       confirmDelete = false; const r = await api.accountDelete(); if (r.ok) S.account = r; draw(); if (!r.ok) showError('acct-error', r.error); return;
