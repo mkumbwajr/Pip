@@ -1,14 +1,16 @@
 # Pip
 
-**One island to Rule All Agents.** A free, open-source status island for Windows and macOS. A small notch at the top of your
+**One island to Rule All Agents.** An open-source status island for Windows and macOS. A small notch at the top of your
 screen shows what your AI coding agents (Claude Code and Codex) are doing, and opens on hover into a panel of tools.
 The interface is in Tanzanian Swahili by default; English is in Settings.
 
 ![Pip open: clock, an agent at work, music and focus](site/img/pip-home.png)
 
-MIT licence. No account needed (an optional Pip account syncs your setup between devices), no paywall, no telemetry.
+MIT licence. Free for 7 days with everything open; after that the island and agent status stay free and the other tabs
+need a one-time license of TSh 5,000 (mobile money or card, through EvPay). The license belongs to your Pip account
+(Google or email), which also syncs your setup between devices. No telemetry.
 
-**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · macOS (Intel and Apple silicon) · version 0.7.0
+**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · macOS (Intel and Apple silicon) · version 0.8.0
 
 The installer is not code-signed yet, so Windows SmartScreen warns: choose "More info", then "Run anyway". The Mac
 DMG is not signed either: the first time, right-click Pip in Applications and choose **Open**. When a

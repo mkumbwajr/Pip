@@ -17,6 +17,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 #island[data-tab=calendar] { --tint: #0f8a8f; } #island[data-tab=mail] { --tint: #d6303f; }
 #island { position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
 #island.detach { top: 3px; }
+.mac #island.detach { top: 1px; } /* the Mac's menu bar is dark and shallow: the detached pill sits right against the top */
 /* the outer glow is always Pip's colour; what the agent is doing shows in Pip's face and in the breathing of the glow */
 #island { --glow: var(--pip); }
 

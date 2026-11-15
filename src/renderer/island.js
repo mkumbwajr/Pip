@@ -843,6 +843,7 @@ api.onChanged(async () => {
   const init = await api.init();
   t = window.makeT(init.strings, { mac: init.platform === 'darwin' }); document.documentElement.lang = init.settings.lang;
   Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art, notch: init.notch || null, license: init.license || null });
+  document.documentElement.classList.toggle('mac', init.platform === 'darwin'); // a few placements differ on the Mac
   if (S.notch) { document.documentElement.style.setProperty('--notch-w', S.notch.width + 'px'); document.documentElement.style.setProperty('--notch-h', S.notch.height + 'px'); }
   S.spotify.on = init.spotify; S.google = init.google; S.hubError = await api.hubError();
   // Pip was closed while a mode was running: put the focus guard back the way it was before the mode

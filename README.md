@@ -5,10 +5,12 @@
 
 ![Pip ikiwa imefunguka: saa, agent kazini, muziki na focus](site/img/pip-home.png)
 
-Bure na open source (MIT). Huhitaji akaunti (akaunti ya Pip ni hiari, ina-sync mipangilio kati ya vifaa), hakuna malipo, hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani
+Open source (MIT). Siku 7 za kwanza ni bure, kila kitu kikiwa wazi; baadaye island na hali ya ma-agent vinabaki bure, na tabs
+nyingine zinahitaji leseni ya TSh 5,000 mara moja (M-Pesa, Mixx by Yas, Airtel Money, HaloPesa au kadi, kupitia EvPay).
+Leseni inakaa kwenye akaunti ya Pip (Google au email), ambayo pia ina-sync mipangilio kati ya vifaa. Hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani
 cha Tanzania; English ipo kwenye Settings. [English README](README.en.md)
 
-**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · macOS (Intel na Apple silicon) · toleo 0.7.0
+**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · macOS (Intel na Apple silicon) · toleo 0.8.0
 
 Installer haina signature bado, kwa hiyo Windows SmartScreen itakuonya: bonyeza "More info" kisha "Run anyway".
 Kwenye Mac, DMG nayo haina signature: mara ya kwanza bonyeza kulia Pip kwenye Applications kisha **Open**.
