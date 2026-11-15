@@ -9,7 +9,7 @@ Used by pip-api.py. Python's standard library only.
              hosted page (card details never touch Pip). EvPay tells this server the result with a signed webhook.
 
 Configuration (environment, from /etc/pip-api-evpay.env, root-only, never in git):
-  EVPAY_BASE_URL, EVPAY_CLIENT_ID, EVPAY_CLIENT_SECRET   EvPay API (sandbox first)
+  EVPAY_BASE_URL, EVPAY_CLIENT_ID, EVPAY_CLIENT_SECRET   EvPay API (live: https://api.evpay.co.tz; docs.evpay.co.tz)
   EVPAY_SIG_KEY            signs requests to EvPay and checks its webhooks (EvPay's documented default: the client secret)
   EVPAY_WEBHOOK_SECRET     only if EvPay issued a separate webhook secret
   PIP_PRICE_TZS            default 5000      PIP_TRIAL_DAYS   default 7
@@ -22,6 +22,7 @@ TRIAL_DAYS = int(os.environ.get('PIP_TRIAL_DAYS', '7'))
 PUBLIC_URL = os.environ.get('PIP_PUBLIC_URL', 'https://pip.bang.co.tz').rstrip('/')
 DEVICE_RE = re.compile(r'^[0-9a-f]{64}$')  # Pip sends a SHA-256 of the machine ID, never the ID itself
 PRODUCT = 'Pip license'
+UA = 'pip-api/1.0 (+https://pip.bang.co.tz)'  # EvPay sits behind Cloudflare, which turns away clients without a name
 
 lock = threading.Lock()
 
@@ -126,7 +127,7 @@ class EvPay:
     def ready(self): return bool(self.base and self.client_id and self.client_secret)
 
     def _http(self, method, url, body, headers):
-        req = urllib.request.Request(url, data=body, method=method, headers=headers)
+        req = urllib.request.Request(url, data=body, method=method, headers={**headers, 'User-Agent': UA, 'Accept': 'application/json'})
         try:
             with self.opener(req, timeout=20) as r: return r.status, json.loads(r.read() or b'{}')
         except urllib.error.HTTPError as e:
@@ -161,17 +162,21 @@ class EvPay:
         return j.get('data') or {}
 
     def mobile(self, order, phone, operator):
-        return self.call('POST', '/api/v1/payment/ussd', {'fsOperator': operator, 'amount': order['amountTzs'], 'product': PRODUCT,
-            'callbackUrl': PUBLIC_URL + '/api/evpay/webhook', 'payerAccountId': phone, 'requestId': order['ref'], 'currency': 'TZS'})
+        d = self.call('POST', '/api/v1/payment/ussd', {'fsOperator': operator, 'amount': order['amountTzs'], 'product': PRODUCT,
+            'callbackUrl': PUBLIC_URL + '/api/evpay/webhook', 'payerAccountId': phone, 'requestId': order['ref'], 'currency': 'TZS',
+            'narrative': 'Pip one-time license'})
+        return {**d, 'id': d.get('transactionId') or d.get('id') or ''}
     def card(self, order, email):
         back = PUBLIC_URL + '/paid?order=' + order['ref']
         name = (email.split('@')[0] if email else 'Pip') or 'Pip'
-        return self.call('POST', '/api/v1/payment/card', {
-            'details': {'amount': order['amountTzs'], 'product': PRODUCT, 'description': 'Pip one-time license', 'currency': 'TZS',
-                        'callbackUrl': PUBLIC_URL + '/api/evpay/webhook', 'redirectUrl': back, 'cancelUrl': back, 'requestId': order['ref']},
-            # EvPay's hosted form wants billing fields; the buyer fills in the real ones on EvPay's page
-            'customer': {'name': name, 'firstname': name, 'lastname': name, 'phoneNumber': '', 'address': 'Not provided', 'city': 'Dar es Salaam',
-                         'state': 'Dar es Salaam', 'postcode': '00000', 'country': 'TZ', **({'email': email} if email else {})}})
+        d = self.call('POST', '/api/v1/payment/card', {
+            'paymentType': 'card',
+            'details': {'amount': order['amountTzs'], 'currency': 'TZS', 'redirectUrl': back, 'cancelUrl': back},
+            # EvPay requires every billing field; the buyer's card details go only into EvPay's own page
+            'customer': {'firstname': name[:40], 'lastname': 'Pip', 'email': email or 'info@bang.co.tz', 'address': 'Not provided',
+                         'city': 'Dar es Salaam', 'state': 'DSM', 'postcode': '00000', 'country': 'TZ'},
+            'callbackUrl': PUBLIC_URL + '/api/evpay/webhook', 'metadata': {'orderId': order['ref']}})
+        return {**d, 'id': d.get('reference') or d.get('id') or ''}
     def payment(self, evpay_id): return self.call('GET', '/api/v1/payment/' + evpay_id)
 
     def webhook_ok(self, raw, header, tolerance=300):
@@ -191,7 +196,7 @@ UNDONE = {'payment.refunded', 'payment.reversed'}
 def apply_event(store, event, payload):
     """Marks the order and grants or takes back the license. Returns the order's new status, or None if unknown."""
     d = payload.get('data') if isinstance(payload.get('data'), dict) else {}
-    ref = payload.get('requestId') or d.get('requestId') or d.get('orderReference')
+    ref = payload.get('requestId') or d.get('requestId') or d.get('orderReference') or (d.get('metadata') or {}).get('orderId')
     o = store.order(ref)
     if not o: return None
     if event in PAID:
@@ -207,11 +212,11 @@ def reconcile(store, evpay, older_than_ms=600000, newest_ms=2 * 86400000):
     done = 0
     for f in os.listdir(store.p('orders')):
         o = store.read(store.p('orders', f)) if f.endswith('.json') else None
-        if not o or o.get('status') != 'pending' or not o.get('evpayId'): continue
+        if not o or o.get('status') != 'pending': continue
         age = now_ms() - o.get('created', 0)
         if age < older_than_ms or age > newest_ms: continue
         try:
-            ev = status_from_evpay(evpay.payment(o['evpayId']).get('status'))
+            ev = status_from_evpay(evpay.payment(o['evpayId'] if o.get('method') == 'card' and o.get('evpayId') else o['ref']).get('status'))
             if ev: apply_event(store, ev, {'requestId': o['ref']}); done += 1
         except EvPayError: pass
     return done
@@ -221,4 +226,5 @@ def status_from_evpay(text):
     s = str(text or '').lower()
     if s in ('success', 'succeeded', 'successful', 'completed', 'settled', 'paid'): return 'payment.succeeded'
     if s in ('failed', 'cancelled', 'canceled', 'expired', 'rejected', 'declined'): return 'payment.failed'
+    if s in ('refunded', 'reversed'): return 'payment.refunded'
     return None

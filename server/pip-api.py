@@ -239,10 +239,10 @@ class Api(BaseHTTPRequestHandler):
             o = store.order(p.split('/')[-1])
             if not o or o['user'] != user: return self.reply(404, {'error': 'No such order'})
             # the webhook normally settles it; while it is late, ask EvPay directly (at most every ten seconds)
-            if o['status'] == 'pending' and o.get('evpayId') and evpay.ready and time.time() - checked.get(o['ref'], 0) > 10:
+            if o['status'] == 'pending' and evpay.ready and time.time() - checked.get(o['ref'], 0) > 10:
                 checked[o['ref']] = time.time()
                 try:
-                    ev = lic.status_from_evpay(evpay.payment(o['evpayId']).get('status'))
+                    ev = lic.status_from_evpay(evpay.payment(o.get('evpayId') if o['method'] == 'card' and o.get('evpayId') else o['ref']).get('status'))
                     if ev: lic.apply_event(store, ev, {'requestId': o['ref']}); o = store.order(o['ref'])
                 except lic.EvPayError: pass
             return self.reply(200, {'order': o['ref'], 'status': o['status'], 'licensed': bool(store.license(user))})
@@ -251,9 +251,10 @@ class Api(BaseHTTPRequestHandler):
     def webhook(self):
         raw = self.raw()
         if raw is None or not evpay.webhook_ok(raw, self.headers.get('X-EvPay-Signature')): return self.reply(401, {'error': 'Bad signature'})
-        event, delivery = self.headers.get('X-EvPay-Event', ''), self.headers.get('X-EvPay-Delivery', '')
+        delivery = self.headers.get('X-EvPay-Delivery', '')
         try: payload = json.loads(raw or b'{}')
         except ValueError: payload = {}
+        event = self.headers.get('X-EvPay-Event', '') or (payload.get('event', '') if isinstance(payload, dict) else '')
         if event and (not delivery or store.first_delivery(delivery)):  # EvPay retries: each delivery counts once
             if lic.apply_event(store, event, payload if isinstance(payload, dict) else {}) is None:
                 print('evpay webhook for an unknown order:', event, file=sys.stderr)

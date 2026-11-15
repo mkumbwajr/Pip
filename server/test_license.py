@@ -19,15 +19,16 @@ class FakeEvPay(BaseHTTPRequestHandler):
         if self.path == '/api/auth/v1':
             b = json.loads(raw); ok = b == {'clientId': 'test-client', 'clientSecret': SECRET}; fake['auth'] += 1
             # the shape in EvPay's docs (not wrapped in the usual envelope)
-            return self.send({'access_token': 'tok', 'expires_in': 300, 'token_type': 'Bearer'} if ok else {'success': False}, 200 if ok else 401)
+            return self.send({'success': True, 'code': 200, 'data': {'accessToken': 'tok', 'expiresIn': 36000, 'tokenType': 'Bearer'}} if ok else {'success': False, 'code': 400, 'errors': {'code': 'ERR_102'}}, 200 if ok else 400)
         if fake['expire_next']:  # the token ran out early: EvPay answers 401 once
             fake['expire_next'] = False; return self.send({'success': False, 'code': 401, 'message': 'authentication_required'}, 401)
         want = hmac.new(SECRET.encode(), self.headers['X-Timestamp'].encode() + b'.' + raw, hashlib.sha256).hexdigest()
         if self.headers.get('Authorization') != 'Bearer tok' or self.headers.get('X-Signature') != want:
             fake['bad_sig'] += 1; return self.send({'success': False, 'message': 'bad signature'}, 401)
         fake['calls'].append((method, self.path, json.loads(raw) if raw else None))
-        if self.path == '/api/v1/payment/ussd': return self.send({'success': True, 'data': {'id': 'ev-1', 'status': 'PENDING'}})
-        if self.path == '/api/v1/payment/card': return self.send({'success': True, 'data': {'id': 'ev-2', 'status': 'PENDING', 'checkoutUrl': 'https://pay.example/c/ev-2'}})
+        if self.headers.get('User-Agent', '').startswith('Python-urllib'): return self.send({'success': False, 'message': 'blocked like Cloudflare'}, 403)
+        if self.path == '/api/v1/payment/ussd': return self.send({'success': True, 'code': 202, 'data': {'requestId': json.loads(raw)['requestId'], 'transactionId': 'E1', 'status': 'PENDING'}}, 202)
+        if self.path == '/api/v1/payment/card': return self.send({'success': True, 'code': 201, 'data': {'reference': 'pl_2', 'status': 'PENDING', 'paymentUrl': 'https://pay.example/c/ev-2'}}, 201)
         if self.path.startswith('/api/v1/payment/'): return self.send({'success': True, 'data': {'id': self.path.split('/')[-1], 'status': fake['status']}})
         self.send({'success': False}, 404)
     def do_GET(self): self.handle_any('GET')
@@ -60,7 +61,8 @@ class LicenseFlow(unittest.TestCase):
         except urllib.error.HTTPError as e: return e.code, json.loads(e.read() or b'{}')
 
     def hook(self, event, ref, delivery, secret=SECRET, age=0):
-        raw = json.dumps({'data': {'requestId': ref, 'status': event}}).encode(); t = int(time.time()) - age
+        t = int(time.time()) - age  # the documented message: {event, timestamp, data: {id, orderReference, status, ...}}
+        raw = json.dumps({'event': event, 'timestamp': t, 'data': {'id': 'E1', 'orderReference': ref, 'status': 'SUCCESS', 'amount': 5000, 'currency': 'TZS'}}).encode()
         sig = 't=%d,v1=%s' % (t, hmac.new(secret.encode(), str(t).encode() + b'.' + raw, hashlib.sha256).hexdigest())
         return self.call('POST', '/api/evpay/webhook', raw=raw, headers={'X-EvPay-Signature': sig, 'X-EvPay-Event': event, 'X-EvPay-Delivery': delivery})
 
@@ -101,7 +103,8 @@ class LicenseFlow(unittest.TestCase):
         c, r = self.call('POST', '/api/pay/card', {'email': 'buyer@example.com'}, self.token)
         self.assertEqual(c, 200, r); self.assertEqual(r['checkoutUrl'], 'https://pay.example/c/ev-2')
         card = [x for x in fake['calls'] if x[1] == '/api/v1/payment/card'][-1][2]
-        self.assertEqual(card['details']['requestId'], r['order']); self.assertTrue(card['details']['callbackUrl'].endswith('/api/evpay/webhook'))
+        self.assertEqual((card['paymentType'], card['metadata']['orderId'], card['details']['amount']), ('card', r['order'], 5000)); self.assertTrue(card['callbackUrl'].endswith('/api/evpay/webhook'))
+        self.assertEqual(sorted(card['customer']), ['address', 'city', 'country', 'email', 'firstname', 'lastname', 'postcode', 'state'], 'every billing field EvPay requires')
         fake['status'] = 'pending'; self.assertEqual(self.call('GET', '/api/pay/' + r['order'], token=self.token)[1]['status'], 'pending')
         # no webhook yet: Pip asks again, and the server checks with EvPay directly
         self.api.checked.clear(); fake['status'] = 'SUCCESS'
