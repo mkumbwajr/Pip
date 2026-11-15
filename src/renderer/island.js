@@ -7,6 +7,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const island = $('#island'), shell = $('#shell'), pill = $('#pill'), page = $('#page'), tabs = $('#tabs'), pip = $('#pip'), bar = $('#bar'), tip = $('#tip'), menu = $('#menu'), volPop = $('#vol-pop');
 let t = window.makeT({});
 
+const FREE = new Set(['ai']); // after the trial without a license: the agents' tab (and the folded island) keep working
 const LIVE = new Set(['home', 'ai', 'music', 'tray', 'clips', 'calendar', 'mail']); // redrawn when data changes; the others hold what you are typing
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#e8e8ee'];
 const AGENT = { claude: 'Claude Code', codex: 'Codex' };
@@ -283,13 +284,54 @@ const homes = {
   }
 };
 
-const FILL = new Set(['home', 'pip', 'music', 'mail', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
+// ---------- the license: after the 7-day trial, every tab but the agents asks for it ----------
+S.buy = { phone: '', order: '', method: '', operator: '', error: '', busy: false };
+const OPERATOR_NAMES = { Mpesa: 'M-Pesa', TigoPesa: 'Mixx by Yas', AirtelMoney: 'Airtel Money', HaloPesa: 'HaloPesa' };
+function buyPage() {
+  const L = S.license || {}, b = S.buy, price = 'TSh ' + Number(L.priceTzs || 5000).toLocaleString('en');
+  const title = L.licensed ? t('Pip is yours') : L.locked ? t('Your 7-day trial is over') : t('{n} days of your trial left', { n: L.daysLeft ?? 7 });
+  let right;
+  if (L.licensed) right = `<div class="by-ok">${icon('check')}<b>${esc(t('Thank you! Every tab is open, on every PC and Mac with your account.'))}</b></div>`;
+  else if (!L.signedIn) right = `<p class="by-note">${esc(t('The license lives in your Pip account, so it works on every PC and Mac you sign in to.'))}</p>
+      <button class="wbtn wide" data-buy-signin>${esc(t('Sign in first'))}</button>`;
+  else if (b.order) right = `<div class="by-wait"><span class="by-spin"></span><b>${esc(b.method === 'card' ? t('Finish paying on the page that opened in your browser.') : t('Approve the payment on your phone ({network}).', { network: OPERATOR_NAMES[b.operator] || b.operator }))}</b></div>
+      <p class="by-note">${esc(t('Pip unlocks by itself as soon as it goes through.'))}</p><button class="linkbtn" data-buy-cancel>${esc(t('Cancel'))}</button>`;
+  else right = `<label class="by-lab" for="by-phone">${esc(t('Pay with mobile money'))}</label>
+      <div class="by-row"><input id="by-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="07XX XXX XXX" value="${esc(b.phone)}"><button class="wbtn" data-pay-mobile ${b.busy ? 'disabled' : ''}>${esc(b.busy ? t('Sending…') : t('Pay {price}', { price }))}</button></div>
+      <p class="by-note">M-Pesa · Mixx by Yas · Airtel Money · HaloPesa</p>
+      <button class="linkbtn" data-pay-card ${b.busy ? 'disabled' : ''}>${icon('external')}${esc(t('Pay by card instead'))}</button>`;
+  return `<div class="by"><div class="by-l"><span class="by-pip"><i></i><i></i></span><h3>${esc(title)}</h3>
+      <p>${esc(L.licensed ? t('Bought once, yours for good.') : t('Unlock every tab for {price}, once. The island and your agents keep working either way.', { price }))}</p></div>
+    <div class="by-r">${right}${b.error ? `<p class="by-err">${esc(b.error)}</p>` : ''}</div></div>`;
+}
+// while a payment is pending: ask every four seconds, for up to ten minutes
+async function pollOrder(ref) {
+  for (let i = 0; i < 150 && S.buy.order === ref; i++) {
+    await new Promise(r => setTimeout(r, 4000));
+    if (S.buy.order !== ref) return;
+    const r = await api.payOrder(ref);
+    if (!r?.ok) continue;
+    if (r.status === 'paid' || r.licensed) { S.license = { ...S.license, ...r, licensed: true, locked: false }; S.buy = { ...S.buy, order: '', error: '' }; drawTabs(); if (!typing()) draw(true); confetti(); return; }
+    if (r.status === 'failed' || r.status === 'refunded') { S.buy = { ...S.buy, order: '', error: t('The payment did not go through. Try again.') }; if (!typing()) draw(true); return; }
+  }
+  if (S.buy.order === ref) { S.buy = { ...S.buy, order: '', error: t('No answer from the payment yet. If you paid, Pip unlocks by itself shortly.') }; draw(true); }
+}
+async function startPay(kind) {
+  if (kind === 'mobile') S.buy.phone = $('#by-phone')?.value.trim() || '';
+  S.buy = { ...S.buy, busy: true, error: '' }; draw(true);
+  const r = kind === 'mobile' ? await api.payMobile(S.buy.phone) : await api.payCard();
+  S.buy.busy = false;
+  if (!r?.ok) { S.buy.error = r?.error || t('The payment could not be started.'); return draw(true); }
+  S.buy = { ...S.buy, order: r.order, method: kind, operator: r.operator || '' }; draw(true); pollOrder(r.order);
+}
+
+const FILL = new Set(['buy', 'home', 'pip', 'music', 'mail', 'focus', 'modes', 'tray', 'note', 'calendar']); // pages laid out to the panel's full size, without scrolling
 let lastHtml = '';
 function draw(force) {
   drawPill();
   if (!S.open || S.dragging || (!force && (!LIVE.has(S.tab) || typing()))) return;
   page.classList.toggle('fill', FILL.has(S.tab));
-  const html = pages[S.tab]();
+  const html = S.tab === 'buy' || (S.license?.locked && !FREE.has(S.tab)) ? buyPage() : pages[S.tab]();
   if (html === lastHtml && page.childElementCount) { tick(); return; } // same page as on screen: rebuilding it only made it flicker
   lastHtml = html; page.innerHTML = html;
   for (const el of page.querySelectorAll('[data-w]')) el.style.width = el.dataset.w + '%';
@@ -305,7 +347,7 @@ function draw(force) {
 }
 function drawTabs() {
   const hidden = new Set(S.settings?.hiddenTabs || []);
-  tabs.innerHTML = tabList().filter(([id]) => id === 'home' || !hidden.has(id)).map(([id, name]) => `<button type="button" data-tab="${id}" data-tip="${esc(name)}" aria-label="${esc(name)}" class="${id === S.tab ? 'on' : ''}">${icon(id)}<b>${esc(name)}</b></button>`).join('');
+  tabs.innerHTML = tabList().filter(([id]) => id === 'home' || !hidden.has(id)).map(([id, name]) => `<button type="button" data-tab="${id}" data-tip="${esc(name)}" aria-label="${esc(name)}" class="${id === S.tab ? 'on' : ''}${S.license?.locked && !FREE.has(id) ? ' locked' : ''}">${icon(id)}<b>${esc(name)}</b></button>`).join('');
   const gear = $('#bar-bright'), vol = $('#bar-vol');
   gear.innerHTML = icon('sun'); gear.dataset.tip = t('Background brightness'); gear.setAttribute('aria-label', t('Background brightness')); $('#bright-ico').innerHTML = icon('sun');
   vol.innerHTML = icon('volume'); vol.dataset.tip = t('Volume'); vol.setAttribute('aria-label', t('Volume'));
@@ -329,7 +371,7 @@ function setOpen(open, tab) {
   if (open === S.open) return;
   S.open = open;
   // Home every time it opens, unless something asked for a tab, or it folded away on the lyrics while the song plays on
-  if (open) go(tab || (S.backToLyrics && S.settings?.lyrics && S.win.media?.playing ? 'music' : 'home'));
+  if (open) go(tab || (S.license?.locked ? 'ai' : S.backToLyrics && S.settings?.lyrics && S.win.media?.playing ? 'music' : 'home'));
   else { S.backToLyrics = S.tab === 'music' && Boolean(S.settings?.lyrics); S.pinned = false; S.auto = false; showMenu(false); showVolume(false); showBright(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
 }
 function openSettings() { api.openSettings(); setOpen(false); }
@@ -697,6 +739,10 @@ page.addEventListener('click', async e => {
   }
   else if (d.calView) { S.cal.view = d.calView; S.cal.events = null; draw(true); refreshCalendar(); }
   else if (d.googleIn !== undefined) signInGoogle();
+  else if (d.payMobile !== undefined) startPay('mobile');
+  else if (d.payCard !== undefined) startPay('card');
+  else if (d.buySignin !== undefined) api.openSettings('connections');
+  else if (d.buyCancel !== undefined) { S.buy = { ...S.buy, order: '', error: '' }; draw(true); }
   else if (d.inbox !== undefined) api.openInbox();
   else if (d.connect !== undefined) { const r = await api.connectAgent('claude', true); if (r?.agents) S.agents = r.agents; if (!r?.ok) openSettings(); else draw(true); }
   else if (d.modePick) { S.modePick = d.modePick; draw(true); }
@@ -765,6 +811,9 @@ api.onAi(snap => {
 });
 api.onFinish(entry => chime(entry.state === 'done'));
 api.onWin(state => { const was = S.win.media?.title; S.win = state; if (state.media?.title !== was) applyArtColor(); refreshLyrics(); refreshSongInfo(); draw(); });
+// the license changed (checked, bought, signed in or out): the tabs lock or unlock
+api.onLicense(v => { S.license = v; drawTabs(); if (S.open && !typing()) draw(true); });
+api.onBuy(() => (S.open ? go('buy') : setOpen(true, 'buy')));
 api.onArt(art => { S.art = art; applyArtColor(); if (S.tab === 'music') draw(); });
 // a newer Pip was found by the periodic check: a dot on the ••• menu and on Updates, until it is installed
 api.onUpdate(u => { S.update = u; island.classList.toggle('has-update', Boolean(u?.newer)); if (S.menu && S.menuView !== 'updates') showMenu(true, S.menuView); });
@@ -792,10 +841,12 @@ api.onChanged(async () => {
 (async () => {
   const init = await api.init();
   t = window.makeT(init.strings, { mac: init.platform === 'darwin' }); document.documentElement.lang = init.settings.lang;
-  Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art, notch: init.notch || null });
+  Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art, notch: init.notch || null, license: init.license || null });
   if (S.notch) { document.documentElement.style.setProperty('--notch-w', S.notch.width + 'px'); document.documentElement.style.setProperty('--notch-h', S.notch.height + 'px'); }
   S.spotify.on = init.spotify; S.google = init.google; S.hubError = await api.hubError();
   // Pip was closed while a mode was running: put the focus guard back the way it was before the mode
   if (S.settings.modeRestore) await save({ modeRestore: null, guard: { on: Boolean(S.settings.modeRestore.guardOn) } });
   applyMascot(); applyArtColor(); drawTabs(); drawPill(); setInterval(second, 1000);
 })();
+
+page.addEventListener('keydown', e => { if (e.target.id === 'by-phone' && e.key === 'Enter' && !S.buy.busy) { e.preventDefault(); startPay('mobile'); } });

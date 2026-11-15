@@ -68,6 +68,7 @@ class LicenseFlow(unittest.TestCase):
         dev = hashlib.sha256(b'machine-1').hexdigest()
         c, a = self.call('POST', '/api/license/status', {'device': dev}); self.assertEqual(c, 200)
         self.assertFalse(a['licensed']); self.assertEqual(a['trialEndsAt'] - a['trialStarted'], 7 * 86400000); self.assertEqual(a['priceTzs'], 5000)
+        self.assertTrue(a['selling'], 'EvPay is set up in this test, so Pip may lock after the trial')
         time.sleep(0.01); _, b = self.call('POST', '/api/license/status', {'device': dev})
         self.assertEqual(a['trialStarted'], b['trialStarted'], 'asking again (or reinstalling) does not restart the trial')
         _, c2 = self.call('POST', '/api/license/status', {'device': 'not-a-hash'}); self.assertNotIn('trialEndsAt', c2)
@@ -126,6 +127,12 @@ class LicenseFlow(unittest.TestCase):
         self.assertIsNone(L.normalize_phone('0754')); self.assertIsNone(L.normalize_phone('+1 202 555 0100'))
         for n, op in (('0754000000', 'Mpesa'), ('0655000000', 'TigoPesa'), ('0715000000', 'TigoPesa'), ('0685000000', 'AirtelMoney'), ('0625000000', 'HaloPesa')):
             self.assertEqual(L.operator_for(L.normalize_phone(n)), op, n)
+
+    def test_5b_no_trial_starts_before_buying_opens(self):
+        s = self.api.lic.Store(self.tmp); dev = hashlib.sha256(b'early-user').hexdigest()
+        self.assertNotIn('trialEndsAt', s.status(None, dev, selling=False))
+        time.sleep(0.01); a = s.status(None, dev, selling=True)
+        self.assertGreater(a['trialStarted'], a['now'] - 1000, 'the seven days start when buying opens')
 
     def test_6_grant_by_hand(self):
         s = self.api.lic.Store(self.tmp); u = self.api.h('email:gift@example.com'); s.grant(u, 'manual', 'manual')

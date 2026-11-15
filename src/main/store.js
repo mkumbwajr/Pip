@@ -33,7 +33,8 @@ const DEFAULTS = {
   modeRestore: null,     // while a mode runs: what to put back when it stops ({ guardOn })
   buddyAgent: 'claude',
   autoUpdate: true,      // look for a newer Pip on pip.bang.co.tz by itself (at start and every six hours)
-  updateOffered: '',     // the newest update already announced, so the notification comes once per release
+  updateOffered: '',
+  trialNotice: 0,        // the trial end already announced (once, the day before)     // the newest update already announced, so the notification comes once per release
   shortcut: 'Control+Alt+Space'
 };
 

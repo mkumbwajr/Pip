@@ -78,7 +78,9 @@ agent uliyemchagua kupitia akaunti yako; mipangilio, noti, mji na link ya kalend
 (inahifadhiwa pip.bang.co.tz; ukiingia kwa email, email yako inatumika kukutumia code tu); mafaili ya simu yakipita
 relay ya pip.bang.co.tz (yame-encrypt-iwa, key haipiti server, yanafutwa baada ya saa moja); Spotify ukiiunganisha;
 Google ukiingia (kalenda yako na idadi tu ya email ambazo hujasoma, sio nani wala nini); na pip.bang.co.tz kuangalia kama
-kuna Pip mpya (ikiwaka na kila masaa sita, unaweza kuzima). Hooks, ulivyo-copy, noti na mafaili vinabaki kwenye PC. Sera kamili: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
+kuna Pip mpya (ikiwaka na kila masaa sita, unaweza kuzima); kuangalia leseni, hash ya kitambulisho cha kifaa hiki tu
+(sio kitambulisho chenyewe), kwenda pip.bang.co.tz ikiwaka na kila masaa sita; na ukinunua Pip kwa simu, namba yako
+kwenda EvPay kupitia pip.bang.co.tz (kwa kadi unalipa kwenye ukurasa wa EvPay wenyewe). Hooks, ulivyo-copy, noti na mafaili vinabaki kwenye PC. Sera kamili: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 
 ## Kutafsiri
 

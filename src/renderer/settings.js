@@ -65,7 +65,11 @@ const views = {
           ? row('mail', t('Or with email'), t('We email you a 6-digit code. No password.'), `<input type="email" id="mail-addr" placeholder="${esc(t('you@example.com'))}" value="${esc(mail.address)}">${button('mail-send', mail.busy ? t('Sending…') : t('Send code'))}`, 'wide')
           : row('mail', t('Type the code'), t('We sent a 6-digit code to {email}.', { email: mail.address }), `<input type="text" id="mail-code" inputmode="numeric" maxlength="6" placeholder="000000">${button('mail-verify', mail.busy ? t('Checking…') : t('Sign in'), 'primary')}${button('mail-back', t('Use another email'))}`, 'wide')
       ]) + `<div class="err" id="acct-error"></div>`;
-    return account + group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
+    const L = S.license || {}, price = 'TSh ' + Number(L.priceTzs || 5000).toLocaleString('en');
+    const licence = group(t('Pip license'), [row('star', L.licensed ? t('Bought') : L.locked ? t('The trial is over') : t('Trial: {n} days left', { n: L.daysLeft ?? 7 }),
+      L.licensed ? t('Every tab is open, on every PC and Mac with your Pip account.') : t('After 7 days, the island and agent status keep working; the other tabs need the license ({price}, once).', { price }),
+      L.licensed ? '' : button('lic-buy', t('Buy Pip'), 'primary'))]);
+    return account + (L.selling || L.licensed ? licence : '') + group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
       + `<div class="err" id="ag-error"></div>`
       + group(t('Accounts'), [
         row('calendar', 'Google', t('For your calendar and the number of unread emails (never who or what).'), button('go-go', S.google ? t('Sign out') : t('Sign in with Google'), S.google ? '' : 'primary')),
@@ -160,7 +164,7 @@ const views = {
         link('shield', t('Privacy'), t('What leaves your PC, and when.'), 'https://pip.bang.co.tz/privacy'),
         link('heart', t('Source code'), t('Free and open source (MIT).'), 'https://github.com/mkumbwajr/Pip')
       ])
-      + `<div class="about">${mascot(S.settings.mascot.hat, true)}<b>Pip ${esc(S.version)}</b><span>© ${new Date().getFullYear()} BANG DIGITAL LTD</span><span>${esc(t('MIT licence. No account, no paywall, no telemetry.'))}</span></div>`;
+      + `<div class="about">${mascot(S.settings.mascot.hat, true)}<b>Pip ${esc(S.version)}</b><span>© ${new Date().getFullYear()} BANG DIGITAL LTD</span><span>${esc(t('MIT licence. Free for 7 days, then a one-time license. No telemetry.'))}</span></div>`;
   }
 };
 
@@ -262,6 +266,7 @@ page.addEventListener('click', async e => {
     }
     case 'mail-back': mail.stage = 'enter'; return draw();
     case 'acct-out': S.account = await api.accountSignOut(); return draw();
+    case 'lic-buy': return api.buy();
     case 'acct-del': {
       if (!confirmDelete) { confirmDelete = true; draw(); setTimeout(() => { confirmDelete = false; if (current === 'connections') draw(); }, 4000); return; }
       confirmDelete = false; const r = await api.accountDelete(); if (r.ok) S.account = r; draw(); if (!r.ok) showError('acct-error', r.error); return;
@@ -316,7 +321,7 @@ page.addEventListener('change', async e => {
 // typing here right now
 api.onChanged(async () => {
   const init = await api.init(), lang = S.settings.lang;
-  Object.assign(S, { settings: init.settings, agents: init.agents, account: init.account, google: init.google, spotify: init.spotify });
+  Object.assign(S, { settings: init.settings, agents: init.agents, account: init.account, google: init.google, spotify: init.spotify, license: init.license });
   if (init.settings.lang !== lang) return location.reload();
   const a = document.activeElement; if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'range') return;
   draw();
@@ -324,6 +329,9 @@ api.onChanged(async () => {
 
 (async () => {
   S = await api.init(); S.hubError = await api.hubError(); t = window.makeT(S.strings, { mac: S.platform === 'darwin' }); document.documentElement.lang = S.settings.lang;
+  if (sections().some(x => x[0] === location.hash.slice(1))) current = location.hash.slice(1); // opened on a section (the island's "sign in first")
   $('#q').placeholder = t('Search settings'); $('#search-ico').innerHTML = icon('search');
   draw(); setInterval(tick, 5000);
 })();
+
+api.onSettingsGo(section => { if (sections().some(x => x[0] === section)) { current = section; query = ''; $('#q').value = ''; draw(); } });

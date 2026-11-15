@@ -13,9 +13,11 @@ Publisher: BANG DIGITAL LTD. Repo: https://github.com/mkumbwajr/Pip
    `src/locales/sw.json` and must be Tanzanian street Swahili mixed with the English tech words people really use
    (Swanglish): not textbook Swahili, not Kenyan usage. `test/more.test.cjs` fails if a text is missing or unused.
    The owner reviews wording: list every new string in your summary.
-3. **No account required, no paywall, no telemetry.** The Pip account (Google sign-in, preferences sync, `server/`) is
-   optional and Pip must work fully without it. Anything that leaves the PC must be switched on by the user and named
-   in the README's "Kinachotoka nje ya PC yako" section.
+3. **Free for 7 days, then a one-time license; no telemetry.** After the trial the island and the agents' status keep
+   working without a license; the other tabs need it (`src/main/license.js`, `server/license.py`, paid through EvPay).
+   Nothing locks until the server says buying is open. The Pip account is optional except to buy (the license belongs
+   to it). Anything that leaves the PC must be switched on by the user, or be the license check, and be named in the
+   README's "Kinachotoka nje ya PC yako" section and on the privacy page.
 4. **Never break the user's agent config.** `hook-install.js` only touches its own entries, keeps a `.pip-backup`,
    never replaces an existing status line and refuses to write JSON it cannot parse. Keep those guarantees and
    their tests.

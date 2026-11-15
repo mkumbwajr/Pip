@@ -91,6 +91,8 @@ sign in to a Pip account (stored on pip.bang.co.tz under a hash of your Google I
 the code), files sent to or from your phone across networks (end-to-end encrypted through pip.bang.co.tz, deleted after
 an hour), Spotify if you connect it, Google if
 you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz to see whether a
-newer Pip is out (at start and every six hours, can be switched off). Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
+newer Pip is out (at start and every six hours, can be switched off), the license check (a one-way hash of this
+device's ID, and your Pip account's session when signed in, at start and every six hours), and, when you buy Pip with
+mobile money, the phone number you type, to EvPay through pip.bang.co.tz (a card is paid on EvPay's own page). Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 
 Code comments are in English so contributors outside Tanzania can read them.

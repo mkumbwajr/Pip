@@ -62,11 +62,12 @@ class Store:
                 try: os.remove(f)
                 except OSError: pass
 
-    def status(self, user, device):
-        """What Pip needs: licensed, or how long the trial still runs (by the server's clock)."""
+    def status(self, user, device, selling=True):
+        """What Pip needs: licensed, or how long the trial still runs (by the server's clock). While nothing is on sale no
+        trial is started, so everyone already using Pip gets the full seven days from the day buying opens."""
         lic = self.license(user) if user else None
         out = {'licensed': bool(lic), 'priceTzs': PRICE_TZS, 'trialDays': TRIAL_DAYS, 'now': now_ms()}
-        if device:
+        if device and selling:
             started = self.trial(device)
             out.update({'trialStarted': started, 'trialEndsAt': started + TRIAL_DAYS * 86400000})
         return out

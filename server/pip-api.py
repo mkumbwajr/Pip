@@ -183,7 +183,8 @@ class Api(BaseHTTPRequestHandler):
         if method == 'POST' and p == '/api/evpay/webhook': return self.webhook()
         if method == 'POST' and p == '/api/license/status':  # works signed out too: the trial belongs to the device
             b = self.body() or {}; device = str(b.get('device', '')).lower()
-            return self.reply(200, store.status(self.who()[0], device if lic.DEVICE_RE.match(device) else None))
+            # selling: EvPay is set up. Until then Pip locks nothing, so nobody is stuck behind a purchase they cannot make
+            return self.reply(200, {**store.status(self.who()[0], device if lic.DEVICE_RE.match(device) else None, evpay.ready), 'selling': evpay.ready})
         user, key = self.who()
         if not user: return self.reply(401, {'error': 'Sign in again'})
         if p.startswith('/api/pay'): return self.pay(method, p, user)

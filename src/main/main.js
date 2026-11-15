@@ -23,6 +23,7 @@ const { Google, clientFor } = require('./google.js');
 const { Account } = require('./account.js');
 const { Relay } = require('./relay.js');
 const { latestRelease, isReleaseUrl } = require('./update.js');
+const { License, deviceHash } = require('./license.js');
 const { makeT } = require('../shared/i18n.js');
 
 // Pip.exe --remove-hooks: take Pip's entries out of the agents' config files and leave. The uninstaller runs this.
@@ -57,7 +58,7 @@ const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
 const WIN_ICON = path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
-let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, account = null, relay = null, quitting = false;
+let license = null, store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, account = null, relay = null, quitting = false;
 let strings = {}, t = makeT(strings);
 
 // ---------- language ----------
@@ -195,8 +196,9 @@ function openWelcome() {
 }
 
 // ---------- the settings window ----------
-function openSettings() {
-  if (settingsWin && !settingsWin.isDestroyed()) { settingsWin.show(); settingsWin.focus(); return; }
+function openSettings(section) {
+  section = /^[a-z]{2,20}$/.test(String(section || '')) ? section : '';
+  if (settingsWin && !settingsWin.isDestroyed()) { if (section) settingsWin.webContents.send('settings:go', section); settingsWin.show(); settingsWin.focus(); return; }
   settingsWin = new BrowserWindow({ width: 1060, height: 740, minWidth: 820, minHeight: 560, title: t('Pip settings'), backgroundColor: '#0c0c10', autoHideMenuBar: true, icon: WIN_ICON,
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   settingsWin.setMenu(null);
@@ -207,7 +209,7 @@ function openSettings() {
       relaunchCommand: app.isPackaged ? `"${process.execPath}"` : '' });
   } catch {}
   settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  settingsWin.loadFile(path.join(RENDERER, 'settings.html'));
+  settingsWin.loadFile(path.join(RENDERER, 'settings.html'), section ? { hash: section } : undefined);
   settingsWin.on('closed', () => { settingsWin = null; });
 }
 const changed = () => send('app:changed');
@@ -347,7 +349,7 @@ const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e)
 function wireIpc() {
   handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, notch: notchInfo(), settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
     art: helper.art, tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
-    strings, languages: languages(), node: hasNode(), spotify: spotify.connected, google: google.connected, googleBuiltIn: Boolean(clientFor(null)), account: account.status() }));
+    strings, languages: languages(), node: hasNode(), spotify: spotify.connected, google: google.connected, googleBuiltIn: Boolean(clientFor(null)), account: account.status(), license: license.view() }));
   handle('app:strings', () => strings);
   handle('settings:set', patch => { const all = applySettings(patch); account?.changed(); return all; });
   // the Pip account (optional): Google says who you are, Pip's server keeps your preferences for your other devices
@@ -355,18 +357,34 @@ function wireIpc() {
   handle('account:signin', async () => {
     const c = clientFor(null); // the account server knows only the Google client Pip ships with
     if (!c) return { ok: false, error: t('This build of Pip has no Google sign-in, so it cannot use a Pip account.') };
-    try { const how = await account.signIn(await google.identity(c.clientId, c.secret)); return { ok: true, how, ...account.status() }; }
+    try { const how = await account.signIn(await google.identity(c.clientId, c.secret)); checkLicense(); return { ok: true, how, ...account.status() }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
   handle('account:emailCode', async email => { try { await account.emailCode(String(email || '').trim(), store.get('lang')); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('account:emailVerify', async (email, code) => {
-    try { const how = await account.signInEmail(String(email || '').trim(), String(code || '').replace(/\D/g, '')); return { ok: true, how, ...account.status() }; }
+    try { const how = await account.signInEmail(String(email || '').trim(), String(code || '').replace(/\D/g, '')); checkLicense(); return { ok: true, how, ...account.status() }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
   handle('account:sync', async () => { try { if (!(await account.pull())) await account.push(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  handle('account:signout', async () => { await account.signOut(); return account.status(); });
-  handle('account:delete', async () => { try { await account.remove(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  handle('settings:open', () => openSettings());
+  handle('account:signout', async () => { await account.signOut(); checkLicense(); return account.status(); });
+  // the license: the trial, buying it (EvPay, through Pip's server), and how a payment is going
+  handle('license:status', () => license.view());
+  handle('license:check', async () => { await checkLicense(); return license.view(); });
+  handle('license:payMobile', async (phone, operator) => {
+    try { return { ok: true, ...(await license.payMobile(String(phone || '').slice(0, 20), operator ? String(operator) : '')) }; }
+    catch (e) { return { ok: false, error: payError(e) }; }
+  });
+  handle('license:payCard', async () => {
+    try {
+      const r = await license.payCard(account.status().email || '');
+      if (!/^https:\/\//.test(String(r.checkoutUrl || ''))) throw new Error('EvPay did not return a card page');
+      shell.openExternal(r.checkoutUrl); return { ok: true, order: r.order };
+    } catch (e) { return { ok: false, error: payError(e) }; }
+  });
+  handle('license:order', async ref => { try { const r = await license.order(String(ref || '')); if (r.licensed) licenseChanged(); return { ok: true, ...r }; } catch (e) { return { ok: false, error: payError(e) }; } });
+  handle('license:buy', () => { send('island:buy'); });
+  handle('account:delete', async () => { try { await account.remove(); checkLicense(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('settings:open', section => openSettings(section));
   handle('autostart:set', on => { app.setLoginItemSettings({ openAtLogin: Boolean(on) }); return app.getLoginItemSettings().openAtLogin; });
   handle('agents:connect', (agent, on) => { const r = connect(String(agent), Boolean(on)); changed(); return r; });
   handle('ai:decide', (id, behavior) => hub.decide(String(id), String(behavior)));
@@ -473,6 +491,45 @@ function wireIpc() {
 }
 
 // ---------- start ----------
+// ---------- the license ----------
+// This device's ID for the trial: Windows' MachineGuid, the Mac's hardware UUID, or a random one Pip keeps. Only a
+// hash of it ever leaves the computer (license.js).
+function machineId() {
+  try {
+    if (process.platform === 'win32') {
+      const r = spawnSync('reg', ['query', 'HKLM\\SOFTWARE\\Microsoft\\Cryptography', '/v', 'MachineGuid'], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+      const m = /MachineGuid\s+REG_SZ\s+([0-9a-f-]{20,})/i.exec(r.stdout || ''); if (m) return m[1];
+    } else if (process.platform === 'darwin') {
+      const r = spawnSync('ioreg', ['-rd1', '-c', 'IOPlatformExpertDevice'], { encoding: 'utf8', timeout: 5000 });
+      const m = /"IOPlatformUUID"\s*=\s*"([0-9A-F-]{20,})"/i.exec(r.stdout || ''); if (m) return m[1];
+    }
+  } catch {}
+  const file = data('device-id');
+  try { const id = fs.readFileSync(file, 'utf8').trim(); if (id) return id; } catch {}
+  const id = randomBytes(16).toString('hex'); try { fs.writeFileSync(file, id); } catch {} return id;
+}
+let deviceId = null;
+function licenseChanged() {
+  const v = license.view(); send('license:changed', v);
+  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('app:changed');
+  // one notification the day before the trial ends
+  if (v.selling && !v.licensed && !v.locked && v.daysLeft === 1 && store.get('trialNotice') !== v.trialEndsAt) {
+    store.set({ trialNotice: v.trialEndsAt });
+    try { new Notification({ title: t('Your Pip trial ends tomorrow'), icon: ICON, body: t('Buy Pip once for TSh {price} to keep every tab.', { price: v.priceTzs.toLocaleString('en') }) }).show(); } catch {}
+  }
+}
+async function checkLicense() { try { await license.check(); } catch {} licenseChanged(); }
+// the server's answers (English), in the app's language
+const PAY_SAYS = {
+  'That phone number does not look right': () => t('That phone number does not look right.'),
+  'That network is not supported': () => t('That mobile network is not supported.'),
+  'Payments are not set up yet': () => t('Payments are not open yet. Try again later.'),
+  'Too many payment attempts. Try again in an hour.': () => t('Too many payment attempts. Try again in an hour.'),
+  'This account already has a license': () => t('This account already has Pip.'),
+  'Sign in again': () => t('Sign in to your Pip account first.')
+};
+function payError(e) { const m = String(e.message || e); return PAY_SAYS[m] ? PAY_SAYS[m]() : t('The payment could not be started: {error}', { error: m }); }
+
 // A newer installer on pip.bang.co.tz (a higher version, or the same version built later): offered once with a
 // notification that opens the download, and kept in the island's menu until Pip is updated. Settings can switch it off.
 let updateTimer = null;
@@ -516,6 +573,13 @@ app.whenReady().then(async () => {
   const pullAccount = () => account.pull().catch(e => { account.error = String(e.message || e); });
   setTimeout(pullAccount, 5000); setInterval(pullAccount, 10 * 60e3);
   scheduleUpdates();
+  deviceId = deviceHash(machineId());
+  license = new License({
+    fetchImpl: webFetch, device: () => deviceId, token: () => account?.session?.token || '',
+    load: () => { try { return JSON.parse(fs.readFileSync(data('license.json'), 'utf8')); } catch { return null; } },
+    save: v => { try { fs.writeFileSync(data('license.json'), JSON.stringify(v)); } catch {} }
+  });
+  setTimeout(checkLicense, 3000); setInterval(checkLicense, 6 * 3600e3);
   const gvault = data('google.bin');
   google = new Google({
     t: (...a) => t(...a), fetchImpl: webFetch, open: url => shell.openExternal(url),

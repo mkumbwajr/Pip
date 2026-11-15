@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('pipApp', {
   spotifyLogin: call('spotify:login'), spotifyLogout: call('spotify:logout'), spotifyDevices: call('spotify:devices'), spotifyTransfer: call('spotify:transfer'),
   googleLogin: call('google:login'), googleLogout: call('google:logout'), googleEvents: call('google:events'), googleUnread: call('google:unread'), openInbox: call('google:openInbox'), chat: call('pip:chat'), fillArt: call('art:fill'), lastClip: () => ipcRenderer.invoke('clips:last'),
   checkUpdate: call('app:update'), openRelease: call('app:release'), openLink: call('app:link'), restart: call('app:restart'), resetSettings: call('settings:reset'),
+  licenseStatus: call('license:status'), licenseCheck: call('license:check'), payMobile: call('license:payMobile'), payCard: call('license:payCard'), payOrder: call('license:order'), buy: call('license:buy'),
   openWelcome: call('welcome:open'), welcomeDone: call('welcome:done'),
   accountStatus: call('account:status'), accountSignIn: call('account:signin'), accountEmailCode: call('account:emailCode'), accountEmailVerify: call('account:emailVerify'), accountSync: call('account:sync'), accountSignOut: call('account:signout'), accountDelete: call('account:delete'),
   media: call('media:cmd'), seek: call('media:seek'), setVolume: call('volume:set'), lyrics: call('lyrics:get'), songInfo: call('song:info'),
@@ -25,5 +26,5 @@ contextBridge.exposeInMainWorld('pipApp', {
   dragOut: file => ipcRenderer.send('tray:drag', String(file)),
   pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
   onAi: on('ai:state'), onFinish: on('ai:finish'), onWin: on('win:state'), onTray: on('tray:changed'), onClips: on('clips:changed'),
-  onToggle: on('island:toggle'), onArt: on('win:art'), onUpdate: on('update:available'), onCursor: on('cursor'), onChanged: on('app:changed'), onShareProgress: on('share:progress')
+  onToggle: on('island:toggle'), onArt: on('win:art'), onUpdate: on('update:available'), onLicense: on('license:changed'), onBuy: on('island:buy'), onSettingsGo: on('settings:go'), onCursor: on('cursor'), onChanged: on('app:changed'), onShareProgress: on('share:progress')
 });
