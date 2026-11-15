@@ -31,7 +31,9 @@ const installVhost = file => {
 
 if (process.argv.includes('--mac')) { // the Mac disk image from this version's GitHub release (built there by Actions)
   const file = path.join(root, 'dist', `Pip-${version}-mac.dmg`), url = `https://github.com/mkumbwajr/Pip/releases/download/v${version}/Pip-${version}-mac.dmg`;
-  if (!fs.existsSync(file)) { fs.mkdirSync(path.dirname(file), { recursive: true }); const r = spawnSync('curl', ['-fL', '--retry', '3', '-o', file, url], { stdio: 'inherit' }); if (r.status !== 0) { fs.rmSync(file, { force: true }); console.error('no Mac build on GitHub yet: ' + url); process.exit(1); } }
+  // always fresh: a release can be rebuilt under the same version, and an old local copy would be published instead
+  fs.rmSync(file, { force: true });
+  { fs.mkdirSync(path.dirname(file), { recursive: true }); const r = spawnSync('curl', ['-fL', '--retry', '3', '-o', file, url], { stdio: 'inherit' }); if (r.status !== 0) { fs.rmSync(file, { force: true }); console.error('no Mac build on GitHub yet: ' + url); process.exit(1); } }
   copy(file, `/srv/pip/download/Pip-${version}-mac.dmg`);
   const latest = JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg` });
   sh(`set -e; cd /srv/pip/download; ln -sf Pip-${version}-mac.dmg Pip-mac.dmg; printf '%s\n' '${latest}' > /srv/pip/latest.json; chmod -R a+rX /srv/pip`);
