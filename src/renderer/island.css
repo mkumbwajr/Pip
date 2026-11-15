@@ -32,8 +32,10 @@ button, input, textarea, select { font: inherit; color: inherit; }
 #island.open.attach #shell { border-radius: 0 0 22px 22px; }
 #island.pinned:not(.attach) #shell { border-color: var(--accent); }
 
-#pill { display: block; width: 100%; height: 36px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; outline: 0; }
-#pill-inner { display: inline-flex; align-items: center; gap: 9px; height: 36px; padding: 0 14px 0 8px; white-space: nowrap; max-width: 640px; }
+/* flex, anchored left: a button centres content that is too wide, which cut into Pip's eyes on long song titles */
+#pill { display: flex; justify-content: flex-start; overflow: hidden; width: 100%; height: 36px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; outline: 0; }
+#pill-inner > .pip, #pill-side { flex: none; }
+#pill-inner { flex: none; display: inline-flex; align-items: center; gap: 9px; height: 36px; padding: 0 14px 0 8px; white-space: nowrap; max-width: 640px; }
 #pill-text { overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
 #pill-text:empty { display: none; }
 #pill-side { color: var(--dim); font-variant-numeric: tabular-nums; }
@@ -511,4 +513,7 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 #island.notched:not(.open) #pill-gap { display: block; flex: none; width: var(--notch-w, 200px); margin-right: -2px; }
 #island.notched:not(.open) .pip { order: -1; flex: none; width: calc(var(--side, 56px) - 10px); justify-content: flex-start; padding-left: 14px; }
 #island.notched.bare:not(.open) #pill-inner { padding: 0; }
+#island.notched:not(.open) #pill-inner { flex: 1 1 auto; min-width: 0; }
+#island.notched:not(.open) #pill-text { flex: 0 1 auto; min-width: 0; max-width: none; }
+#island.notched:not(.open) #pill-side { flex: none; padding-right: 14px; }
 #island.notched.attach:not(.open) #shell { border-radius: 0 0 14px 14px; }

@@ -72,7 +72,7 @@ function drawPill() {
   else if (top && top.state === 'error') text = t('{agent} hit an error', { agent: AGENT[top.agent] });
   else if (S.recv) { text = t('Receiving {name}', { name: S.recv.name }); side = S.recv.pct + '%'; }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
-  else if (m?.playing) text = m.artist ? `${m.title} · ${m.artist}` : m.title;
+  else if (m?.playing) text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; // beside a notch: the title only, to stay compact
   if (top && (top.state === 'working' || top.state === 'asking')) side = ''; // a task is running: the strip shows only what it does
   $('#pill-text').textContent = text;
   island.classList.toggle('asking-pill', Boolean(pillAsk)); $('#pill-ask').hidden = !pillAsk;
@@ -92,7 +92,7 @@ function drawPill() {
   if (S.notch && !S.open) {
     // the window is centred on the screen, so the gap is too: both sides as wide as the wider one, eyes at the far left
     const inner = $('#pill-inner'), right = [...inner.children].filter(el => el.id !== 'pip' && el.id !== 'pill-gap' && el.offsetParent).reduce((w, el) => w + Math.max(el.scrollWidth, el.getBoundingClientRect().width) + 10, 0); // full width, not the squeezed one
-    const side = Math.max(56, Math.min(260, Math.ceil(right) + 18));
+    const side = Math.max(56, Math.min(150, Math.ceil(right) + 18)); // longer text ends in "…" rather than widening the island
     island.style.setProperty('--side', side + 'px'); shell.style.width = (S.notch.width + 2 * side) + 'px';
   } else shell.style.width = S.open ? '' : Math.max(84, Math.min(pillAsk ? 620 : 440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
   const dot = tabs.querySelector('[data-tab=ai]'); if (dot) dot.classList.toggle('dot', S.ai.top === 'asking');
@@ -324,11 +324,12 @@ function go(tab) {
 }
 /** Opens the preview or folds back to the pill. The page is drawn before opening and left in place while closing,
     so the morph never shows an empty panel. */
-function setOpen(open, tab = 'home') {
+function setOpen(open, tab) {
   if (open === S.open) return;
   S.open = open;
-  if (open) go(tab); // Home every time it opens, unless something asked for a tab
-  else { S.pinned = false; S.auto = false; showMenu(false); showVolume(false); showBright(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
+  // Home every time it opens, unless something asked for a tab, or it folded away on the lyrics while the song plays on
+  if (open) go(tab || (S.backToLyrics && S.settings?.lyrics && S.win.media?.playing ? 'music' : 'home'));
+  else { S.backToLyrics = S.tab === 'music' && Boolean(S.settings?.lyrics); S.pinned = false; S.auto = false; showMenu(false); showVolume(false); showBright(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
 }
 function openSettings() { api.openSettings(); setOpen(false); }
 

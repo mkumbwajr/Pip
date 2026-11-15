@@ -149,6 +149,9 @@ function createIsland() {
   island = new BrowserWindow({
     ...ISLAND, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
     skipTaskbar: true, alwaysOnTop: true, hasShadow: false, show: false, focusable: true, icon: WIN_ICON,
+    // macOS pushes windows down below the menu bar; a frameless window with this flag goes exactly where it is put,
+    // so the island can sit at y=0, over the menu bar and around the camera notch
+    enableLargerThanScreen: process.platform === 'darwin',
     webPreferences: { preload: path.join(__dirname, '..', 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, autoplayPolicy: 'no-user-gesture-required' }
   });
   island.setAlwaysOnTop(true, 'screen-saver');

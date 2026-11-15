@@ -56,7 +56,7 @@ const views = {
       <label class="field"><span>${esc(t('Your town (for the weather)'))}</span><input type="text" id="town" value="${esc(s.weather.place)}" placeholder="Dar es Salaam"></label>`;
   },
   4() {
-    const card = (id, name) => `<div class="agent ${S.agents[id] ? 'on' : ''}"><span class="logo">${icon(id === 'claude' ? 'ai' : 'apps')}</span><div class="grow"><b>${name}</b><span>${esc(S.agents[id] ? t('Connected') : t('Not connected'))}</span></div>
+    const card = (id, name) => `<div class="agent ${S.agents[id] ? 'on' : ''}"><span class="logo ${id}">${id === 'claude' ? claudeLogo() : openaiLogo()}</span><div class="grow"><b>${name}</b><span>${esc(S.agents[id] ? t('Connected') : t('Not connected'))}</span></div>
       <button type="button" class="${S.agents[id] ? 'ghost' : 'primary'}" data-agent="${id}">${esc(S.agents[id] ? t('Disconnect') : t('Connect'))}</button></div>`;
     return `<h2>${esc(t('Which AI do you use?'))}</h2><p class="lead">${esc(t('Pip follows them while they work. You can change this later in Settings.'))}</p>
       ${card('claude', 'Claude Code')}${card('codex', 'Codex')}<p class="err" id="err"></p>
