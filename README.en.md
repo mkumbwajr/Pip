@@ -10,7 +10,7 @@ MIT licence. Free for 7 days with everything open; after that the island and age
 need a one-time license of TSh 5,000 (mobile money or card, through EvPay). The license belongs to your Pip account
 (Google or email), which also syncs your setup between devices. No telemetry.
 
-**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · macOS (Intel and Apple silicon) · version 1.0.0
+**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · macOS (Intel and Apple silicon) · version 1.0.1
 
 The installer is not code-signed yet, so Windows SmartScreen warns: choose "More info", then "Run anyway". The Mac
 DMG is not signed either: the first time, right-click Pip in Applications and choose **Open**. When a

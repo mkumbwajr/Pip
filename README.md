@@ -10,7 +10,7 @@ nyingine zinahitaji leseni ya TSh 5,000 mara moja (M-Pesa, Mixx by Yas, Airtel M
 Leseni inakaa kwenye akaunti ya Pip (Google au email), ambayo pia ina-sync mipangilio kati ya vifaa. Hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani
 cha Tanzania; English ipo kwenye Settings. [English README](README.en.md)
 
-**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · macOS (Intel na Apple silicon) · toleo 1.0.0
+**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · macOS (Intel na Apple silicon) · toleo 1.0.1
 
 Installer haina signature bado, kwa hiyo Windows SmartScreen itakuonya: bonyeza "More info" kisha "Run anyway".
 Kwenye Mac, DMG nayo haina signature: mara ya kwanza bonyeza kulia Pip kwenye Applications kisha **Open**.
