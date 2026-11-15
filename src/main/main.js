@@ -175,6 +175,7 @@ function applySettings(patch) {
   if (before.island.display !== after.island.display || before.island.scale !== after.island.scale) placeIsland();
   if (before.weather.place !== after.weather.place && !(patch.weather && 'lat' in patch.weather)) { store.set({ weather: { lat: null, lon: null } }); weatherCache.at = 0; }
   if (before.lang !== after.lang) { loadLanguage(); tray?.refresh(); }
+  if (after.autoUpdate && !before.autoUpdate) checkForUpdate(); // switched back on: look now, not in six hours
   helper.watch = Boolean(after.guard.on); // the Mac reads browser tabs only while the focus guard is on
   hub.context = agentContext(); changed(); for (const w of [settingsWin, welcomeWin]) if (w && !w.isDestroyed()) w.webContents.send('app:changed');
   return store.all();
@@ -472,6 +473,24 @@ function wireIpc() {
 }
 
 // ---------- start ----------
+// A newer installer on pip.bang.co.tz (a higher version, or the same version built later): offered once with a
+// notification that opens the download, and kept in the island's menu until Pip is updated. Settings can switch it off.
+let updateTimer = null;
+async function checkForUpdate() {
+  if (!store.get('autoUpdate')) return;
+  try {
+    const u = await latestRelease({ current: app.getVersion(), fetchImpl: webFetch });
+    if (!u.newer || !isReleaseUrl(u.url)) return;
+    send('update:available', { ok: true, ...u });
+    const key = u.latest + '+' + (u.build || '');
+    if (store.get('updateOffered') === key) return;
+    store.set({ updateOffered: key });
+    const n = new Notification({ title: t('A new Pip is ready'), icon: ICON, body: t('Pip {version} is out. Click to download it.', { version: u.latest }) });
+    n.on('click', () => shell.openExternal(u.url)); n.show();
+  } catch {}
+}
+function scheduleUpdates() { clearInterval(updateTimer); setTimeout(checkForUpdate, 60e3); updateTimer = setInterval(checkForUpdate, 6 * 3600e3); }
+
 app.whenReady().then(async () => {
   store = new Store(data('settings.json')); loadLanguage(); registerAppId();
   // Peep started with Windows: Pip takes over that place, and Peep's own start-up entry goes
@@ -496,6 +515,7 @@ app.whenReady().then(async () => {
   // another device may have changed something: look shortly after start, then every ten minutes
   const pullAccount = () => account.pull().catch(e => { account.error = String(e.message || e); });
   setTimeout(pullAccount, 5000); setInterval(pullAccount, 10 * 60e3);
+  scheduleUpdates();
   const gvault = data('google.bin');
   google = new Google({
     t: (...a) => t(...a), fetchImpl: webFetch, open: url => shell.openExternal(url),

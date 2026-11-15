@@ -25,5 +25,5 @@ contextBridge.exposeInMainWorld('pipApp', {
   dragOut: file => ipcRenderer.send('tray:drag', String(file)),
   pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
   onAi: on('ai:state'), onFinish: on('ai:finish'), onWin: on('win:state'), onTray: on('tray:changed'), onClips: on('clips:changed'),
-  onToggle: on('island:toggle'), onArt: on('win:art'), onCursor: on('cursor'), onChanged: on('app:changed'), onShareProgress: on('share:progress')
+  onToggle: on('island:toggle'), onArt: on('win:art'), onUpdate: on('update:available'), onCursor: on('cursor'), onChanged: on('app:changed'), onShareProgress: on('share:progress')
 });

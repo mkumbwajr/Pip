@@ -11,8 +11,10 @@ MIT licence. No account needed (an optional Pip account syncs your setup between
 **Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · macOS (Intel and Apple silicon) · version 0.7.0
 
 The installer is not code-signed yet, so Windows SmartScreen warns: choose "More info", then "Run anyway". The Mac
-DMG is not signed either: the first time, right-click Pip in Applications and choose **Open**. Inside
-Pip, the `•••` menu → **Updates** tells you when a newer version is out.
+DMG is not signed either: the first time, right-click Pip in Applications and choose **Open**. When a
+newer Pip is uploaded to pip.bang.co.tz, Pip shows a notification (click it to download) and a dot on the `•••` menu →
+**Updates**. It looks at start and every six hours; switch it off in Settings → General. Each build carries a stamp
+(`tools/stamp.js`), so an installer rebuilt under the same version number is offered too.
 
 ## Features
 
@@ -88,7 +90,7 @@ chose (through your own login), your Pip preferences, note, town and calendar li
 sign in to a Pip account (stored on pip.bang.co.tz under a hash of your Google ID or email; with email sign-in your address is used only to send
 the code), files sent to or from your phone across networks (end-to-end encrypted through pip.bang.co.tz, deleted after
 an hour), Spotify if you connect it, Google if
-you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz when you check
-for updates. Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
+you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz to see whether a
+newer Pip is out (at start and every six hours, can be switched off). Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 
 Code comments are in English so contributors outside Tanzania can read them.

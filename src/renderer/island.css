@@ -517,3 +517,9 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 #island.notched:not(.open) #pill-text { flex: 0 1 auto; min-width: 0; max-width: none; }
 #island.notched:not(.open) #pill-side { flex: none; padding-right: 14px; }
 #island.notched.attach:not(.open) #shell { border-radius: 0 0 14px 14px; }
+
+/* a newer Pip is out: a small dot on the ••• menu button and on the Updates tile */
+#island.has-update.open #pill-more { position: relative; }
+#island.has-update.open #pill-more::after, .mn-tile.new::after { content: ""; position: absolute; top: -2px; right: -2px; width: 8px; height: 8px; border-radius: 50%; background: #3ddc84; box-shadow: 0 0 0 2px var(--bg); }
+.mn-tile.new { position: relative; color: #3ddc84; }
+.mn-tile.new::after { top: 8px; right: 10px; }

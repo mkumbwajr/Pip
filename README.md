@@ -12,7 +12,8 @@ cha Tanzania; English ipo kwenye Settings. [English README](README.en.md)
 
 Installer haina signature bado, kwa hiyo Windows SmartScreen itakuonya: bonyeza "More info" kisha "Run anyway".
 Kwenye Mac, DMG nayo haina signature: mara ya kwanza bonyeza kulia Pip kwenye Applications kisha **Open**.
-Ndani ya Pip, menu ya `•••` → **Updates** inakuambia toleo jipya likitoka.
+Pip mpya ikitoka kwenye pip.bang.co.tz, Pip inakuletea notification (bonyeza u-download) na kidoti kwenye menu ya `•••` →
+**Updates**. Inaangalia ikiwaka na kila baada ya masaa sita; unaweza kuzima kwenye Settings → General.
 
 ## Inafanya nini
 
@@ -76,8 +77,8 @@ Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo (hali ya hewa); jina la 
 agent uliyemchagua kupitia akaunti yako; mipangilio, noti, mji na link ya kalenda ukiingia kwenye akaunti ya Pip
 (inahifadhiwa pip.bang.co.tz; ukiingia kwa email, email yako inatumika kukutumia code tu); mafaili ya simu yakipita
 relay ya pip.bang.co.tz (yame-encrypt-iwa, key haipiti server, yanafutwa baada ya saa moja); Spotify ukiiunganisha;
-Google ukiingia (kalenda yako na idadi tu ya email ambazo hujasoma, sio nani wala nini); na pip.bang.co.tz ukibonyeza
-Updates. Hooks, ulivyo-copy, noti na mafaili vinabaki kwenye PC. Sera kamili: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
+Google ukiingia (kalenda yako na idadi tu ya email ambazo hujasoma, sio nani wala nini); na pip.bang.co.tz kuangalia kama
+kuna Pip mpya (ikiwaka na kila masaa sita, unaweza kuzima). Hooks, ulivyo-copy, noti na mafaili vinabaki kwenye PC. Sera kamili: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 
 ## Kutafsiri
 

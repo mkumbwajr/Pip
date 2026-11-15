@@ -22,6 +22,11 @@ const ssh = ['-i', key, '-o', 'StrictHostKeyChecking=accept-new', '-o', 'BatchMo
 const sh = script => { const r = spawnSync('ssh', [...ssh, 'root@' + HOST, script], { stdio: 'inherit' }); if (r.status !== 0) { console.error('server step failed'); process.exit(1); } };
 const copy = (from, to, recursive) => { const r = spawnSync('scp', [...ssh, ...(recursive ? ['-r'] : []), from, `root@${HOST}:${to}`], { stdio: 'inherit' }); if (r.status !== 0) { console.error('upload failed'); process.exit(1); } };
 
+// latest.json as it is live now (to keep the other system's build stamp), or {} if it cannot be read
+const liveLatest = () => { try { return JSON.parse(spawnSync('curl', ['-fsL', `https://${DOMAIN}/latest.json`], { encoding: 'utf8', timeout: 20000 }).stdout); } catch { return {}; } };
+// A build's stamp (tools/stamp.js): Pip offers an update when the stamp is newer, even under the same version
+const stampOf = file => { try { return String(JSON.parse(fs.readFileSync(file, 'utf8')).stamp || ''); } catch { return ''; } };
+const macStampFile = path.join(root, 'dist', 'Pip-mac-build.json');
 // Puts a Nginx file in place, tests the whole config, reloads; on a failed test the previous file comes back.
 const installVhost = file => {
   copy(file, VHOST + '.new');
@@ -34,8 +39,11 @@ if (process.argv.includes('--mac')) { // the Mac disk image from this version's 
   // always fresh: a release can be rebuilt under the same version, and an old local copy would be published instead
   fs.rmSync(file, { force: true });
   { fs.mkdirSync(path.dirname(file), { recursive: true }); const r = spawnSync('curl', ['-fL', '--retry', '3', '-o', file, url], { stdio: 'inherit' }); if (r.status !== 0) { fs.rmSync(file, { force: true }); console.error('no Mac build on GitHub yet: ' + url); process.exit(1); } }
+  fs.rmSync(macStampFile, { force: true }); // the stamp the Mac build put on the release next to its disk image
+  spawnSync('curl', ['-fsL', '--retry', '3', '-o', macStampFile, `https://github.com/mkumbwajr/Pip/releases/download/v${version}/Pip-mac-build.json`]);
   copy(file, `/srv/pip/download/Pip-${version}-mac.dmg`);
-  const latest = JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg` });
+  const live = liveLatest(), build = { ...(live.version === version ? live.build : {}), mac: stampOf(macStampFile) || undefined };
+  const latest = JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg`, build });
   sh(`set -e; cd /srv/pip/download; ln -sf Pip-${version}-mac.dmg Pip-mac.dmg; printf '%s\n' '${latest}' > /srv/pip/latest.json; chmod -R a+rX /srv/pip`);
   console.log('published the Mac build of Pip ' + version); process.exit(0);
 }
@@ -92,7 +100,9 @@ fs.copyFileSync(installer, path.join(out, 'download', `Pip-Setup-${version}.exe`
 // the Mac disk image is built on GitHub (macOS runner); put it in dist/ (gh run download -n Pip-mac -D dist) to publish it too
 const dmg = path.join(root, 'dist', `Pip-${version}-mac.dmg`), hasMac = fs.existsSync(dmg);
 if (hasMac) fs.copyFileSync(dmg, path.join(out, 'download', `Pip-${version}-mac.dmg`));
-fs.writeFileSync(path.join(out, 'latest.json'), JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, ...(hasMac ? { mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg` } : {}) }) + '\n');
+const winStamp = stampOf(path.join(root, 'src', 'build.json')), macStamp = hasMac ? stampOf(macStampFile) : '';
+fs.writeFileSync(path.join(out, 'latest.json'), JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, ...(hasMac ? { mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg` } : {}),
+  build: { ...(winStamp ? { win: winStamp } : {}), ...(macStamp ? { mac: macStamp } : {}) } }) + '\n');
 // upload next to the live folder, then swap, so visitors never see a half-copied site; only the newest installer is kept
 sh('rm -rf /srv/pip.new /srv/pip.old');
 copy(out, '/srv/pip.new', true);

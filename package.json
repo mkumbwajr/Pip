@@ -10,8 +10,8 @@
     "start": "electron .",
     "test": "node --test test/*.test.cjs",
     "dist": "electron-builder --win dir --x64 --publish never && makensis build/pip.nsi",
-    "dist:win": "electron-builder --win dir --x64 --publish never -c.win.signAndEditExecutable=true && makensis build/pip.nsi",
-    "dist:mac": "electron-builder --mac dmg --universal --publish never"
+    "dist:win": "node tools/stamp.js && electron-builder --win dir --x64 --publish never -c.win.signAndEditExecutable=true && makensis build/pip.nsi",
+    "dist:mac": "node tools/stamp.js && electron-builder --mac dmg --universal --publish never"
   },
   "dependencies": {
     "qrcode": "^1.5.4"

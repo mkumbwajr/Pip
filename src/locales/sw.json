@@ -398,5 +398,9 @@
   "The email could not be sent. Try again.": "Email haikuweza kutumwa. Jaribu tena.",
   "That code has expired. Ask for a new one.": "Code hiyo imeisha muda. Omba nyingine.",
   "That code is not right.": "Code hiyo sio sahihi.",
-  "Optional. Pip works fully without an account. Only your Google ID or email says who you are.": "Hiari. Pip inafanya kazi yote bila akaunti. Google ID au email yako tu ndio inasema wewe ni nani."
+  "Optional. Pip works fully without an account. Only your Google ID or email says who you are.": "Hiari. Pip inafanya kazi yote bila akaunti. Google ID au email yako tu ndio inasema wewe ni nani.",
+  "A new Pip is ready": "Pip mpya iko tayari",
+  "Pip {version} is out. Click to download it.": "Pip {version} imetoka. Bonyeza ku-download.",
+  "Tell me when a new Pip is out": "Niambie Pip mpya ikitoka",
+  "Looks at pip.bang.co.tz at start and every six hours.": "Inaangalia pip.bang.co.tz ikiwaka, na kila baada ya masaa sita."
 }

@@ -85,6 +85,7 @@ function drawPill() {
     $('#pill-chip').title = u ? `${t('Claude usage')}: ${t('5 hours')} ${u.pct}%${w ? ` · ${t('Week')} ${w.pct}%` : ''}` : '';
   }
   island.classList.toggle('notched', Boolean(S.notch)); // set again because className was rebuilt above
+  island.classList.toggle('has-update', Boolean(S.update?.newer));
   island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
   document.documentElement.style.setProperty('--bright', S.settings?.island.brightness ?? 0.1);
   island.classList.toggle('bare', !S.open && !text && S.settings?.island.mode !== 'detach'); // attached and idle: only Pip in the notch
@@ -346,10 +347,10 @@ function showMenu(on, view = 'main') {
   else if (view === 'updates') {
     const u = S.update;
     menu.innerHTML = back(t('Updates')) + `<div class="mn-upd">${!u ? esc(t('Checking…')) : !u.ok ? esc(t('Could not check: {error}', { error: u.error })) : u.newer
-      ? `<b>${esc(t('Pip {version} is out', { version: u.latest }))}</b><button class="wbtn sm" data-release="${esc(u.url)}">${esc(t('Download'))}</button>` : esc(t('You have the newest Pip ({version}).', { version: u.current }))}</div>`;
+      ? `<b>${esc(u.latest === u.current ? t('A new Pip is ready') : t('Pip {version} is out', { version: u.latest }))}</b><button class="wbtn sm" data-release="${esc(u.url)}">${esc(t('Download'))}</button>` : esc(t('You have the newest Pip ({version}).', { version: u.current }))}</div>`;
   }
   else menu.innerHTML = (v ? `<div class="mn-vol">${icon('volume')}<input type="range" id="mvol" min="0" max="100" value="${v.level}" aria-label="${esc(t('Volume'))}"></div>` : '')
-    + `<div class="mn-grid">${tile('apps', 'apps', t('All apps'))}${tile('customize', 'pencil', t('Customize'))}${tile('settings', 'gear', t('Settings'))}${tile('updates', 'refresh', t('Updates'))}${tile('fold', 'up', t('Fold in'))}${tile('quit', 'power', t('Quit'), 'quit')}</div>`;
+    + `<div class="mn-grid">${tile('apps', 'apps', t('All apps'))}${tile('customize', 'pencil', t('Customize'))}${tile('settings', 'gear', t('Settings'))}${tile('updates', 'refresh', t('Updates'), S.update?.newer ? 'new' : '')}${tile('fold', 'up', t('Fold in'))}${tile('quit', 'power', t('Quit'), 'quit')}</div>`;
   const mv = $('#mvol'); if (mv) mv.style.setProperty('--fill', mv.value + '%');
   menuFades();
 }
@@ -765,6 +766,8 @@ api.onAi(snap => {
 api.onFinish(entry => chime(entry.state === 'done'));
 api.onWin(state => { const was = S.win.media?.title; S.win = state; if (state.media?.title !== was) applyArtColor(); refreshLyrics(); refreshSongInfo(); draw(); });
 api.onArt(art => { S.art = art; applyArtColor(); if (S.tab === 'music') draw(); });
+// a newer Pip was found by the periodic check: a dot on the ••• menu and on Updates, until it is installed
+api.onUpdate(u => { S.update = u; island.classList.toggle('has-update', Boolean(u?.newer)); if (S.menu && S.menuView !== 'updates') showMenu(true, S.menuView); });
 // Pip looks at the pointer: the eyes shift a few pixels towards it, less when it is close
 api.onCursor(p => {
   const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);

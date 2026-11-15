@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# written by tools/stamp.js at each build
+src/build.json
 *.log
 
 # Pip's Google OAuth client (has the client secret): stays on the build PC, goes into the installer, never into git

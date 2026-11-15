@@ -96,6 +96,7 @@ const views = {
       + group(t('Start-up and sound'), [
         row('power', S.platform === 'darwin' ? t('Open at login') : t('Start with Windows'), t('Pip is there when you sign in.'), toggle('autostart', S.autostart, t('Start with Windows'))),
         row('bell', t('Chime when an agent finishes'), t('A short sound, and another when an agent needs you.'), toggle('sounds', s.sounds, t('Chime when an agent finishes'))),
+        row('refresh', t('Tell me when a new Pip is out'), t('Looks at pip.bang.co.tz at start and every six hours.'), toggle('autoUpdate', s.autoUpdate !== false, t('Tell me when a new Pip is out'))),
         row('keyboard', t('Shortcut'), t('Opens and folds the island from anywhere.'), `<span class="kbd">${s.shortcut.split('+').map(k => `<kbd>${esc(k.replace('Control', 'Ctrl'))}</kbd>`).join('')}</span>`)
       ])
       + group(t('App'), [
