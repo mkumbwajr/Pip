@@ -140,7 +140,7 @@ document.addEventListener('keydown', e => {
 });
 
 (async () => {
-  S = await api.init(); t = window.makeT(S.strings); document.documentElement.lang = S.settings.lang;
+  S = await api.init(); t = window.makeT(S.strings, { mac: S.platform === 'darwin' }); document.documentElement.lang = S.settings.lang;
   try { restored = sessionStorage.getItem('restored') === '1'; } catch {} // came back in the account's language
   homeAt = Math.max(0, HOMES().findIndex(h => h[0] === (S.settings.homeStyle || 'clock')));
   draw();

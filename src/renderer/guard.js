@@ -2,7 +2,7 @@
 // A short pause before a distracting window: one slow breath, then you choose. Esc means "go back".
 const NAMES = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', reddit: 'Reddit', 'x.com': 'X', facebook: 'Facebook', netflix: 'Netflix', twitter: 'X' };
 (async () => {
-  const init = await window.pipApp.init(), t = window.makeT(init.strings);
+  const init = await window.pipApp.init(), t = window.makeT(init.strings, { mac: init.platform === 'darwin' });
   document.documentElement.lang = init.settings.lang;
   document.documentElement.style.setProperty('--pip', init.settings.mascot.color);
   const raw = new URLSearchParams(location.search).get('what') || '';
