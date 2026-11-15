@@ -193,3 +193,14 @@ test('account: only preferences travel; sign-in restores an account that has som
   server = { data: null, updatedAt: 0 }; const acc2 = new Account({ load: () => null, save: () => {}, getSettings: () => all, apply: () => assert.fail('nothing to apply'), fetchImpl: fake, base: 'https://x/api' });
   assert.equal(await acc2.signIn('id'), 'saved'); assert.equal(server.data.lang, 'en');
 });
+
+test('mac helper: reads Wi-Fi and Bluetooth from the output of macOS tools', () => {
+  const { wifiDevice, wifiOn, ssidOf, btOn } = require('../src/main/mac-helper.js');
+  assert.equal(wifiDevice('Hardware Port: Ethernet\nDevice: en1\n\nHardware Port: Wi-Fi\nDevice: en0\n'), 'en0');
+  assert.equal(wifiDevice('Hardware Port: Ethernet\nDevice: en1\n'), null);
+  assert.equal(wifiOn('Wi-Fi Power (en0): On'), true); assert.equal(wifiOn('Wi-Fi Power (en0): Off'), false);
+  assert.equal(ssidOf('<dictionary> {\n  SSID : Nyumbani\n}'), 'Nyumbani'); assert.equal(ssidOf('  SSID : <redacted>'), ''); // hidden without location access
+  assert.equal(btOn(JSON.stringify({ SPBluetoothDataType: [{ controller_properties: { controller_state: 'attrib_on' } }] })), true);
+  assert.equal(btOn(JSON.stringify({ SPBluetoothDataType: [{ controller_properties: { controller_state: 'attrib_off' } }] })), false);
+  assert.equal(btOn('not json'), null);
+});
