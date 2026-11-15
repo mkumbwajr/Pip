@@ -97,12 +97,13 @@
   <p>You can sign in to a Pip account so another PC or Mac with Pip picks up your setup. Pip works fully without one.</p>
   <table>
     <tr><th>What</th><th>Details</th></tr>
-    <tr><td>Sign-in</td><td>With Google, asking only who you are (<code>openid email</code>): your Google ID and email address. No password is
-      created or stored, and this sign-in gives no access to your calendar or mail.</td></tr>
+    <tr><td>Sign-in</td><td>With Google, asking only who you are (<code>openid email</code>): your Google ID and email address; or with your
+      email address and a six-digit code that Pip's server sends from no-reply@bang.co.tz. The code is kept in memory for at most
+      ten minutes. No password is created or stored, and neither sign-in gives access to your calendar or mail.</td></tr>
     <tr><td>What is kept</td><td>Your Pip preferences (language, island look and behaviour, Home layout, Pip's name, colour and hat, tabs,
       modes, focus guard list, sounds, music switches, shortcut), the text of your Note, your weather town, and your calendar
       link if you set one. Never: your files, what you copy, your agents' work, chats, Google or Spotify logins.</td></tr>
-    <tr><td>Where</td><td>On BANG DIGITAL's own server (pip.bang.co.tz, Vultr), stored under a one-way hash of your Google ID, reached only
+    <tr><td>Where</td><td>On BANG DIGITAL's own server (pip.bang.co.tz, Vultr), stored under a one-way hash of your Google ID (or of your email address), reached only
       over HTTPS. Your email is shown to you in Pip but is not stored on the server. Session tokens are stored as hashes.</td></tr>
     <tr><td>Deleting</td><td>Settings, Connections, Delete my Pip account removes everything the server holds for you and signs out every
       device, at once. Your PCs keep their own settings.</td></tr>

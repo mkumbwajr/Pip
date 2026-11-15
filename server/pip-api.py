@@ -13,7 +13,9 @@ Runs on BANG DIGITAL's server behind Nginx (https://pip.bang.co.tz/api/...), as 
 Who you are comes only from Google (an ID token checked with Google, for Pip's own OAuth client). No passwords.
 Users are stored under a hash of their Google ID; session tokens are stored as hashes too.
 """
-import hashlib, json, os, re, shutil, secrets, sys, threading, time, urllib.parse, urllib.request
+import hashlib, hmac, json, os, re, shutil, secrets, sys, threading, time, urllib.parse, urllib.request
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import mail  # server/mail.py: the sign-in code email
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get('PIP_API_PORT', '48620'))
@@ -25,6 +27,9 @@ RELAY_MS = 3600 * 1000           # a relay box lives one hour
 RELAY_FILE_MAX = 200 * 1024 * 1024 # one file
 RELAY_BOX_MAX = 600 * 1024 * 1024  # all files in one box
 ID_RE = re.compile(r'^[A-Za-z0-9_-]{16,40}$')
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+codes = {}                       # email -> {hash, expires, tries}: sign-in codes, in memory only
+sent = {}                        # 'mail:<email>' / 'mailip:<ip>' -> [times]: codes sent in the last hour
 lock = threading.Lock()
 hits = {}                       # ip -> [window start, count]
 
@@ -43,6 +48,13 @@ def write_json(p, value):
 
 def sessions(): return read_json(path('sessions.json'), {})
 def save_sessions(s): write_json(path('sessions.json'), s)
+
+def too_many(key, limit):
+    """True when more than `limit` codes went to this address (or from this IP) in the last hour; counts this one."""
+    with lock:
+        recent = [t for t in sent.get(key, []) if time.time() - t < 3600]
+        if len(recent) >= limit: sent[key] = recent; return True
+        sent[key] = recent + [time.time()]; return False
 
 def list_box(folder):
     out = []
@@ -126,6 +138,31 @@ class Api(BaseHTTPRequestHandler):
                 s = sessions(); s[h(token)] = {'user': user, 'created': now_ms(), 'expires': now_ms() + SESSION_DAYS * 86400000}
                 save_sessions(s)
             return self.reply(200, {'token': token, 'email': u[1]})
+        # email sign-in: a six-digit code by email (no-reply@bang.co.tz), good for ten minutes and five tries
+        if method == 'POST' and p == '/api/email/start':
+            b = self.body() or {}; email = str(b.get('email', '')).strip().lower()
+            if len(email) > 254 or not EMAIL_RE.match(email): return self.reply(400, {'error': 'That email address does not look right'})
+            ip = self.headers.get('X-Real-IP') or self.client_address[0]
+            if too_many('mail:' + email, 5) or too_many('mailip:' + ip, 15): return self.reply(429, {'error': 'Too many codes asked for. Try again in an hour.'})
+            code = str(secrets.randbelow(10 ** 6)).zfill(6)
+            with lock: codes[email] = {'hash': h(email + ':' + code), 'expires': time.time() + 600, 'tries': 0}
+            try: mail.send_code(email, code, 'en' if b.get('lang') == 'en' else 'sw')
+            except Exception as err:
+                print('mail failed:', type(err).__name__, file=sys.stderr)  # never the address
+                return self.reply(502, {'error': 'The email could not be sent. Try again.'})
+            return self.reply(200, {'ok': True})
+        if method == 'POST' and p == '/api/email/verify':
+            b = self.body() or {}; email = str(b.get('email', '')).strip().lower(); code = str(b.get('code', '')).strip()
+            with lock:
+                c = codes.get(email)
+                if not c or c['expires'] < time.time() or c['tries'] >= 5:
+                    codes.pop(email, None); return self.reply(401, {'error': 'That code has expired. Ask for a new one.'})
+                c['tries'] += 1
+                if not hmac.compare_digest(c['hash'], h(email + ':' + code)): return self.reply(401, {'error': 'That code is not right.'})
+                codes.pop(email, None)
+                token = secrets.token_urlsafe(32); s = sessions()
+                s[h(token)] = {'user': h('email:' + email), 'created': now_ms(), 'expires': now_ms() + SESSION_DAYS * 86400000}; save_sessions(s)
+            return self.reply(200, {'token': token, 'email': email})
         user, key = self.who()
         if not user: return self.reply(401, {'error': 'Sign in again'})
         file = path('users', user + '.json')

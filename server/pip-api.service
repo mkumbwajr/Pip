@@ -8,6 +8,8 @@ Wants=network-online.target
 ExecStart=/usr/bin/python3 /srv/pip-api/pip-api.py
 # PIP_GOOGLE_CLIENT_IDS: Pip's own Google OAuth client ID(s), written by the deploy script
 EnvironmentFile=/etc/pip-api.env
+# PIP_SMTP_HOST / _PORT / _USER / _PASS, PIP_MAIL_FROM: the account that sends sign-in codes (set by hand, root only)
+EnvironmentFile=-/etc/pip-api-mail.env
 Restart=on-failure
 RestartSec=3
 # no fixed user, its own data folder (/var/lib/pip-api), and nothing else on the server writable or readable

@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('pipApp', {
   googleLogin: call('google:login'), googleLogout: call('google:logout'), googleEvents: call('google:events'), googleUnread: call('google:unread'), openInbox: call('google:openInbox'), chat: call('pip:chat'), fillArt: call('art:fill'), lastClip: () => ipcRenderer.invoke('clips:last'),
   checkUpdate: call('app:update'), openRelease: call('app:release'), openLink: call('app:link'), restart: call('app:restart'), resetSettings: call('settings:reset'),
   openWelcome: call('welcome:open'), welcomeDone: call('welcome:done'),
-  accountStatus: call('account:status'), accountSignIn: call('account:signin'), accountSync: call('account:sync'), accountSignOut: call('account:signout'), accountDelete: call('account:delete'),
+  accountStatus: call('account:status'), accountSignIn: call('account:signin'), accountEmailCode: call('account:emailCode'), accountEmailVerify: call('account:emailVerify'), accountSync: call('account:sync'), accountSignOut: call('account:signout'), accountDelete: call('account:delete'),
   media: call('media:cmd'), seek: call('media:seek'), setVolume: call('volume:set'), lyrics: call('lyrics:get'), songInfo: call('song:info'),
   weather: call('weather:get'), calendar: call('calendar:get'), stats: call('stats:get'),
   trayAdd: call('tray:add'), trayRemove: call('tray:remove'), trayOpen: call('tray:open'), copyClip: call('clips:copy'), clearClips: call('clips:clear'), quit: call('app:quit'),

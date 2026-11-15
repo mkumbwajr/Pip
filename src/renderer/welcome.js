@@ -9,7 +9,7 @@ const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#14a3a8'];
 const ST = { hello: 1, account: 2, place: 3, agents: 4, home: 5, name: 6, done: 7 }, STEPS = 7;
-let restored = false, busy = false;
+let restored = false, busy = false, mail = { stage: 'enter', address: '', busy: false };
 let t = window.makeT({}), S = null, step = Math.max(1, Math.min(STEPS, Number(location.hash.slice(1)) || 1)), homeAt = 0;
 
 const mascot = (cls = '') => `<span class="mascot ${cls}"><i></i><i></i></span>`;
@@ -39,8 +39,14 @@ const views = {
     return `<div class="acct"><span class="cloud">${icon('link')}</span><h2>${esc(t('Keep Pip on every device'))}</h2>
       <p class="lead">${esc(t('Sign in to save your preferences, note, town and calendar link, and get them back on any PC or Mac with Pip.'))}</p>
       <button type="button" class="gbtn" id="acct-go" ${busy ? 'disabled' : ''}>${googleG()}<span>${esc(busy ? t('Finish the login in your browser…') : t('Continue with Google'))}</span></button>
+      <div class="or"><span>${esc(t('or with email'))}</span></div>
+      ${mail.stage === 'enter'
+        ? `<form class="mailf" id="mail-form"><input type="email" id="mail-addr" placeholder="${esc(t('you@example.com'))}" value="${esc(mail.address)}" autocomplete="email" required><button type="submit" class="primary" ${mail.busy ? 'disabled' : ''}>${esc(mail.busy ? t('Sending…') : t('Send code'))}</button></form>`
+        : `<p class="sent">${esc(t('We sent a 6-digit code to {email}.', { email: mail.address }))}</p>
+           <form class="mailf" id="code-form"><input type="text" id="mail-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" class="code" required><button type="submit" class="primary" ${mail.busy ? 'disabled' : ''}>${esc(mail.busy ? t('Checking…') : t('Sign in'))}</button></form>
+           <button type="button" class="linkish" id="mail-back">${esc(t('Use another email'))}</button>`}
       <p class="err" id="err"></p>
-      <p class="safe">${icon('shield')}${esc(t('Optional. Pip works fully without an account. Google only tells Pip who you are.'))}</p></div>`;
+      <p class="safe">${icon('shield')}${esc(t('Optional. Pip works fully without an account. Only your Google ID or email says who you are.'))}</p></div>`;
   },
   3() {
     const s = S.settings;
@@ -92,11 +98,26 @@ function draw() {
   $('#next').hidden = step === ST.account && !S.account?.signedIn; // there: Continue with Google, or Skip
   document.body.dataset.step = step;
   $('#acct-go')?.addEventListener('click', signIn);
+  $('#mail-form')?.addEventListener('submit', async e => {
+    e.preventDefault(); mail.address = $('#mail-addr').value.trim(); mail.busy = true; draw();
+    const r = await api.accountEmailCode(mail.address); mail.busy = false;
+    if (r.ok) mail.stage = 'code'; draw(); if (!r.ok) $('#err').textContent = r.error; else $('#mail-code')?.focus();
+  });
+  $('#code-form')?.addEventListener('submit', async e => {
+    e.preventDefault(); const code = $('#mail-code').value; mail.busy = true; draw();
+    const r = await api.accountEmailVerify(mail.address, code); mail.busy = false;
+    if (!r.ok) { draw(); $('#err').textContent = r.error; return; }
+    await signedIn(r);
+  });
+  $('#mail-back')?.addEventListener('click', () => { mail.stage = 'enter'; draw(); });
 }
 async function signIn() {
   busy = true; draw();
   const r = await api.accountSignIn(); busy = false;
   if (!r.ok) { draw(); $('#err').textContent = r.error; return; }
+  await signedIn(r);
+}
+async function signedIn(r) {
   S.account = r; restored = r.how === 'restored';
   if (restored) { const init = await api.init(); S.settings = init.settings; if (init.settings.lang !== document.documentElement.lang) { sessionStorage.setItem('restored', '1'); location.hash = String(ST.account); return location.reload(); } }
   draw();
@@ -136,7 +157,7 @@ $('#step').addEventListener('change', async e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight' && step === ST.home) { homeAt = (homeAt + 1) % 4; draw(); }
   if (e.key === 'ArrowLeft' && step === ST.home) { homeAt = (homeAt + 3) % 4; draw(); }
-  if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') $('#next').click();
+  if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT' && !e.target.closest('form')) $('#next').click();
 });
 
 (async () => {

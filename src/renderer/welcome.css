@@ -101,3 +101,14 @@ select option { background: #15151b; }
 .acct .err { margin-top: 12px; } .acct .safe { justify-content: center; margin-top: 18px; }
 .who { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
 .who svg { width: 16px; height: 16px; color: var(--ok); }
+
+/* email sign-in under the Google button */
+.or { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 360px; margin: 18px 0 12px; color: var(--mute); font-size: 12px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.mailf { display: flex; gap: 8px; width: 100%; max-width: 360px; }
+.mailf input { flex: 1; min-width: 0; height: 46px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); outline: 0; }
+.mailf input:focus { border-color: var(--pip); }
+.mailf input.code { text-align: center; font: 700 20px/1 ui-monospace, Consolas, monospace; letter-spacing: .35em; }
+.mailf button { height: 46px; padding: 0 16px; border-radius: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sent { margin: 0 0 10px; font-size: 13px; color: var(--soft); }
+.linkish { margin-top: 8px; padding: 4px; border: 0; background: none; color: var(--mute); font-size: 12px; text-decoration: underline; cursor: pointer; }

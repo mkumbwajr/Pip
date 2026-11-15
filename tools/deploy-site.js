@@ -45,10 +45,10 @@ if (process.argv.includes('--api')) { // Pip accounts: server/pip-api.py as a sy
   const EARLIER = ['896184851986-tqo26d1bdsvth1e8rvilev49vtc4lnc2.apps.googleusercontent.com'];
   const env = path.join(os.tmpdir(), 'pip-api.env'); fs.writeFileSync(env, `PIP_GOOGLE_CLIENT_IDS=${[clientId, ...EARLIER.filter(id => id !== clientId)].join(',')}\n`);
   sh('mkdir -p /srv/pip-api');
-  copy(path.join(root, 'server', 'pip-api.py'), '/srv/pip-api/pip-api.py');
+  copy(path.join(root, 'server', 'pip-api.py'), '/srv/pip-api/pip-api.py'); copy(path.join(root, 'server', 'mail.py'), '/srv/pip-api/mail.py');
   copy(path.join(root, 'server', 'pip-api.service'), '/etc/systemd/system/pip-api.service');
   copy(env, '/etc/pip-api.env'); fs.rmSync(env);
-  sh(`set -e; chmod 755 /srv/pip-api; chmod 644 /srv/pip-api/pip-api.py /etc/systemd/system/pip-api.service; chmod 600 /etc/pip-api.env
+  sh(`set -e; chmod 755 /srv/pip-api; chmod 644 /srv/pip-api/pip-api.py /srv/pip-api/mail.py /etc/systemd/system/pip-api.service; chmod 600 /etc/pip-api.env
     systemctl daemon-reload; systemctl enable pip-api >/dev/null 2>&1; systemctl restart pip-api; sleep 2
     code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:48620/api/prefs); echo "pip-api answers $code (401 = running, nobody signed in)"; [ "$code" = 401 ]`);
   installVhost(path.join(root, 'site', 'nginx-pip.conf'));

@@ -354,6 +354,11 @@ function wireIpc() {
     try { const how = await account.signIn(await google.identity(c.clientId, c.secret)); return { ok: true, how, ...account.status() }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
+  handle('account:emailCode', async email => { try { await account.emailCode(String(email || '').trim(), store.get('lang')); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('account:emailVerify', async (email, code) => {
+    try { const how = await account.signInEmail(String(email || '').trim(), String(code || '').replace(/\D/g, '')); return { ok: true, how, ...account.status() }; }
+    catch (e) { return { ok: false, error: String(e.message || e) }; }
+  });
   handle('account:sync', async () => { try { if (!(await account.pull())) await account.push(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('account:signout', async () => { await account.signOut(); return account.status(); });
   handle('account:delete', async () => { try { await account.remove(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });

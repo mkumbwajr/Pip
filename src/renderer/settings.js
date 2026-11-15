@@ -7,7 +7,7 @@ const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const page = $('#page');
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#14a3a8', '#f0435a', '#e8e8ee'];
-let t = window.makeT({}), S = null, current = 'home', query = '', confirmReset = false, confirmDelete = false, accountBusy = false;
+let t = window.makeT({}), S = null, current = 'home', query = '', confirmReset = false, confirmDelete = false, accountBusy = false, mail = { stage: 'enter', address: '', busy: false };
 
 // ---------- building blocks ----------
 const group = (title, rows, extra = '') => `<section class="grp">${title ? `<h2>${esc(title)}</h2>` : ''}<div class="card ${extra}">${rows.join('')}</div></section>`;
@@ -60,7 +60,11 @@ const views = {
         row('check', a.email, (when ? t('Synced {when}', { when }) : t('Signed in')) + (a.error ? ' · ' + a.error : ''), button('acct-sync', accountBusy ? t('Syncing…') : t('Sync now')) + button('acct-out', t('Sign out'))),
         row('trash', t('Delete my Pip account'), t('Removes your saved preferences from Pip\'s server and signs out every device. This PC keeps its settings.'), button('acct-del', confirmDelete ? t('Sure? Delete') : t('Delete'), 'danger'))
       ] : [row('link', t('Pip account'), t('Optional. Saves your preferences, note, town and calendar link, so any PC or Mac with Pip can pick them up.'),
-        button('acct-in', accountBusy ? t('Finish the login in your browser…') : t('Sign in with Google'), 'primary'))]) + `<div class="err" id="acct-error"></div>`;
+        button('acct-in', accountBusy ? t('Finish the login in your browser…') : t('Sign in with Google'), 'primary')),
+        mail.stage === 'enter'
+          ? row('mail', t('Or with email'), t('We email you a 6-digit code. No password.'), `<input type="email" id="mail-addr" placeholder="${esc(t('you@example.com'))}" value="${esc(mail.address)}">${button('mail-send', mail.busy ? t('Sending…') : t('Send code'))}`, 'wide')
+          : row('mail', t('Type the code'), t('We sent a 6-digit code to {email}.', { email: mail.address }), `<input type="text" id="mail-code" inputmode="numeric" maxlength="6" placeholder="000000">${button('mail-verify', mail.busy ? t('Checking…') : t('Sign in'), 'primary')}${button('mail-back', t('Use another email'))}`, 'wide')
+      ]) + `<div class="err" id="acct-error"></div>`;
     return account + group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
       + `<div class="err" id="ag-error"></div>`
       + group(t('Accounts'), [
@@ -244,6 +248,18 @@ page.addEventListener('click', async e => {
       if (r.ok) { S.account = r; const init = await api.init(); S.settings = init.settings; if (init.settings.lang !== document.documentElement.lang) return location.reload(); }
       draw(); if (!r.ok) showError('acct-error', r.error); return;
     }
+    case 'mail-send': {
+      mail.address = $('#mail-addr').value.trim(); mail.busy = true; draw();
+      const r = await api.accountEmailCode(mail.address); mail.busy = false; if (r.ok) mail.stage = 'code';
+      draw(); if (!r.ok) showError('acct-error', r.error); else $('#mail-code')?.focus(); return;
+    }
+    case 'mail-verify': {
+      const code = $('#mail-code').value; mail.busy = true; draw();
+      const r = await api.accountEmailVerify(mail.address, code); mail.busy = false;
+      if (r.ok) { mail.stage = 'enter'; S.account = r; const init = await api.init(); S.settings = init.settings; if (init.settings.lang !== document.documentElement.lang) return location.reload(); }
+      draw(); if (!r.ok) showError('acct-error', r.error); return;
+    }
+    case 'mail-back': mail.stage = 'enter'; return draw();
     case 'acct-out': S.account = await api.accountSignOut(); return draw();
     case 'acct-del': {
       if (!confirmDelete) { confirmDelete = true; draw(); setTimeout(() => { confirmDelete = false; if (current === 'connections') draw(); }, 4000); return; }

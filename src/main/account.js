@@ -6,6 +6,14 @@
 // Changes win by time: the newest save, from whichever device, is what every device ends up with.
 
 const BASE = 'https://pip.bang.co.tz/api';
+// the server's messages (English), in the app's language
+const SERVER_SAYS = {
+  'That email address does not look right': t => t('That email address does not look right.'),
+  'Too many codes asked for. Try again in an hour.': t => t('Too many codes asked for. Try again in an hour.'),
+  'The email could not be sent. Try again.': t => t('The email could not be sent. Try again.'),
+  'That code has expired. Ask for a new one.': t => t('That code has expired. Ask for a new one.'),
+  'That code is not right.': t => t('That code is not right.')
+};
 // what travels; dotted names take one field of an object
 const SYNC = ['lang', 'country', 'agentLanguage', 'buddyAgent', 'hiddenTabs', 'homeStyle', 'mascot', 'sounds', 'lyrics', 'songInfo',
   'weather', 'calendarUrl', 'note', 'guard', 'modes', 'shortcut',
@@ -36,8 +44,8 @@ class Account {
     const r = await this.fetchImpl(this.base + path, { method, headers: { 'Content-Type': 'application/json', ...(this.session?.token ? { Authorization: 'Bearer ' + this.session.token } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000) });
     const j = await r.json().catch(() => ({}));
-    if (r.status === 401 && path !== '/login') { this.forget(); throw new Error(this.t('Your Pip account signed out. Sign in again.')); }
-    if (!r.ok) throw new Error(j.error || this.t('Pip\'s server said no ({code}).', { code: r.status }));
+    if (r.status === 401 && path !== '/login' && !path.startsWith('/email/')) { this.forget(); throw new Error(this.t('Your Pip account signed out. Sign in again.')); }
+    if (!r.ok) throw new Error(SERVER_SAYS[j.error]?.(this.t) || j.error || this.t('Pip\'s server said no ({code}).', { code: r.status }));
     return j;
   }
   remember(patch) { this.session = { ...this.session, ...patch }; this.save(this.session); }
@@ -45,8 +53,12 @@ class Account {
 
   /** Signs in with a Google ID token. Returns 'restored' when the account already had preferences (now on this
       device too), or 'saved' when this device's preferences became the account's. */
-  async signIn(idToken) {
-    const j = await this.call('POST', '/login', { idToken });
+  async signIn(idToken) { return this.finish(await this.call('POST', '/login', { idToken })); }
+  /** Email sign-in, step 1: Pip's server emails a six-digit code (from no-reply@bang.co.tz). */
+  async emailCode(email, lang) { await this.call('POST', '/email/start', { email, lang }); }
+  /** Step 2: the code from that email. Same outcome as signIn. */
+  async signInEmail(email, code) { return this.finish(await this.call('POST', '/email/verify', { email, code })); }
+  async finish(j) {
     this.remember({ token: j.token, email: j.email, syncedAt: 0 });
     const remote = await this.call('GET', '/prefs');
     if (remote.data) { this.take(remote); return 'restored'; }
