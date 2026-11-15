@@ -440,6 +440,7 @@ function wireIpc() {
   });
   handle('media:cmd', action => ['toggle', 'next', 'prev'].includes(action) && helper.send({ cmd: 'media', action }));
   // a paired phone plays through this PC (Windows only); an empty id disconnects it
+  handle('audio:output', id => helper.send({ cmd: 'output', id: String(id || '').slice(0, 80) }));
   handle('phone:connect', id => helper.send({ cmd: 'phone', id: typeof id === 'string' ? id.slice(0, 400) : '' }));
   handle('media:seek', ms => helper.send({ cmd: 'seek', ms: Math.max(0, Math.round(Number(ms) || 0)) }));
   handle('volume:set', level => helper.send({ cmd: 'volume', level: Math.max(0, Math.min(100, Math.round(Number(level) || 0))) }));

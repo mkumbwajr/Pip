@@ -31,6 +31,15 @@ public static class PipAudio {
   public static bool Muted() { bool m; Endpoint().GetMute(out m); return m; }
   public static void Set(int level) { Endpoint().SetMasterVolumeLevelScalar(Math.Max(0, Math.Min(100, level)) / 100f, Guid.Empty); }
 }
+// The default speaker, changed the way Windows' own sound settings do it (IPolicyConfig: not documented, but the same
+// interface every audio-switcher app uses since Windows 7). Used for "Plays on", where a phone's music comes out.
+[Guid("F8679F50-850A-41CF-9C72-430F290290C8"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IPolicyConfig { int a(); int b(); int c(); int d(); int e(); int f(); int g(); int h(); int i(); int j();
+  [PreserveSig] int SetDefaultEndpoint([MarshalAs(UnmanagedType.LPWStr)] string id, int role); }
+[ComImport, Guid("870AF99C-171D-4F9E-AF0D-E63DF40C2BC9")] class CPolicyConfigClient { }
+public static class PipOutput {
+  public static bool Set(string id) { var p = (IPolicyConfig)(new CPolicyConfigClient()); int r = 0; for (int role = 0; role < 3; role++) r |= p.SetDefaultEndpoint(id, role); return r == 0; }
+}
 // Commands from Pip arrive on stdin. Windows PowerShell's [Console]::In.ReadLineAsync() blocks until a whole line
 // arrives, which froze the loop below until Pip sent a command; a background thread reads them into a queue instead.
 public static class PipInput {
@@ -119,7 +128,17 @@ function PhoneState {
   if (-not $apcType) { return $null }
   $list = @(); try { $list = @(Await ($devType::FindAllAsync($apcType::GetDeviceSelector())) $devList) } catch {}
   $on = [bool]($script:phoneConn -and "$($script:phoneConn.State)" -eq 'Opened')
-  @{ list = @($list | ForEach-Object { @{ id = $_.Id; name = $_.Name } }); id = $script:phoneId; name = $script:phoneName; on = $on }
+  $outs = $null; if ($on) { $outs = Outputs }
+  @{ list = @($list | ForEach-Object { @{ id = $_.Id; name = $_.Name } }); id = $script:phoneId; name = $script:phoneName; on = $on; outputs = $outs }
+}
+# The PC's speakers, for "Plays on": Windows sends a phone's sound to the default one.
+$mediaDev = $null; try { $mediaDev = [Windows.Media.Devices.MediaDevice, Windows.Media.Devices, ContentType = WindowsRuntime] } catch {}
+$mmId = { param($id) $m = [regex]::Match([string]$id, '\{0\.0\.0\.00000000\}\.\{[0-9a-fA-F-]+\}'); if ($m.Success) { $m.Value.ToLower() } else { '' } }
+function Outputs {
+  if (-not $mediaDev) { return $null }
+  $list = @(); try { $list = @(Await ($devType::FindAllAsync($mediaDev::GetAudioRenderSelector())) $devList) } catch {}
+  $def = ''; try { $def = & $mmId ($mediaDev::GetDefaultAudioRenderId('Default')) } catch {}
+  @{ current = $def; list = @($list | ForEach-Object { @{ id = (& $mmId $_.Id); name = $_.Name } } | Where-Object { $_.id }) }
 }
 function PhoneOff { if ($script:phoneConn) { try { $script:phoneConn.Dispose() } catch {} }; $script:phoneConn = $null; $script:phoneId = ''; $script:phoneName = '' }
 function PhoneOn($id) {
@@ -131,7 +150,7 @@ function PhoneOn($id) {
   $d = $null; try { $d = Await ($devType::CreateFromIdAsync([string]$id)) $devType } catch {}; if ($d) { $script:phoneName = $d.Name }
 }
 
-function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 4)); [Console]::Out.Flush() }
+function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 6)); [Console]::Out.Flush() }
 
 [PipInput]::Start(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0; $phones = $null
 while ($true) {
@@ -143,6 +162,7 @@ while ($true) {
         'media' { $s = Session; if ($s) { switch ($c.action) { 'toggle' { $s.TryTogglePlayPauseAsync() | Out-Null } 'next' { $s.TrySkipNextAsync() | Out-Null } 'prev' { $s.TrySkipPreviousAsync() | Out-Null } } } }
         'seek' { $s = Session; if ($s) { $s.TryChangePlaybackPositionAsync([long]$c.ms * 10000) | Out-Null } } # position in 100 ns ticks
         'volume' { [PipAudio]::Set([int]$c.level) }
+        'output' { if ($c.id -match '^\{0\.0\.0\.00000000\}\.\{[0-9a-fA-F-]+\}$') { [PipOutput]::Set([string]$c.id) | Out-Null }; $phones = PhoneState }
         'phone' { if ($c.id -and $apcType) { PhoneOn $c.id } else { PhoneOff }; $phones = PhoneState }
         'minimize' { [PipWin]::Minimize([long]$c.hwnd) }
         'radio' {
@@ -161,7 +181,7 @@ while ($true) {
     if ($soon -gt 0) { $soon-- }
     $media = MediaState; $front = FrontState
     $vol = $null; try { $vol = @{ level = [PipAudio]::Level(); muted = [PipAudio]::Muted() } } catch {}
-    $key = "$($media.title)|$($media.artist)|$($media.playing)|$($vol.level)|$($vol.muted)|$($front.hwnd)|$($front.title)|$($net.wifi.on)|$($net.wifi.ssid)|$($net.bt.on)|$($phones.on)|$($phones.list.Count)"
+    $key = "$($media.title)|$($media.artist)|$($media.playing)|$($vol.level)|$($vol.muted)|$($front.hwnd)|$($front.title)|$($net.wifi.on)|$($net.wifi.ssid)|$($net.bt.on)|$($phones.on)|$($phones.list.Count)|$($phones.outputs.current)"
     if ($key -ne $lastKey -or ([DateTime]::UtcNow - $lastAt).TotalSeconds -ge 5) {
       Emit @{ type = 'state'; media = $media; volume = $vol; front = $front; net = $net; phones = $phones }
       $lastKey = $key; $lastAt = [DateTime]::UtcNow

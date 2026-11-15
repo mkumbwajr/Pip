@@ -23,7 +23,7 @@ const weatherName = c => (c === 0 ? t('Clear') : c <= 3 ? t('Cloudy') : c <= 48 
 const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: 'idle', history: [], usage: null }, agents: {}, win: { media: null, volume: null, net: null }, tray: [], clips: [],
   weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', lyricsAt: 0, share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
-  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false, awakeUntil: 0, alert: null, alertTimer: 0, mood: '', pillDrawn: false, restTimer: 0, wakeTimer: 0,
+  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false, awakeUntil: 0, cursorAt: Date.now(), alert: null, alertTimer: 0, mood: '', pillDrawn: false, restTimer: 0, wakeTimer: 0,
   mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {},
   google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0 }, menuView: 'main', update: null,
   chat: { log: [], busy: false, screen: false }, recv: null };
@@ -84,13 +84,16 @@ const richText = s => esc(s).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(
 let lyrUserAt = 0; // when you last scrolled the lyrics yourself: they stop following the song for a moment
 function mediaPosition() { const m = S.win.media; if (!m) return 0; return Math.min(m.durationMs || Infinity, m.positionMs + (m.playing ? Date.now() - S.win.at : 0)); }
 
+const REST_AFTER = 15000; // Pip rests once the pointer has been still this long (and there is no task)
 // ---------- the pill ----------
 function drawPill() {
   const top = S.ai.sessions[0], m = S.win.media;
   island.className = [S.ai.top, S.settings?.island.mode === 'detach' ? 'detach' : 'attach', S.open ? 'open' : '', S.pinned ? 'pinned' : ''].join(' ');
-  const mood = S.ai.top !== 'idle' ? S.ai.top : (m?.playing ? 'music' : 'idle');
-  // nothing to do: Pip rests (eyes half shut, slow breathing) until the pointer comes near; then it wakes with a blink
-  const resting = mood === 'idle' && !S.open && !S.hover && !S.alert && Date.now() >= S.awakeUntil;
+  const phone = S.win.phones?.on && !m?.playing ? S.win.phones : null; // a phone playing through this PC (Windows)
+  const mood = S.ai.top !== 'idle' ? S.ai.top : (m?.playing || phone ? 'music' : 'idle');
+  // nothing to do and the pointer has not moved for 15 s: Pip rests (eyes half shut, slow breathing); it wakes with a
+  // blink as soon as the pointer moves again
+  const resting = mood === 'idle' && !S.open && !S.hover && !S.alert && Date.now() - S.cursorAt >= REST_AFTER && Date.now() >= S.awakeUntil;
   if (resting && !pip.classList.contains('resting') && S.pillDrawn) sfx('rest');
   if (!resting && pip.classList.contains('resting')) { sfx('wake'); pip.classList.add('waking'); clearTimeout(S.wakeTimer); S.wakeTimer = setTimeout(() => { pip.classList.remove('waking'); }, 700); }
   if (mood !== S.mood && S.pillDrawn && ['working', 'music'].includes(mood)) sfx(mood); // done, asking and error ring from their own events
@@ -108,6 +111,7 @@ function drawPill() {
   else if (S.alert && !S.open) { text = S.alert.kind === 'call' ? S.alert.from : S.alert.from + (S.alert.text ? ': ' + S.alert.text : ''); side = S.alert.kind === 'call' ? t('Calling…') : (S.alert.count > 1 ? '+' + (S.alert.count - 1) : ''); }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; // beside a notch: the title only, to stay compact
+  else if (phone) text = t('Playing from {phone}', { phone: phone.name || t('Phone') });
   if (top && (top.state === 'working' || top.state === 'asking')) side = ''; // a task is running: the strip shows only what it does
   $('#pill-text').textContent = text;
   island.classList.toggle('asking-pill', Boolean(pillAsk)); $('#pill-ask').hidden = !pillAsk;
@@ -176,7 +180,7 @@ const pages = {
     if (ph?.on && !m?.playing) return `<div class="mu"><span class="mu-art ph-art">${icon('phone')}<span class="eq"><i></i><i></i><i></i><i></i></span></span>
       <div class="mu-info"><span class="label">${esc(t('Playing from your phone'))}</span><h3 class="cut" title="${esc(ph.name)}">${esc(ph.name || t('Phone'))}</h3>
         <div class="mu-meta">${esc(t('The sound plays on this PC. Change songs on the phone.'))}</div>
-        <div class="mu-foot"><button class="mu-chip" data-phone="">${icon('power')}${esc(t('Disconnect'))}</button></div></div></div>`;
+        <div class="mu-foot">${ph.outputs?.list?.length ? `<label class="ph-out"><span>${esc(t('Plays on'))}</span><select id="output" aria-label="${esc(t('Plays on'))}">${ph.outputs.list.map(o => `<option value="${esc(o.id)}" ${o.id === ph.outputs.current ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select></label>` : ''}<button class="mu-chip" data-phone="">${icon('power')}${esc(t('Disconnect'))}</button></div></div></div>`;
     const phones = S.platform === 'win32' && ph ? (ph.list.length
       ? `<div class="ph-list"><span class="label">${esc(t('Play from your phone'))}</span>${ph.list.map(d => `<button class="mu-chip" data-phone="${esc(d.id)}">${icon('phone')}<span class="cut">${esc(d.name)}</span></button>`).join('')}</div>`
       : `<div class="mu-meta ph-hint">${esc(t('Pair your phone in Bluetooth settings to play its music here.'))}</div>`) : '';
@@ -474,8 +478,6 @@ function pointer(inside) {
   if (inside !== mouseSent) { mouseSent = inside; api.mouse(inside); }
   if (inside === S.hover) return;
   S.hover = inside; clearTimeout(openTimer); clearTimeout(closeTimer);
-  // after the pointer leaves, Pip stays awake a few seconds before resting again
-  clearTimeout(S.restTimer); if (!inside) { S.awakeUntil = Date.now() + 6000; S.restTimer = setTimeout(drawPill, 6100); }
   drawPill();
   if (inside) { if (!S.open && S.settings?.island.openOn !== 'click') openTimer = setTimeout(() => setOpen(true), 70); } // 'click': only a click opens it
   else closeTimer = setTimeout(maybeClose, 280);
@@ -833,6 +835,7 @@ page.addEventListener('input', e => {
 page.addEventListener('change', async e => {
   const el = e.target;
   if (el.id === 'seek') { const m = S.win.media; api.seek(+el.value); if (m) { m.positionMs = +el.value; S.win.at = Date.now(); } seeking = false; return; }
+  if (el.id === 'output') { api.setOutput(el.value); return; } // where a phone's music comes out (the default speaker)
   if (el.id === 'device') { await api.spotifyTransfer(el.value); setTimeout(refreshDevices, 1200); return; }
   if (el.id === 'volume') S.dragging = false;
   else if (el.dataset.radio) api.setRadio(el.dataset.radio, el.checked);
@@ -879,6 +882,9 @@ api.onArt(art => { S.art = art; applyArtColor(); if (S.tab === 'music') draw(); 
 api.onUpdate(u => { S.update = u; island.classList.toggle('has-update', Boolean(u?.newer)); if (S.menu && S.menuView !== 'updates') showMenu(true, S.menuView); });
 // Pip looks at the pointer: the eyes shift a few pixels towards it, less when it is close
 api.onCursor(p => {
+  // the pointer moved (main sends it only when it moves): wake now, and look again once it has been still for 15 s
+  S.cursorAt = Date.now(); if (pip.classList.contains('resting')) drawPill();
+  clearTimeout(S.restTimer); S.restTimer = setTimeout(drawPill, REST_AFTER + 100);
   const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);
   pip.style.setProperty('--ex', (dx / d * (S.open ? 1.6 : 3.2) * pull).toFixed(2) + 'px'); pip.style.setProperty('--ey', (dy / d * (S.open ? 1.2 : 2.4) * pull).toFixed(2) + 'px');
 });

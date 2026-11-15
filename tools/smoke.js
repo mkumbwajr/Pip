@@ -65,6 +65,10 @@ app.whenReady().then(async () => {
   await js(`(() => { const b = document.querySelector('[data-tab=modes]'); b.click(); const r = b.getBoundingClientRect(), t = document.querySelector('[data-tab=tray]'); t.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })); })()`); await shot('5-modes-tooltip');
   await js(`document.querySelector('#pill-more').click()`); await shot('5-menu'); await js(`document.querySelector('#pill-more').click()`);
   await js(`document.querySelector('#pill').click()`); await wait(700); await shot('6-pill-in-use');
+  // a phone playing through the PC (faked state): the folded pill names it, the Music tab shows it with "Plays on"
+  const phoneState = `{ on: true, name: "Ali's Pixel 10", list: [], outputs: { current: 'b', list: [{ id: 'a', name: 'Headphones (AD-G550)' }, { id: 'b', name: 'C34H89x (NVIDIA High Definition Audio)' }] } }`;
+  await js(`(() => { S.win = { ...S.win, media: null, phones: ${phoneState} }; S.pinned = true; setOpen(true, 'music'); draw(true); })()`); await wait(400); await shot('7-phone-music');
+  await js(`(() => { S.ai = { ...S.ai, top: 'idle', sessions: [] }; S.hover = false; setOpen(false); drawPill(); })()`); await wait(700); await shot('7-phone-pill');
   // the rename: Peep's old hook calls still land, nothing on screen or in the hooks says Peep, sharing and updates answer
   const legacy = (await fetch(`http://127.0.0.1:${HUB}/peep/event`, { method: 'POST', headers: { 'X-Peep-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'old', prompt: 'x' }) })).status;
   const hooksText = fs.readFileSync(path.join(process.env.HOME, '.claude', 'settings.json'), 'utf8');
