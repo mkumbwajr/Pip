@@ -347,5 +347,11 @@ if __name__ == '__main__':
         email = sys.argv[2].strip().lower(); store.grant(h('email:' + email), 'manual', 'manual'); print('license granted to', email); sys.exit(0)
     if not CLIENT_IDS: sys.exit('PIP_GOOGLE_CLIENT_IDS is not set')
     if not evpay.ready: print('EvPay is not configured: buying is off, trials still run', file=sys.stderr)
+    def reconciler():  # the spec's fallback for missed webhooks: every five minutes
+        while True:
+            time.sleep(300)
+            try: lic.reconcile(store, evpay)
+            except Exception as err: print('reconcile failed:', type(err).__name__, file=sys.stderr)
+    threading.Thread(target=reconciler, daemon=True).start()
     os.makedirs(path('users'), exist_ok=True); os.makedirs(path('relay'), exist_ok=True)
     ThreadingHTTPServer(('127.0.0.1', PORT), Api).serve_forever()

@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRET = 'test-client-secret'
-fake = {'status': 'pending', 'calls': [], 'bad_sig': 0}
+fake = {'status': 'pending', 'calls': [], 'bad_sig': 0, 'auth': 0, 'expire_next': False}
 
 class FakeEvPay(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
@@ -17,8 +17,11 @@ class FakeEvPay(BaseHTTPRequestHandler):
     def handle_any(self, method):
         raw = self.rfile.read(int(self.headers.get('Content-Length') or 0))
         if self.path == '/api/auth/v1':
-            b = json.loads(raw); ok = b == {'clientId': 'test-client', 'clientSecret': SECRET}
-            return self.send({'success': ok, 'code': 200, 'data': {'accessToken': 'tok', 'expiresIn': 300}} if ok else {'success': False}, 200 if ok else 401)
+            b = json.loads(raw); ok = b == {'clientId': 'test-client', 'clientSecret': SECRET}; fake['auth'] += 1
+            # the shape in EvPay's docs (not wrapped in the usual envelope)
+            return self.send({'access_token': 'tok', 'expires_in': 300, 'token_type': 'Bearer'} if ok else {'success': False}, 200 if ok else 401)
+        if fake['expire_next']:  # the token ran out early: EvPay answers 401 once
+            fake['expire_next'] = False; return self.send({'success': False, 'code': 401, 'message': 'authentication_required'}, 401)
         want = hmac.new(SECRET.encode(), self.headers['X-Timestamp'].encode() + b'.' + raw, hashlib.sha256).hexdigest()
         if self.headers.get('Authorization') != 'Bearer tok' or self.headers.get('X-Signature') != want:
             fake['bad_sig'] += 1; return self.send({'success': False, 'message': 'bad signature'}, 401)
@@ -103,6 +106,19 @@ class LicenseFlow(unittest.TestCase):
         self.api.checked.clear(); fake['status'] = 'SUCCESS'
         a = self.call('GET', '/api/pay/' + r['order'], token=self.token)[1]
         self.assertEqual((a['status'], a['licensed']), ('paid', True))
+
+    def test_4b_expired_token_is_renewed_once(self):
+        self.api.store.revoke(self.user, self.api.store.license(self.user)['order']) if self.api.store.license(self.user) else None
+        before = fake['auth']; fake['expire_next'] = True
+        c, r = self.call('POST', '/api/pay/mobile', {'phone': '0685000000'}, self.token)
+        self.assertEqual(c, 200, r); self.assertEqual(r['operator'], 'AirtelMoney'); self.assertEqual(fake['auth'], before + 1, 'one new token, then the call went through')
+
+    def test_4c_missed_webhook_is_reconciled(self):
+        L = self.api.lic; s = self.api.store
+        o = s.new_order(self.api.h('email:late@example.com'), 'mobile:Mpesa'); o.update(evpayId='ev-9', created=L.now_ms() - 11 * 60000); s.save_order(o)
+        fake['status'] = 'SETTLED'
+        self.assertGreaterEqual(L.reconcile(s, self.api.evpay), 1)
+        self.assertEqual(s.order(o['ref'])['status'], 'paid'); self.assertTrue(s.license(o['user']))
 
     def test_5_phone_numbers_and_networks(self):
         L = self.api.lic

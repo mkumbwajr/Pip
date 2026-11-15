@@ -15,7 +15,7 @@ Configuration (environment, from /etc/pip-api-evpay.env, root-only, never in git
   PIP_PRICE_TZS            default 5000      PIP_TRIAL_DAYS   default 7
   PIP_PUBLIC_URL           default https://pip.bang.co.tz (where EvPay sends the webhook and the card page returns)
 """
-import hashlib, hmac, json, os, re, secrets, threading, time, urllib.error, urllib.request
+import hashlib, hmac, json, os, re, secrets, sys, threading, time, urllib.error, urllib.request
 
 PRICE_TZS = int(os.environ.get('PIP_PRICE_TZS', '5000'))
 TRIAL_DAYS = int(os.environ.get('PIP_TRIAL_DAYS', '7'))
@@ -137,18 +137,26 @@ class EvPay:
         with self.tlock:
             if self.token and self.token_until - 30 > time.time(): return self.token
             code, j = self._http('POST', self.base + '/api/auth/v1', json.dumps({'clientId': self.client_id, 'clientSecret': self.client_secret}).encode(), {'Content-Type': 'application/json'})
-            d = j.get('data') or {}
-            if code != 200 or not j.get('success') or not d.get('accessToken'): raise EvPayError('EvPay sign-in failed (%s)' % code)
-            self.token, self.token_until = d['accessToken'], time.time() + int(d.get('expiresIn') or 300)
+            # EvPay's docs show {access_token, expires_in}; some accounts answer in the usual envelope {data: {accessToken, expiresIn}}
+            d = j.get('data') if isinstance(j.get('data'), dict) else j
+            tok, ttl = d.get('access_token') or d.get('accessToken'), d.get('expires_in') or d.get('expiresIn') or 300
+            if code not in (200, 201) or not tok: raise EvPayError('EvPay sign-in failed (%s)' % code)
+            self.token, self.token_until = tok, time.time() + int(ttl)
             return self.token
+    def forget_token(self):
+        with self.tlock: self.token = None
 
-    def call(self, method, path, body=None):
+    def call(self, method, path, body=None, retry=True):
         if not self.ready: raise EvPayError('Payments are not set up yet')
-        raw = json.dumps(body).encode() if body is not None else b''
+        raw = json.dumps(body).encode() if body is not None else b''  # these exact bytes are signed and sent
         ts = str(now_ms())
         sig = hmac.new(self.sig_key.encode(), ts.encode() + b'.' + raw, hashlib.sha256).hexdigest()
         code, j = self._http(method, self.base + path, raw or None, {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + self.access_token(), 'X-Timestamp': ts, 'X-Signature': sig})
-        if not j.get('success'): raise EvPayError(str(j.get('message') or 'EvPay said no (%s)' % code)[:200])
+        if code == 401 and retry: self.forget_token(); return self.call(method, path, body, False)  # the spec: refresh once, then give up
+        if not j.get('success'):
+            # EvPay's request_id goes to the log for a support ticket; never the credentials or the payer's number
+            print('evpay %s %s failed: %s %s request_id=%s' % (method, path.split('/payment/')[0], code, (j.get('errors') or {}).get('code', ''), j.get('request_id', '')), file=sys.stderr)
+            raise EvPayError(str(j.get('message') or 'EvPay said no (%s)' % code)[:200])
         return j.get('data') or {}
 
     def mobile(self, order, phone, operator):
@@ -191,6 +199,21 @@ def apply_event(store, event, payload):
     elif event == 'payment.on_hold' and o['status'] == 'pending': o['status'] = 'on_hold'; store.save_order(o)
     elif event in UNDONE: o['status'] = 'refunded'; store.save_order(o); store.revoke(o['user'], o['ref'])
     return o['status']
+
+def reconcile(store, evpay, older_than_ms=600000, newest_ms=2 * 86400000):
+    """Orders still pending after ten minutes (a missed webhook): asks EvPay for each, up to two days back."""
+    if not evpay.ready: return 0
+    done = 0
+    for f in os.listdir(store.p('orders')):
+        o = store.read(store.p('orders', f)) if f.endswith('.json') else None
+        if not o or o.get('status') != 'pending' or not o.get('evpayId'): continue
+        age = now_ms() - o.get('created', 0)
+        if age < older_than_ms or age > newest_ms: continue
+        try:
+            ev = status_from_evpay(evpay.payment(o['evpayId']).get('status'))
+            if ev: apply_event(store, ev, {'requestId': o['ref']}); done += 1
+        except EvPayError: pass
+    return done
 
 def status_from_evpay(text):
     """EvPay's own status words, for checking an order directly when a webhook is slow."""
