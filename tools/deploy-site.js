@@ -41,7 +41,9 @@ if (process.argv.includes('--api')) { // Pip accounts: server/pip-api.py as a sy
   let clientId = '';
   try { clientId = require('../src/main/google-client.json').clientId || ''; } catch {}
   if (!/\.apps\.googleusercontent\.com$/.test(clientId)) { console.error('src/main/google-client.json is missing: the server must know Pip\'s Google client ID'); process.exit(1); }
-  const env = path.join(os.tmpdir(), 'pip-api.env'); fs.writeFileSync(env, `PIP_GOOGLE_CLIENT_IDS=${clientId}\n`);
+  // earlier OAuth clients stay accepted, so copies of Pip built with them can still sign in (client IDs are not secret)
+  const EARLIER = ['896184851986-tqo26d1bdsvth1e8rvilev49vtc4lnc2.apps.googleusercontent.com'];
+  const env = path.join(os.tmpdir(), 'pip-api.env'); fs.writeFileSync(env, `PIP_GOOGLE_CLIENT_IDS=${[clientId, ...EARLIER.filter(id => id !== clientId)].join(',')}\n`);
   sh('mkdir -p /srv/pip-api');
   copy(path.join(root, 'server', 'pip-api.py'), '/srv/pip-api/pip-api.py');
   copy(path.join(root, 'server', 'pip-api.service'), '/etc/systemd/system/pip-api.service');
