@@ -73,7 +73,7 @@ function drawPill() {
   else if (S.recv) { text = t('Receiving {name}', { name: S.recv.name }); side = S.recv.pct + '%'; }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist ? `${m.title} · ${m.artist}` : m.title;
-  if (top?.state === 'working' && top.startedAt) side = time(Date.now() - top.startedAt);
+  if (top && (top.state === 'working' || top.state === 'asking')) side = ''; // a task is running: the strip shows only what it does
   $('#pill-text').textContent = text;
   island.classList.toggle('asking-pill', Boolean(pillAsk)); $('#pill-ask').hidden = !pillAsk;
   if (pillAsk) for (const b of $('#pill-ask').children) b.dataset.id = pillAsk.id; $('#pill-side').textContent = S.open ? clock() : side;
@@ -84,11 +84,17 @@ function drawPill() {
     const w = S.ai.usage?.sevenDay; // both windows on hover; the chip itself shows the one that runs out first
     $('#pill-chip').title = u ? `${t('Claude usage')}: ${t('5 hours')} ${u.pct}%${w ? ` · ${t('Week')} ${w.pct}%` : ''}` : '';
   }
+  island.classList.toggle('notched', Boolean(S.notch)); // set again because className was rebuilt above
   island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
   document.documentElement.style.setProperty('--bright', S.settings?.island.brightness ?? 0.1);
   island.classList.toggle('bare', !S.open && !text && S.settings?.island.mode !== 'detach'); // attached and idle: only Pip in the notch
   // the shell's width is set in pixels so the change between sizes can be animated
-  shell.style.width = S.open ? '' : Math.max(84, Math.min(pillAsk ? 620 : 440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
+  if (S.notch && !S.open) {
+    // the window is centred on the screen, so the gap is too: both sides as wide as the wider one, eyes at the far left
+    const inner = $('#pill-inner'), right = [...inner.children].filter(el => el.id !== 'pip' && el.id !== 'pill-gap' && el.offsetParent).reduce((w, el) => w + Math.max(el.scrollWidth, el.getBoundingClientRect().width) + 10, 0); // full width, not the squeezed one
+    const side = Math.max(56, Math.min(260, Math.ceil(right) + 18));
+    island.style.setProperty('--side', side + 'px'); shell.style.width = (S.notch.width + 2 * side) + 'px';
+  } else shell.style.width = S.open ? '' : Math.max(84, Math.min(pillAsk ? 620 : 440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
   const dot = tabs.querySelector('[data-tab=ai]'); if (dot) dot.classList.toggle('dot', S.ai.top === 'asking');
 }
 
@@ -154,7 +160,7 @@ const pages = {
   },
   tray() {
     const sh = S.share;
-    if (sh?.on) return `<div class="tr"><div class="tr-qr"><img alt="QR" src="${esc(sh.qr)}"></div><div class="tr-side"><p>${esc(t('Scan with your phone on the same Wi-Fi.'))} ${esc(t('Stops by itself after an hour.'))}<br><span class="mono">${esc(sh.url.replace(/^http:\/\//, '').replace(/\/[^/]+\/$/, ''))}</span></p>
+    if (sh?.on) return `<div class="tr"><div class="tr-qr"><img alt="QR" src="${esc(sh.qr)}"></div><div class="tr-side"><p>${esc(sh.anyNetwork ? t('Scan with your phone. Works on any network, encrypted end to end.') : t('Scan with your phone on the same Wi-Fi.'))} ${esc(t('Stops by itself after an hour.'))}${sh.anyNetwork ? '' : `<br><span class="mono">${esc(sh.url.replace(/^http:\/\//, '').replace(/\/[^/]+\/$/, ''))}</span>`}</p>
       ${sh.firewall === false ? `<button class="wbtn wide" data-share="firewall">${esc(t('Allow phones on this Wi-Fi'))}</button><p class="tr-hint">${esc(t('Windows Firewall is blocking phones. You approve this once.'))}</p>`
         : `<button class="wbtn wide" data-share="stop">${esc(t('Stop sharing'))}</button><p class="tr-hint">${esc(t('Page not loading? The phone must be on this Wi-Fi, not mobile data or a guest network.'))}</p>`}</div></div>`;
     const left = S.tray.length
@@ -318,10 +324,10 @@ function go(tab) {
 }
 /** Opens the preview or folds back to the pill. The page is drawn before opening and left in place while closing,
     so the morph never shows an empty panel. */
-function setOpen(open) {
+function setOpen(open, tab = 'home') {
   if (open === S.open) return;
   S.open = open;
-  if (open) go(S.tab);
+  if (open) go(tab); // Home every time it opens, unless something asked for a tab
   else { S.pinned = false; S.auto = false; showMenu(false); showVolume(false); showBright(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
 }
 function openSettings() { api.openSettings(); setOpen(false); }
@@ -411,7 +417,7 @@ function tick() {
     const lines = S.lyrics || [], at = pos + 250; // a quarter second early, so the line is there as it is sung
     let i = -1; while (i + 1 < lines.length && lines[i + 1].t <= at) i++;
     const now = $('#ly-now');
-    if (now) now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? '' : t('No lyrics for this song.'));
+    if (now) now.textContent = lines.length ? (lines[i]?.text || '♪') : (S.lyrics === null && S.lyricsFor ? t('Looking for lyrics…') : t('No lyrics for this song.'));
     const box = $('#lyr');
     if (box && box.dataset.i !== String(i)) {
       const first = box.dataset.i === undefined; box.dataset.i = i;
@@ -740,7 +746,7 @@ page.addEventListener('dragstart', e => {
   e.preventDefault(); draggingOut = true; api.dragOut(f.dataset.drag); setTimeout(() => { draggingOut = false; }, 800);
 });
 // files dropped anywhere on the island go to the files tab
-island.addEventListener('dragover', e => { e.preventDefault(); if (draggingOut) return; if (!S.open) setOpen(true); if (S.tab !== 'tray') go('tray'); $('#drop')?.classList.add('over'); });
+island.addEventListener('dragover', e => { e.preventDefault(); if (draggingOut) return; if (!S.open) setOpen(true, 'tray'); else if (S.tab !== 'tray') go('tray'); $('#drop')?.classList.add('over'); });
 island.addEventListener('dragleave', () => $('#drop')?.classList.remove('over'));
 island.addEventListener('drop', async e => {
   e.preventDefault(); $('#drop')?.classList.remove('over'); if (draggingOut) return;
@@ -751,7 +757,7 @@ island.addEventListener('drop', async e => {
 api.onAi(snap => {
   const was = S.ai.top; S.ai = snap;
   // a permission waits in the folded pill with Allow / Deny; a question that needs typing opens the island by itself
-  if (snap.top === 'asking' && was !== 'asking') { chime(true); if (!S.open && !snap.sessions[0]?.ask?.canAnswer) { S.tab = 'ai'; S.auto = true; setOpen(true); } }
+  if (snap.top === 'asking' && was !== 'asking') { chime(true); if (!S.open && !snap.sessions[0]?.ask?.canAnswer) { S.auto = true; setOpen(true, 'ai'); } }
   else if (was === 'asking' && snap.top !== 'asking' && S.auto) { S.auto = false; setTimeout(maybeClose, 900); }
   draw();
 });
@@ -781,8 +787,9 @@ api.onChanged(async () => {
 
 (async () => {
   const init = await api.init();
-  t = window.makeT(init.strings); document.documentElement.lang = init.settings.lang;
-  Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art });
+  t = window.makeT(init.strings, { mac: init.platform === 'darwin' }); document.documentElement.lang = init.settings.lang;
+  Object.assign(S, { settings: init.settings, ai: init.ai, agents: init.agents, win: init.win, tray: init.tray, clips: init.clips, platform: init.platform, art: init.art, notch: init.notch || null });
+  if (S.notch) { document.documentElement.style.setProperty('--notch-w', S.notch.width + 'px'); document.documentElement.style.setProperty('--notch-h', S.notch.height + 'px'); }
   S.spotify.on = init.spotify; S.google = init.google; S.hubError = await api.hubError();
   // Pip was closed while a mode was running: put the focus guard back the way it was before the mode
   if (S.settings.modeRestore) await save({ modeRestore: null, guard: { on: Boolean(S.settings.modeRestore.guardOn) } });

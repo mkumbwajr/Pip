@@ -379,5 +379,10 @@
   "This build of Pip has no Google sign-in, so it cannot use a Pip account.": "Pip hii haina Google sign-in, kwa hiyo haiwezi kutumia akaunti ya Pip.",
   "Google did not say who you are.": "Google haijasema wewe ni nani.",
   "Your Pip account signed out. Sign in again.": "Akaunti yako ya Pip imetoka. Ingia tena.",
-  "Pip's server said no ({code}).": "Server ya Pip imekataa ({code})."
+  "Pip's server said no ({code}).": "Server ya Pip imekataa ({code}).",
+  "Installing blueutil with Homebrew, so Pip can switch Bluetooth…": "Ina-install blueutil kwa Homebrew, ili Pip iweze kuwasha na kuzima Bluetooth…",
+  "Bluetooth can now be switched from the island.": "Sasa unaweza kuwasha na kuzima Bluetooth kutoka kwenye kisiwa.",
+  "Could not install blueutil. Opening Bluetooth settings instead.": "Imeshindwa ku-install blueutil. Inafungua settings za Bluetooth badala yake.",
+  "Looking for lyrics…": "Inatafuta lyrics…",
+  "Scan with your phone. Works on any network, encrypted end to end.": "Scan kwa simu yako. Inafanya kazi kwenye network yoyote, imefungwa (encrypted) mwanzo mpaka mwisho."
 }

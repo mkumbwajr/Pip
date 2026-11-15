@@ -49,27 +49,30 @@ async function ask({ agent = 'claude', question, png, language = '', t = s => s 
     const prompt = agent === 'codex'
       ? `Answer this question about the attached screenshot, briefly and in plain language.\n\n${question}`
       : `Read the image file screen.png in ${dir} (a screenshot of my screen), then answer briefly and in plain language. Do not use any other tool.\n\n${question}`;
-    return await run(commandFor(agent, dir, image), language ? prompt + '\n\n' + language : prompt, dir, t);
+    return await run(commandFor(agent, dir, image), languageRule(language) + prompt, dir, t);
   } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
 }
 
 /** A plain chat with Pip: the agent answers from the conversation alone, in an empty folder, with no screenshot.
     messages: [{ role: 'me' | 'pip', text }], newest last. Nothing is kept: the whole conversation is sent each turn. */
-function chatPrompt(messages, name = 'Pip') {
+// Pip's chat answers in Pip's own language. Said first and firmly: an English error or English text pasted into the
+// question otherwise pulls the answer into English. Asking for a translation is the one exception.
+const languageRule = language => (language ? language + ' This holds even when the message, or text quoted in it, is in English. Only when the user asks for a translation (or for another language) do you write that language.\n\n' : '');
+function chatPrompt(messages, name = 'Pip', language = '') {
   const lines = messages.slice(-12).map(m => `${m.role === 'me' ? 'User' : name}: ${String(m.text || '').slice(0, 4000)}`);
   return `You are ${name}, a small friendly helper living in a status island at the top of the user's screen. Answer the last message `
     + 'briefly and in plain language: short paragraphs, no headings, no tables. Do not use any tools and do not read or change any files.\n\n'
-    + lines.join('\n\n') + `\n\n${name}:`;
+    + languageRule(language) + lines.join('\n\n') + `\n\n${name}:`;
 }
 async function chat({ agent = 'claude', messages = [], name = 'Pip', language = '', t = s => s }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-chat-'));
   try {
-    const prompt = chatPrompt(messages, name);
+    const prompt = chatPrompt(messages, name, language);
     const cmd = agent === 'codex'
       ? { cmd: 'codex', args: ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '-C', q(dir), '-'], parse: out => out.trim() }
       : { cmd: 'claude', args: ['-p', '--output-format', 'json', ...quiet(dir)], parse: out => { try { return String(JSON.parse(out).result || '').trim(); } catch { return out.trim(); } } };
-    return await run(cmd, language ? prompt.replace(/\n\n[^\n]*:$/, '\n\n' + language + '\n\n' + name + ':') : prompt, dir, t);
+    return await run(cmd, prompt, dir, t);
   } finally { fs.rm(dir, { recursive: true, force: true }, () => {}); }
 }
 
-module.exports = { ask, chat, chatPrompt, commandFor };
+module.exports = { ask, chat, chatPrompt, commandFor, languageRule };

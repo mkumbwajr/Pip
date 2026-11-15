@@ -306,7 +306,7 @@ api.onChanged(async () => {
 });
 
 (async () => {
-  S = await api.init(); S.hubError = await api.hubError(); t = window.makeT(S.strings); document.documentElement.lang = S.settings.lang;
+  S = await api.init(); S.hubError = await api.hubError(); t = window.makeT(S.strings, { mac: S.platform === 'darwin' }); document.documentElement.lang = S.settings.lang;
   $('#q').placeholder = t('Search settings'); $('#search-ico').innerHTML = icon('search');
   draw(); setInterval(tick, 5000);
 })();

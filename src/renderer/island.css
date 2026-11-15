@@ -502,3 +502,13 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 .ha-grid span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255, 255, 255, .08); }
 .ha-grid svg { width: 17px; height: 17px; } .ha-grid b { font-size: 10.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .dial-arc.a-use { stroke: #ff5c6c; } .dial-arc.a-focus { stroke: var(--pip); } .dial-arc.a-song { stroke: var(--art, #ff5c8a); }
+
+/* Macs with a camera notch: folded, the island is the notch's own height and sits behind it, Pip's eyes just left of the
+   camera, what is happening just right of it. Open, the panel hangs below as usual. */
+#pill-gap { display: none; }
+#island.notched:not(.open) #shell, #island.notched:not(.open) #pill, #island.notched:not(.open) #pill-inner { height: var(--notch-h, 37px); }
+#island.notched:not(.open) #pill-inner { width: 100%; padding: 0; gap: 10px; }
+#island.notched:not(.open) #pill-gap { display: block; flex: none; width: var(--notch-w, 200px); margin-right: -2px; }
+#island.notched:not(.open) .pip { order: -1; flex: none; width: calc(var(--side, 56px) - 10px); justify-content: flex-start; padding-left: 14px; }
+#island.notched.bare:not(.open) #pill-inner { padding: 0; }
+#island.notched.attach:not(.open) #shell { border-radius: 0 0 14px 14px; }

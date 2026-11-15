@@ -21,6 +21,7 @@ const buddy = require('./buddy.js');
 const { Spotify } = require('./spotify.js');
 const { Google, clientFor } = require('./google.js');
 const { Account } = require('./account.js');
+const { Relay } = require('./relay.js');
 const { latestRelease, isReleaseUrl } = require('./update.js');
 const { makeT } = require('../shared/i18n.js');
 
@@ -56,7 +57,7 @@ const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
 const WIN_ICON = path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
-let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, account = null, quitting = false;
+let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, account = null, relay = null, quitting = false;
 let strings = {}, t = makeT(strings);
 
 // ---------- language ----------
@@ -66,13 +67,15 @@ const languages = () => [{ code: 'en', name: 'English' }, ...fs.readdirSync(LOCA
 function loadLanguage() {
   const code = store.get('lang'); strings = {};
   if (code !== 'en') { try { strings = JSON.parse(fs.readFileSync(path.join(LOCALES, code + '.json'), 'utf8')); } catch {} }
-  t = makeT(strings);
+  t = makeT(strings, { mac: process.platform === 'darwin' });
 }
 // What the agents are told at the start of each session, so they answer the way the island speaks.
 const AGENT_LANGUAGE = {
   sw: 'Language: always write your replies to the user in Swahili as it is spoken in Tanzania. Use everyday, conversational Swahili, mixed naturally with the English tech words Tanzanian developers actually use (Swanglish), for example "file", "code", "bug", "ku-run", "ku-edit", "ku-install". Do not use formal textbook Swahili and do not use Kenyan usage or Sheng. Keep code, commands, file names, error messages and identifiers exactly as they are; only your own explanations are in Swahili.'
 };
 const agentContext = () => (store.get('agentLanguage') ? AGENT_LANGUAGE[store.get('lang')] || '' : '');
+// Pip's own chat and screen questions always answer in Pip's language (the switch above is about the coding agents)
+const pipLanguage = () => AGENT_LANGUAGE[store.get('lang')] || '';
 
 // ---------- helper scripts for Claude Code (they need Node.js on the PC) ----------
 let nodeOk = null;
@@ -115,6 +118,13 @@ function registerAppId() {
 const downloadsDir = () => { try { return app.getPath('downloads'); } catch { return path.join(os.homedir(), 'Downloads'); } };
 
 // ---------- the island window ----------
+// A Mac with a camera notch has a taller menu bar (about 37 points against 24). The folded island then sits behind the
+// notch (its own height, the camera's width in the middle). Electron cannot see the notch itself, so this is measured.
+function notchInfo() {
+  if (process.platform !== 'darwin') return null;
+  const d = displayFor(), bar = d.workArea.y - d.bounds.y;
+  return bar >= 32 && d.bounds.y === 0 ? { width: 200, height: bar } : null;
+}
 function displayFor() { const all = screen.getAllDisplays(); return all[store.get('island.display')] || screen.getPrimaryDisplay(); }
 // Island size (Settings, 80 to 140%): the page is zoomed and the window grows or shrinks with it, so nothing is cut off
 const islandScale = () => Math.max(0.8, Math.min(1.4, Number(store?.get('island.scale')) || 1));
@@ -162,6 +172,7 @@ function applySettings(patch) {
   if (before.island.display !== after.island.display || before.island.scale !== after.island.scale) placeIsland();
   if (before.weather.place !== after.weather.place && !(patch.weather && 'lat' in patch.weather)) { store.set({ weather: { lat: null, lon: null } }); weatherCache.at = 0; }
   if (before.lang !== after.lang) { loadLanguage(); tray?.refresh(); }
+  helper.watch = Boolean(after.guard.on); // the Mac reads browser tabs only while the focus guard is on
   hub.context = agentContext(); changed(); for (const w of [settingsWin, welcomeWin]) if (w && !w.isDestroyed()) w.webContents.send('app:changed');
   return store.all();
 }
@@ -237,7 +248,7 @@ const trayFile = () => data('tray.json');
 let trayFiles = []; const clips = []; let lastClip = '';
 const liveTray = () => trayFiles.filter(f => { try { return fs.statSync(f).isFile(); } catch { return false; } });
 const trayView = () => liveTray().map(f => ({ path: f, name: path.basename(f), size: fs.statSync(f).size }));
-function saveTray() { try { fs.writeFileSync(trayFile(), JSON.stringify(trayFiles)); } catch {} send('tray:changed', trayView()); }
+function saveTray() { try { fs.writeFileSync(trayFile(), JSON.stringify(trayFiles)); } catch {} send('tray:changed', trayView()); relay?.offer(liveTray()).catch(() => {}); } // a phone on another network sees new tray files too
 function addToTray(paths) { for (const p of paths) { const f = path.resolve(String(p)); if (!trayFiles.includes(f)) trayFiles.unshift(f); } trayFiles = liveTray().slice(0, 30); saveTray(); }
 function watchClipboard() {
   setInterval(async () => {
@@ -330,7 +341,7 @@ const ours = e => String(e.senderFrame?.url || '').startsWith(pathToFileURL(REND
 const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e) ? fn(...args) : null));
 
 function wireIpc() {
-  handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
+  handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, notch: notchInfo(), settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
     art: helper.art, tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
     strings, languages: languages(), node: hasNode(), spotify: spotify.connected, google: google.connected, googleBuiltIn: Boolean(clientFor(null)), account: account.status() }));
   handle('app:strings', () => strings);
@@ -372,7 +383,7 @@ function wireIpc() {
   handle('pip:chat', async messages => {
     const list = (Array.isArray(messages) ? messages : []).filter(m => m && (m.role === 'me' || m.role === 'pip')).map(m => ({ role: m.role, text: String(m.text || '').slice(0, 4000) }));
     if (!list.length || list[list.length - 1].role !== 'me') return { ok: false, error: t('Ask something first.') };
-    try { return { ok: true, text: await buddy.chat({ agent: store.get('buddyAgent'), messages: list, name: store.get('mascot').name || 'Pip', language: agentContext(), t: (...a) => t(...a) }) }; }
+    try { return { ok: true, text: await buddy.chat({ agent: store.get('buddyAgent'), messages: list, name: store.get('mascot').name || 'Pip', language: pipLanguage(), t: (...a) => t(...a) }) }; }
     catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
   handle('art:fill', key => { if (helper.art?.key === String(key) && !(helper.art.data && helper.art.data.length > 3000)) fillArtwork(String(key), true); });
@@ -412,13 +423,20 @@ function wireIpc() {
     try { e.sender.startDrag({ file: p, icon }); } catch {}
   });
   handle('share:start', async () => {
-    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(downloadsDir(), 'Pip'), onProgress: p => send('share:progress', p),
-      onReceive: p => { addToTray([p]); send('share:progress', { name: path.basename(p), done: true }); new Notification({ title: 'Pip', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); } });
+    const received = p => { addToTray([p]); send('share:progress', { name: path.basename(p), done: true }); new Notification({ title: 'Pip', icon: ICON, body: t('Received {name}', { name: path.basename(p) }) }).show(); };
+    share ||= new Share({ t: (...a) => t(...a), files: liveTray, saveDir: path.join(downloadsDir(), 'Pip'), onProgress: p => send('share:progress', p), onReceive: received });
+    let lan = null; try { lan = await share.start(); } catch {}
+    // any network: the encrypted relay on Pip's server. The QR code opens it; the same-Wi-Fi page keeps working beside it.
+    let far = '';
+    try {
+      if (!relay) { relay = new Relay({ saveDir: path.join(downloadsDir(), 'Pip'), fetchImpl: webFetch, onProgress: p => send('share:progress', p), onReceive: received }); far = await relay.start(); relay.offer(liveTray()).catch(() => {}); }
+      else far = relay.url;
+    } catch { relay = null; }
+    const url = far || lan?.url; if (!url) return { ok: false, error: t('This PC is not on a network.') };
     // margin 4 is the quiet zone the QR standard asks for: phone cameras need it to find the code
-    try { const s = await share.start(); return { ok: true, ...s, firewall: firewall.hasRule(), qr: await require('qrcode').toDataURL(s.url, { margin: 4, width: 264, errorCorrectionLevel: 'M' }) }; }
-    catch (e) { return { ok: false, error: String(e.message || e) }; }
+    return { ok: true, on: true, url, anyNetwork: Boolean(far), lan: lan?.url || '', firewall: far ? true : firewall.hasRule(), qr: await require('qrcode').toDataURL(url, { margin: 4, width: 264, errorCorrectionLevel: 'M' }) };
   });
-  handle('share:stop', async () => { await share?.stop(); return { ok: true }; });
+  handle('share:stop', async () => { await share?.stop(); await relay?.stop(); relay = null; return { ok: true }; });
   handle('share:firewall', async () => ({ ok: await firewall.addRule() }));
   handle('buddy:ask', async (question, windowId) => {
     question = String(question || '').trim().slice(0, 2000); if (!question) return { ok: false, error: t('Ask something first.') };
@@ -433,7 +451,7 @@ function wireIpc() {
         source = sources.find(s => String(s.display_id) === String(d.id)) || sources[0];
       }
       if (!source || source.thumbnail.isEmpty()) throw new Error(t('Could not take the screenshot.'));
-      return { ok: true, text: await buddy.ask({ agent: store.get('buddyAgent'), question, png: source.thumbnail.toPNG(), language: agentContext(), t: (...a) => t(...a) }) };
+      return { ok: true, text: await buddy.ask({ agent: store.get('buddyAgent'), question, png: source.thumbnail.toPNG(), language: pipLanguage(), t: (...a) => t(...a) }) };
     } catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
   handle('guard:choice', back => {
@@ -500,6 +518,9 @@ app.whenReady().then(async () => {
   let lastSong = '';
   helper.on('state', s => { const k = s.media ? s.media.title + '|' + s.media.artist : ''; if (k && k !== lastSong) { lastSong = k; prefetchSong(s.media); }
     send('win:state', s); checkGuard(s.front); if (s.front?.hwnd !== lastFront) { lastFront = s.front?.hwnd; keepOnTop(); } });
+  // the Mac helper says when it installs blueutil (to switch Bluetooth), so a click that takes a while is explained
+  helper.on('notice', what => { const body = { 'blueutil-installing': t('Installing blueutil with Homebrew, so Pip can switch Bluetooth…'), 'blueutil-ready': t('Bluetooth can now be switched from the island.'), 'blueutil-failed': t('Could not install blueutil. Opening Bluetooth settings instead.') }[what];
+    if (body) try { new Notification({ title: 'Pip', icon: ICON, body, silent: true }).show(); } catch {} });
   helper.on('art', art => { send('win:art', art); if (!art.data) fillArtwork(art.key); });
   // Pip's eyes follow the pointer wherever it is on the screen, so its position is sent while it moves (30 times a second at most)
   let lastPoint = '';
@@ -508,10 +529,10 @@ app.whenReady().then(async () => {
     const p = screen.getCursorScreenPoint(), key = p.x + ',' + p.y; if (key === lastPoint) return;
     lastPoint = key; const b = island.getBounds(), k = islandScale(); send('cursor', { x: (p.x - b.x) / k, y: (p.y - b.y) / k }); // in the page's own (zoomed) pixels
   }, 33);
-  helper.start();
+  helper.watch = Boolean(store.get('guard').on); helper.start();
   screen.on('display-metrics-changed', placeIsland); screen.on('display-added', placeIsland); screen.on('display-removed', placeIsland);
   app.on('second-instance', openSettings); // starting Pip again from the Start menu shows its settings
 });
-app.on('before-quit', () => { quitting = true; helper.stop(); hub?.stop(); share?.stop(); });
+app.on('before-quit', () => { quitting = true; helper.stop(); hub?.stop(); share?.stop(); relay?.stop(); });
 app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed', () => {});

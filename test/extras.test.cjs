@@ -204,3 +204,20 @@ test('mac helper: reads Wi-Fi and Bluetooth from the output of macOS tools', () 
   assert.equal(btOn(JSON.stringify({ SPBluetoothDataType: [{ controller_properties: { controller_state: 'attrib_off' } }] })), false);
   assert.equal(btOn('not json'), null);
 });
+
+test('song info: the cover may come from a close match, the year only from an exact one', () => {
+  const { pickCover, pick } = require('../src/main/songinfo.js');
+  const rows = [{ trackName: 'Blinding Lights', artistName: 'The Weeknd', artworkUrl100: 'a', releaseDate: '2019' }, { trackName: 'Other', artistName: 'Someone', artworkUrl100: 'b', releaseDate: '2001' }];
+  assert.equal(pick(rows, 'Blinding Lights - Radio Edit', 'The Weeknd'), null); // no exact match: no year
+  assert.equal(pickCover(rows, 'Blinding Lights - Radio Edit', 'The Weeknd').artworkUrl100, 'a');
+  assert.equal(pickCover(rows, 'Komasava (Comment ça va)', 'Diamond Platnumz'), null); // never someone else's cover
+});
+
+test('relay: what one side seals only the same key opens, and a changed byte is refused', () => {
+  const { seal, open, sealName, openName } = require('../src/main/relay.js');
+  const key = require('node:crypto').randomBytes(32), other = require('node:crypto').randomBytes(32);
+  const box = seal(key, Buffer.from('siri'));
+  assert.equal(open(key, box).toString(), 'siri'); assert.throws(() => open(other, box));
+  box[20] ^= 1; assert.throws(() => open(key, box));
+  assert.equal(openName(key, sealName(key, 'picha.jpg')), 'picha.jpg'); assert.equal(openName(other, sealName(key, 'x')), '');
+});
