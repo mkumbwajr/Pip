@@ -1,6 +1,6 @@
 # Pip
 
-**Agents wako wote Juu ya Screen.** Kisiwa kidogo juu ya screen yako ya Windows kinachokuonyesha ma-agent wako wa AI
+**Agents wako wote Juu ya Screen.** Kisiwa kidogo juu ya screen yako ya Windows au Mac kinachokuonyesha ma-agent wako wa AI
 (Claude Code na Codex) wanafanya nini, sasa hivi. Pip, kale ka-mascot, anakushtua agent akikuhitaji au akimaliza kazi.
 
 ![Pip ikiwa imefunguka: saa, agent kazini, muziki na focus](site/img/pip-home.png)
@@ -8,9 +8,10 @@
 Bure na open source (MIT). Huhitaji akaunti (akaunti ya Pip ni hiari, ina-sync mipangilio kati ya vifaa), hakuna malipo, hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani
 cha Tanzania; English ipo kwenye Settings. [English README](README.en.md)
 
-**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · toleo 0.7.0
+**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · macOS (Intel na Apple silicon) · toleo 0.7.0
 
 Installer haina signature bado, kwa hiyo Windows SmartScreen itakuonya: bonyeza "More info" kisha "Run anyway".
+Kwenye Mac, DMG nayo haina signature: mara ya kwanza bonyeza kulia Pip kwenye Applications kisha **Open**.
 Ndani ya Pip, menu ya `•••` → **Updates** inakuambia toleo jipya likitoka.
 
 ## Inafanya nini
@@ -32,8 +33,11 @@ Ndani ya Pip, menu ya `•••` → **Updates** inakuambia toleo jipya likitok
   na TikTok, na kurudisha kila kitu ukimaliza. **Mlinzi wa focus** anakuomba upumue kabla ya kufungua tovuti hizo.
 - **Kalenda na Barua:** ingia na Google uone mchongo wa leo na mwezi, na idadi ya email ambazo hujasoma.
 - **Mafaili:** dondosha mafaili kwenye kisiwa, yavute nje kwenda app nyingine, au yatume kati ya simu na PC kwa QR code
-  (simu iwe kwenye Wi-Fi hiyo hiyo).
+  kwenye mtandao wowote: Wi-Fi moja inaenda moja kwa moja, la sivyo kupitia relay ya Pip (encrypted end-to-end).
 - **Noti** (mstari wa `[ ]` unakuwa kiduara cha kutiki), **ulizo-copy**, Wi-Fi na Bluetooth, sauti, hali ya hewa.
+- **Akaunti ya Pip (hiari):** ingia na Google au email (code ya tarakimu 6, hakuna password); mipangilio, noti, mji na
+  link ya kalenda vinakufuata kwenye kila PC au Mac yenye Pip.
+- **Mac:** kisiwa kinakaa juu ya notch ya kamera, macho ya Pip pembeni kushoto; kila "PC" kwenye app inasomeka "Mac".
 - **Kisiwa chako:** mwangaza wa background, ukubwa wa kisiwa (80–140%), uwazi, rangi na kofia ya Pip, kuficha tabs.
 
 ## Kuiwasha (kwa developers)
@@ -41,7 +45,7 @@ Ndani ya Pip, menu ya `•••` → **Updates** inakuambia toleo jipya likitok
 ```
 npm install
 npm start           # kisiwa kinatokea juu ya screen; Ctrl+Alt+Space kinakifungua na kukifunga
-npm test            # tests 35 za Node (OS yoyote)
+npm test            # tests 38 za Node (OS yoyote)
 npm run dist:win    # kwenye Windows: Pip.exe na installer ndani ya dist/ (inahitaji makensis kwenye PATH)
 npm run dist:mac    # kwenye Mac: dist/Pip-<version>-mac.dmg (GitHub Actions inaitengeneza kila push)
 PIP_HUB_PORT=48699 npx electron --no-sandbox tools/smoke.js out/   # smoke test kamili, pembeni ya Pip inayo-run
@@ -55,7 +59,8 @@ Ukiwa tayari una status line yako kwenye Claude Code, Pip haiigusi.
 
 Kwenye Windows 11 halisi: installer (kufunguka), jina na icon ya Pip, muziki (wimbo, picha, mwaka, lyrics), hali ya Wi-Fi na Bluetooth,
 mlinzi wa focus, Google sign-in (kalenda na idadi ya email), kushiriki na simu kwenye Wi-Fi moja, na smoke test kamili
-ya agent (session, ruhusa, kujibu, status line). Toleo la Mac (DMG) limejaribiwa na mwenye project; Wi-Fi, Bluetooth na mlinzi wa focus kwenye Mac bado hazijajaribiwa. Hakijajaribiwa bado: Codex halisi, kuingia Spotify, kubadilisha
+ya agent (session, ruhusa, kujibu, status line). Kwenye Mac halisi (mwenye project, Novemba 2026): vipengele vyote vinafanya kazi, pamoja na kisiwa juu ya notch, muziki,
+Wi-Fi na Bluetooth, mlinzi wa focus na akaunti ya Pip. Hakijajaribiwa bado: Codex halisi, kuingia Spotify, kubadilisha
 Wi-Fi/Bluetooth kwa kubonyeza, kusogeza wimbo kwa bar, Pip agent kufungua chat, na hali ya hewa (card ilionekana tupu).
 
 ## Ukiwa unatoka kwenye Peep
@@ -69,7 +74,8 @@ mpaka Pip izibadilishe kwa zake mara ya kwanza inapowaka.
 Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo (hali ya hewa); jina la wimbo na msanii vinaenda lrclib.net
 (lyrics) na iTunes Search (mwaka na picha ya wimbo; Deezer kwa picha ambazo iTunes haina); link ya kalenda inasomwa; swali la screen na chat ya Pip vinaenda kwa
 agent uliyemchagua kupitia akaunti yako; mipangilio, noti, mji na link ya kalenda ukiingia kwenye akaunti ya Pip
-(inahifadhiwa pip.bang.co.tz); Spotify ukiiunganisha;
+(inahifadhiwa pip.bang.co.tz; ukiingia kwa email, email yako inatumika kukutumia code tu); mafaili ya simu yakipita
+relay ya pip.bang.co.tz (yame-encrypt-iwa, key haipiti server, yanafutwa baada ya saa moja); Spotify ukiiunganisha;
 Google ukiingia (kalenda yako na idadi tu ya email ambazo hujasoma, sio nani wala nini); na pip.bang.co.tz ukibonyeza
 Updates. Hooks, ulivyo-copy, noti na mafaili vinabaki kwenye PC. Sera kamili: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 
@@ -81,6 +87,7 @@ test moja inahakikisha hakuna neno lililosahaulika. Lugha nyingine ni faili jipy
 ## Kuitoa
 
 Settings za Windows → Apps → Pip → Uninstall. Uninstaller inaondoa hooks za Pip kwenye Claude Code na Codex. Ukiitoa
-kwa mkono, toa tiki za ma-agent kwenye Settings kwanza, au run `Pip.exe --remove-hooks`.
+kwa mkono, toa tiki za ma-agent kwenye Settings kwanza, au run `Pip.exe --remove-hooks`. Kwenye Mac: toa tiki za
+ma-agent kwenye Settings, kisha futa Pip kwenye Applications.
 
 Pip ni project ya BANG DIGITAL LTD inayojitegemea. Haitumii code wala michoro ya app nyingine yoyote ya aina hii.
