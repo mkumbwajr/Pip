@@ -200,3 +200,9 @@ details p { padding: 0 4px 26px; color: var(--soft); font-size: 17px; max-width:
 .btn.ghost:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
 
 .btn[hidden] { display: none; }
+
+/* Words with a fixed English version: shown instead of the Swahili when the browser translates the page
+   (Chrome and Edge mark the page with these classes), so the translation reads as written, not as a machine guess */
+.en-only { display: none; }
+html.translated-ltr .en-only, html.translated-rtl .en-only { display: inline; }
+html.translated-ltr .sw-only, html.translated-rtl .sw-only { display: none; }
