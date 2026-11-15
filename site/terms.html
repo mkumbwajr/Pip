@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pip terms of use</title>
+<script src="/theme.js"></script>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/icon.png" type="image/png">
+<style>
+  body { margin: 0; padding: 0 0 60px; background: #0b0b0e; color: #ececf1; font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 0; }
+  /* the same top bar as the homepage */
+  .nav { position: sticky; top: 0; z-index: 10; height: 52px; background: rgba(0, 0, 0, .72); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .nav-in { max-width: 980px; height: 100%; margin: 0 auto; padding: 0 22px; display: flex; align-items: center; gap: 28px; }
+  .brand { display: inline-flex; align-items: center; gap: 9px; color: #f5f5f7; font-weight: 600; font-size: 17px; text-decoration: none; }
+  .pip { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 24px; height: 21px; border-radius: 7.5px; background: #7c5cff; }
+  .pip i { width: 4px; height: 7px; border-radius: 2px; background: #fff; transform-origin: 50% 55%; animation: blink 5.2s infinite; }
+  @keyframes blink { 0%, 40%, 43.5%, 86%, 88.5%, 91%, 93.5%, 100% { transform: scaleY(1); } 41.8% { transform: scaleY(.08); } 87.2% { transform: scaleY(.08); } 92.2% { transform: scaleY(.08); } }
+  @keyframes blink-now { 0%, 100% { transform: scaleY(1); } 45% { transform: scaleY(.08); } }
+  .brand:hover .pip i { animation: blink-now .32s ease 2; }
+  @media (prefers-reduced-motion: reduce) { .pip i { animation: none !important; } }
+  .nav nav { display: flex; gap: 26px; margin-left: auto; font-size: 13px; }
+  .nav nav a { color: rgba(255, 255, 255, .8); text-decoration: none; } .nav nav a:hover { color: #fff; }
+  .nav nav a[aria-current] { color: #fff; }
+  .pill-btn { display: inline-flex; align-items: center; height: 28px; padding: 0 14px; border-radius: 14px; background: #fff; color: #000 !important; font-size: 13px; font-weight: 600; text-decoration: none; }
+  @media (max-width: 734px) { .nav nav { display: none; } .nav-in { justify-content: space-between; } .theme { margin-left: auto; margin-right: 8px; } }
+  .theme { display: grid; place-items: center; width: 32px; height: 32px; margin-left: -10px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+  .theme:hover { background: rgba(127, 127, 127, .15); }
+  .theme svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .theme .i-sun { display: none; } [data-theme="light"] .theme .i-sun { display: block; } [data-theme="light"] .theme .i-moon { display: none; }
+  /* light theme */
+  [data-theme="light"] body { background: #fff; color: #1d1d1f; }
+  [data-theme="light"] h1, [data-theme="light"] h2, [data-theme="light"] strong, [data-theme="light"] th, [data-theme="light"] code { color: #1d1d1f; }
+  [data-theme="light"] p, [data-theme="light"] li, [data-theme="light"] td { color: #515154; }
+  [data-theme="light"] a { color: #6a4dff; } [data-theme="light"] .brand { color: #1d1d1f; }
+  [data-theme="light"] .box { background: #f5f5f7; border-color: #e3e3e8; } [data-theme="light"] th, [data-theme="light"] td, [data-theme="light"] footer { border-color: #e3e3e8; }
+  [data-theme="light"] .nav { background: rgba(255, 255, 255, .72); border-color: rgba(0, 0, 0, .08); }
+  [data-theme="light"] .nav nav a { color: rgba(0, 0, 0, .75); } [data-theme="light"] .nav nav a[aria-current] { color: #000; }
+  [data-theme="light"] .pill-btn { background: #1d1d1f; color: #fff !important; }
+  h1 { font-size: 34px; line-height: 1.2; margin: 0 0 6px; }
+  h2 { font-size: 20px; margin: 36px 0 8px; }
+  p, li { color: #c4c4cc; }
+  strong { color: #fff; }
+  a { color: #b5a4ff; }
+  .meta { color: #8a8a94; font-size: 14px; margin: 0 0 28px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 8px 0; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-top: 1px solid #2a2a31; }
+  th { color: #fff; }
+  td { color: #c4c4cc; }
+  code { font-size: 14px; color: #fff; }
+  .box { padding: 16px 18px; border: 1px solid #2a2a31; border-radius: 14px; background: #131317; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #2a2a31; color: #8a8a94; font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="/"><span class="pip"><i></i><i></i></span><span>Pip</span></a>
+    <nav aria-label="Kurasa"><a href="/#vipengele">Vipengele</a><a href="/privacy">Faragha</a><a href="/terms" aria-current="page">Masharti</a><a href="/#maswali">Maswali</a></nav>
+    <button class="theme" type="button" data-theme-toggle aria-label="Badilisha mwanga"><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></button>
+    <a class="pill-btn" href="/download/Pip-Setup.exe">Pakua</a>
+  </div>
+</header>
+<main>
+  <h1>Pip terms of use</h1>
+  <p class="meta">Pip for Windows and Mac &middot; BANG DIGITAL LTD, Tanzania &middot; Last updated 15 November 2026</p>
+
+  <div class="box">
+    <p><strong>Short version.</strong> Pip is free, open-source software. Use it, change it and share it under the MIT
+      licence. It comes as it is, with no warranty. The optional Pip account and file relay are free services we try to
+      keep running but do not guarantee. Do not use them to break the law or to harm anyone.</p>
+    <p lang="sw"><strong>Kwa ufupi.</strong> Pip ni software ya bure na open source. Itumie, ibadilishe na uigawe chini ya
+      leseni ya MIT. Inakuja kama ilivyo, bila dhamana. Akaunti ya Pip na kutuma mafaili kupitia server ni huduma za bure
+      tunazojitahidi ziendelee kufanya kazi, lakini hatuziahidi. Usizitumie kuvunja sheria wala kumdhuru mtu yeyote.</p>
+  </div>
+
+  <h2>1. Who we are and what these terms cover</h2>
+  <p>Pip is made by BANG DIGITAL LTD, Tanzania ("we"). These terms cover the Pip app for Windows and Mac, the website
+    pip.bang.co.tz, and the online services Pip offers: the optional Pip account (preferences sync), the update check and
+    the file relay used to send files between your phone and your computer. By installing Pip or using these services you
+    agree to these terms. If you do not agree, do not use them.</p>
+
+  <h2>2. The licence</h2>
+  <p>Pip's source code is published under the <a href="https://github.com/mkumbwajr/Pip/blob/main/LICENSE">MIT licence</a>.
+    You may use, copy, change and share it, including commercially, as long as the copyright and licence notice stay with
+    it. The name "Pip", the Pip mascot and the BANG DIGITAL name are ours: you may not present a changed version as the
+    official Pip.</p>
+
+  <h2>3. The Pip account (optional)</h2>
+  <ul>
+    <li>You sign in with Google. You must be allowed to use that Google account and be at least 13 years old.</li>
+    <li>The account keeps your Pip preferences, note, weather town and calendar link so your other devices can use them.
+      What is kept, and how, is described in the <a href="/privacy">privacy policy</a>.</li>
+    <li>You can delete your account at any time in Pip: Settings, Connections, Delete my Pip account.</li>
+    <li>We may remove accounts that are abused (for example, used to store content that is unlawful or that is not Pip
+      settings), or that have not been used for more than two years.</li>
+  </ul>
+
+  <h2>4. Sending files between your phone and your computer</h2>
+  <ul>
+    <li>Only send files you have the right to send. You are responsible for what you send.</li>
+    <li>When the phone and the computer are not on the same network, files pass through our server in encrypted form and
+      are deleted after one hour. We cannot read them, and we do not keep copies.</li>
+    <li>Do not use the relay to spread malware, to share content that is illegal in Tanzania or where you are, or to send
+      files to people without their consent.</li>
+  </ul>
+
+  <h2>5. Your AI agents and other services</h2>
+  <p>Pip shows and controls tools you already use: Claude Code, Codex, Spotify, Apple Music, Google Calendar and others.
+    Their own terms apply to your use of them. Pip's chat sends your messages to the coding agent you chose, through your
+    own login on your computer; their answers come from that agent, not from us, and may be wrong. Check anything important
+    before you rely on it.</p>
+
+  <h2>6. Acceptable use</h2>
+  <p>Do not try to break into, overload or disrupt pip.bang.co.tz or its services, get around their limits, or use them to
+    reach other people's data. We may block traffic that does this.</p>
+
+  <h2>7. No warranty</h2>
+  <p>Pip and its services are provided "as is", without warranty of any kind, express or implied, including fitness for a
+    particular purpose and non-infringement. The online services may change, pause or stop. Keep your own copies of anything
+    that matters to you.</p>
+
+  <h2>8. Limitation of liability</h2>
+  <p>As far as the law allows, BANG DIGITAL LTD is not liable for any indirect, incidental or consequential loss, or for
+    loss of data, profit or business, arising from your use of Pip or its services. Nothing in these terms limits liability
+    that the law does not allow to be limited.</p>
+
+  <h2>9. Changes</h2>
+  <p>We may update these terms. The new version is published on this page with a new date. If a change is significant we
+    will also say so in the release notes. Using Pip after a change means you accept the new terms.</p>
+
+  <h2>10. Law and contact</h2>
+  <p>These terms are governed by the laws of the United Republic of Tanzania. Questions:
+    <a href="mailto:info@bang.co.tz">info@bang.co.tz</a> &middot; BANG DIGITAL LTD, Tanzania.</p>
+
+  <footer>&copy; 2026 BANG DIGITAL LTD &middot; <a href="https://pip.bang.co.tz/">pip.bang.co.tz</a> &middot; <a href="/privacy">Privacy</a> &middot; <a href="https://github.com/mkumbwajr/Pip">Source code (MIT)</a></footer>
+</main>
+</body>
+</html>

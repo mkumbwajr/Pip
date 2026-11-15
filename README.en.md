@@ -38,7 +38,7 @@ Pip, the `•••` menu → **Updates** tells you when a newer version is out.
 | Spotify device switching (your own client ID, PKCE) | Token refresh and device list tested with a fake server; login not run |
 | Installer and uninstaller (plain NSIS, `build/pip.nsi`) | Built and opened on Windows |
 | Optional Pip account: Google sign-in, preferences / note / town / calendar link synced through pip.bang.co.tz (`server/pip-api.py`) | Server tested live (refuses bad tokens) and locally end to end; sync logic unit-tested; a real Google sign-in into an account not yet tried |
-| **macOS build** (DMG for Intel and Apple silicon, built by GitHub Actions; Spotify and Music through AppleScript, volume) | Written, never run on a Mac. No focus guard, Wi-Fi or Bluetooth on the Mac yet. Not signed: right-click the app and choose Open the first time |
+| **macOS build** (DMG for Intel and Apple silicon, built by GitHub Actions; Spotify and Music through AppleScript, volume) | Run by the owner on a Mac (music controls fixed after that). Wi-Fi and Bluetooth icons, the focus guard (front app, and the open tab in Safari and Chromium browsers; Firefox by name only) and Pip installing `blueutil` with Homebrew to switch Bluetooth are written but not yet run on a Mac. On a Mac every "PC" in the app reads "Mac". Not signed: right-click the app and choose Open the first time |
 
 ## Run it
 
@@ -79,7 +79,7 @@ replaces them with its own on its first start.
 ## What leaves your PC
 
 Only what you switch on: the town you type (Open-Meteo), song title and artist (lrclib.net for lyrics, iTunes Search
-for the year and cover art), your private calendar link, a screenshot and question, or a chat with Pip, to the agent you
+for the year and cover art, Deezer for covers iTunes lacks), your private calendar link, a screenshot and question, or a chat with Pip, to the agent you
 chose (through your own login), your Pip preferences, note, town and calendar link if you
 sign in to a Pip account (stored on pip.bang.co.tz under a hash of your Google ID), Spotify if you connect it, Google if
 you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz when you check

@@ -55,7 +55,7 @@ Ukiwa tayari una status line yako kwenye Claude Code, Pip haiigusi.
 
 Kwenye Windows 11 halisi: installer (kufunguka), jina na icon ya Pip, muziki (wimbo, picha, mwaka, lyrics), hali ya Wi-Fi na Bluetooth,
 mlinzi wa focus, Google sign-in (kalenda na idadi ya email), kushiriki na simu kwenye Wi-Fi moja, na smoke test kamili
-ya agent (session, ruhusa, kujibu, status line). Toleo la Mac (DMG) limeandikwa lakini halijawahi kuwashwa kwenye Mac. Hakijajaribiwa bado: Codex halisi, kuingia Spotify, kubadilisha
+ya agent (session, ruhusa, kujibu, status line). Toleo la Mac (DMG) limejaribiwa na mwenye project; Wi-Fi, Bluetooth na mlinzi wa focus kwenye Mac bado hazijajaribiwa. Hakijajaribiwa bado: Codex halisi, kuingia Spotify, kubadilisha
 Wi-Fi/Bluetooth kwa kubonyeza, kusogeza wimbo kwa bar, Pip agent kufungua chat, na hali ya hewa (card ilionekana tupu).
 
 ## Ukiwa unatoka kwenye Peep
@@ -67,7 +67,7 @@ mpaka Pip izibadilishe kwa zake mara ya kwanza inapowaka.
 ## Kinachotoka nje ya PC yako
 
 Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo (hali ya hewa); jina la wimbo na msanii vinaenda lrclib.net
-(lyrics) na iTunes Search (mwaka na picha ya wimbo); link ya kalenda inasomwa; swali la screen na chat ya Pip vinaenda kwa
+(lyrics) na iTunes Search (mwaka na picha ya wimbo; Deezer kwa picha ambazo iTunes haina); link ya kalenda inasomwa; swali la screen na chat ya Pip vinaenda kwa
 agent uliyemchagua kupitia akaunti yako; mipangilio, noti, mji na link ya kalenda ukiingia kwenye akaunti ya Pip
 (inahifadhiwa pip.bang.co.tz); Spotify ukiiunganisha;
 Google ukiingia (kalenda yako na idadi tu ya email ambazo hujasoma, sio nani wala nini); na pip.bang.co.tz ukibonyeza
