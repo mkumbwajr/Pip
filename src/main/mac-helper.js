@@ -37,10 +37,28 @@ const READ = `function run(argv) {
       if (!out.media || m.playing) out.media = m; if (m.playing) break;
     } catch (e) {}
   }
+  // Anything else playing, above all music AirPlayed from an iPhone (AirPlay Receiver): the Mac's own "Now Playing",
+  // the same one Control Center shows, from the MediaRemote framework. osascript is Apple's own program, which newer
+  // macOS still lets read it.
+  if (!out.media || !out.media.playing) { try {
+    $.NSBundle.bundleWithPath('/System/Library/PrivateFrameworks/MediaRemote.framework').load;
+    var R = $.NSClassFromString('MRNowPlayingRequest'), item = R.localNowPlayingItem, info = item.nowPlayingInfo;
+    var g = function (k) { var v = info.objectForKey('kMRMediaRemoteNowPlayingInfo' + k); return v.isNil() ? null : ObjC.deepUnwrap(v); };
+    var title = g('Title');
+    if (title) {
+      var rate = Number(g('PlaybackRate')) || 0, el = Number(g('ElapsedTime')) || 0, ts = info.objectForKey('kMRMediaRemoteNowPlayingInfoTimestamp');
+      if (rate > 0 && !ts.isNil()) el += -ts.timeIntervalSinceNow; // the elapsed time is as it was at that moment
+      var app = 'AirPlay'; try { var c = R.localNowPlayingPlayerPath.client; if (!c.isNil()) app = ObjC.unwrap(c.displayName) || app; } catch (e) {}
+      var nm = { title: String(title), artist: String(g('Artist') || ''), album: String(g('Album') || ''), playing: rate > 0 || Boolean(R.localIsPlaying),
+        positionMs: Math.round(el * 1000), durationMs: Math.round((Number(g('Duration')) || 0) * 1000), canSeek: true, app: app, artUrl: '', remote: true };
+      if (!out.media || nm.playing) out.media = nm;
+    }
+  } catch (e) {} }
   return JSON.stringify(out);
 }`;
 const run = (cmd, args, timeout = 6000) => new Promise(resolve => execFile(cmd, args, { timeout }, (err, out) => resolve(err ? null : String(out))));
 const NET_MS = 10000;
+const MR = "$.NSBundle.bundleWithPath('/System/Library/PrivateFrameworks/MediaRemote.framework').load; ";
 
 /** The Wi-Fi device ("en0" on most Macs) from networksetup's list of ports. */
 function wifiDevice(listing) { const m = String(listing || '').match(/Hardware Port: (?:Wi-Fi|AirPort)\s*\nDevice: (\S+)/); return m ? m[1] : null; }
@@ -68,7 +86,7 @@ class MacHelper extends EventEmitter {
       const raw = await osa(READ, [this.watch ? '1' : '0']); if (!raw) return;
       let s; try { s = JSON.parse(raw); } catch { return; }
       const m = s.media;
-      if (m) this.player = m.app;
+      if (m) { this.player = m.app; this.remote = Boolean(m.remote); }
       // a new state when something you would see changed, and every ten seconds to keep the song position honest
       const key = JSON.stringify([m?.title, m?.artist, m?.playing, s.volume?.level, s.volume?.muted, this.net, s.front]);
       if (key === this.last && Date.now() - this.lastAt < 10000) return;
@@ -105,6 +123,9 @@ class MacHelper extends EventEmitter {
   /** The same commands win-helper takes: media (toggle, next, prev), seek, volume. Others have nothing to do here. */
   send(c) {
     const p = JSON.stringify(this.player);
+    // the system's Now Playing (AirPlay and others): MediaRemote's commands (2 play/pause, 4 next, 5 previous)
+    if (this.remote && c?.cmd === 'media') { const n = { toggle: 2, next: 4, prev: 5 }[c.action]; if (n !== undefined) osa(`${MR}ObjC.bindFunction('MRMediaRemoteSendCommand', ['bool', ['int', 'id']]); $.MRMediaRemoteSendCommand(${n}, $());`).then(() => { this.last = ''; this.poll(); }); return n !== undefined; }
+    if (this.remote && c?.cmd === 'seek') { osa(`${MR}ObjC.bindFunction('MRMediaRemoteSetElapsedTime', ['void', ['double']]); $.MRMediaRemoteSetElapsedTime(${Math.max(0, Number(c.ms) || 0) / 1000});`); this.last = ''; return true; }
     if (c?.cmd === 'media') { const fn = { toggle: 'playpause', next: 'nextTrack', prev: 'previousTrack' }[c.action]; if (fn) osa(`Application(${p}).${fn}()`).then(() => { this.last = ''; this.poll(); }); return Boolean(fn); }
     if (c?.cmd === 'seek') { osa(`Application(${p}).playerPosition = ${Math.max(0, Number(c.ms) || 0) / 1000}`); this.last = ''; return true; }
     if (c?.cmd === 'radio' && c.kind === 'WiFi' && this.wifiDev) { run('networksetup', ['-setairportpower', this.wifiDev, c.on ? 'on' : 'off']).then(() => setTimeout(() => this.readNet(), 1500)); return true; }

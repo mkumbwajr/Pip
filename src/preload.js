@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('pipApp', {
   licenseStatus: call('license:status'), licenseCheck: call('license:check'), payMobile: call('license:payMobile'), payCard: call('license:payCard'), payOrder: call('license:order'), buy: call('license:buy'),
   openWelcome: call('welcome:open'), welcomeDone: call('welcome:done'),
   accountStatus: call('account:status'), accountSignIn: call('account:signin'), accountEmailCode: call('account:emailCode'), accountEmailVerify: call('account:emailVerify'), accountSync: call('account:sync'), accountSignOut: call('account:signout'), accountDelete: call('account:delete'),
-  media: call('media:cmd'), seek: call('media:seek'), setVolume: call('volume:set'), lyrics: call('lyrics:get'), songInfo: call('song:info'),
+  media: call('media:cmd'), seek: call('media:seek'), phone: call('phone:connect'), iphoneAllow: call('iphone:allow'), setVolume: call('volume:set'), lyrics: call('lyrics:get'), songInfo: call('song:info'),
   weather: call('weather:get'), calendar: call('calendar:get'), stats: call('stats:get'),
   trayAdd: call('tray:add'), trayRemove: call('tray:remove'), trayOpen: call('tray:open'), copyClip: call('clips:copy'), clearClips: call('clips:clear'), quit: call('app:quit'),
   shareStart: call('share:start'), shareStop: call('share:stop'), shareFirewall: call('share:firewall'),
@@ -26,5 +26,5 @@ contextBridge.exposeInMainWorld('pipApp', {
   dragOut: file => ipcRenderer.send('tray:drag', String(file)),
   pathFor: file => { try { return webUtils.getPathForFile(file); } catch { return ''; } },
   onAi: on('ai:state'), onFinish: on('ai:finish'), onWin: on('win:state'), onTray: on('tray:changed'), onClips: on('clips:changed'),
-  onToggle: on('island:toggle'), onArt: on('win:art'), onUpdate: on('update:available'), onLicense: on('license:changed'), onBuy: on('island:buy'), onSettingsGo: on('settings:go'), onCursor: on('cursor'), onChanged: on('app:changed'), onShareProgress: on('share:progress')
+  onToggle: on('island:toggle'), onArt: on('win:art'), onUpdate: on('update:available'), onLicense: on('license:changed'), onBuy: on('island:buy'), onAlert: on('island:alert'), onSettingsGo: on('settings:go'), onCursor: on('cursor'), onChanged: on('app:changed'), onShareProgress: on('share:progress')
 });

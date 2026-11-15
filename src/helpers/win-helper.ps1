@@ -106,9 +106,34 @@ function NetState {
   if ($b) { $bt = @{ on = ("$($b.State)" -eq 'On') } }
   @{ wifi = $wifi; bt = $bt }
 }
+# A phone as the music source: Windows 10 2004+ can be a Bluetooth speaker (A2DP sink) for a paired phone
+# (Windows.Media.Audio.AudioPlaybackConnection). The sound goes to the default output. Windows does not pass on the
+# song's name, so the island only says which phone is playing. Only phones the user paired in Bluetooth settings appear.
+$asAction = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncAction' })[0]
+$apcType = $null; try { $apcType = [Windows.Media.Audio.AudioPlaybackConnection, Windows.Media.Audio, ContentType = WindowsRuntime] } catch {}
+$devType = [Windows.Devices.Enumeration.DeviceInformation, Windows.Devices.Enumeration, ContentType = WindowsRuntime]
+$devList = [Windows.Devices.Enumeration.DeviceInformationCollection, Windows.Devices.Enumeration, ContentType = WindowsRuntime]
+$openType = $null; try { $openType = [Windows.Media.Audio.AudioPlaybackConnectionOpenResult, Windows.Media.Audio, ContentType = WindowsRuntime] } catch {}
+$phoneConn = $null; $phoneName = ''; $phoneId = ''
+function PhoneState {
+  if (-not $apcType) { return $null }
+  $list = @(); try { $list = @(Await ($devType::FindAllAsync($apcType::GetDeviceSelector())) $devList) } catch {}
+  $on = [bool]($script:phoneConn -and "$($script:phoneConn.State)" -eq 'Opened')
+  @{ list = @($list | ForEach-Object { @{ id = $_.Id; name = $_.Name } }); id = $script:phoneId; name = $script:phoneName; on = $on }
+}
+function PhoneOff { if ($script:phoneConn) { try { $script:phoneConn.Dispose() } catch {} }; $script:phoneConn = $null; $script:phoneId = ''; $script:phoneName = '' }
+function PhoneOn($id) {
+  PhoneOff
+  $c = $apcType::TryCreateFromId([string]$id); if (-not $c) { return }
+  $t = $asAction.Invoke($null, @($c.StartAsync())); $t.Wait(5000) | Out-Null
+  $o = $asTask.MakeGenericMethod($openType).Invoke($null, @($c.OpenAsync())); $o.Wait(20000) | Out-Null # the phone may take a while to answer
+  $script:phoneConn = $c; $script:phoneId = [string]$id
+  $d = $null; try { $d = Await ($devType::CreateFromIdAsync([string]$id)) $devType } catch {}; if ($d) { $script:phoneName = $d.Name }
+}
+
 function Emit($o) { [Console]::Out.WriteLine(($o | ConvertTo-Json -Compress -Depth 4)); [Console]::Out.Flush() }
 
-[PipInput]::Start(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0
+[PipInput]::Start(); $lastKey = ''; $lastAt = [DateTime]::MinValue; $tick = 0; $net = $null; $artKey = ''; $soon = 0; $phones = $null
 while ($true) {
   $closed = [PipInput]::Closed # read before draining, so a last command sent just before stdin closed still runs
   while ($null -ne ($text = [PipInput]::Next())) {
@@ -118,6 +143,7 @@ while ($true) {
         'media' { $s = Session; if ($s) { switch ($c.action) { 'toggle' { $s.TryTogglePlayPauseAsync() | Out-Null } 'next' { $s.TrySkipNextAsync() | Out-Null } 'prev' { $s.TrySkipPreviousAsync() | Out-Null } } } }
         'seek' { $s = Session; if ($s) { $s.TryChangePlaybackPositionAsync([long]$c.ms * 10000) | Out-Null } } # position in 100 ns ticks
         'volume' { [PipAudio]::Set([int]$c.level) }
+        'phone' { if ($c.id -and $apcType) { PhoneOn $c.id } else { PhoneOff }; $phones = PhoneState }
         'minimize' { [PipWin]::Minimize([long]$c.hwnd) }
         'radio' {
           Await ($radioType::RequestAccessAsync()) $accessType | Out-Null
@@ -130,14 +156,14 @@ while ($true) {
     $lastKey = ''; $soon = 3 # look again a few times right after a command
   }
   if ($closed) { break } # Pip has gone
-  if ($tick % 50 -eq 0) { $net = NetState }
+  if ($tick % 50 -eq 0) { $net = NetState; $phones = PhoneState }
   if ($tick % 2 -eq 0 -or $soon -gt 0) {
     if ($soon -gt 0) { $soon-- }
     $media = MediaState; $front = FrontState
     $vol = $null; try { $vol = @{ level = [PipAudio]::Level(); muted = [PipAudio]::Muted() } } catch {}
-    $key = "$($media.title)|$($media.artist)|$($media.playing)|$($vol.level)|$($vol.muted)|$($front.hwnd)|$($front.title)|$($net.wifi.on)|$($net.wifi.ssid)|$($net.bt.on)"
+    $key = "$($media.title)|$($media.artist)|$($media.playing)|$($vol.level)|$($vol.muted)|$($front.hwnd)|$($front.title)|$($net.wifi.on)|$($net.wifi.ssid)|$($net.bt.on)|$($phones.on)|$($phones.list.Count)"
     if ($key -ne $lastKey -or ([DateTime]::UtcNow - $lastAt).TotalSeconds -ge 5) {
-      Emit @{ type = 'state'; media = $media; volume = $vol; front = $front; net = $net }
+      Emit @{ type = 'state'; media = $media; volume = $vol; front = $front; net = $net; phones = $phones }
       $lastKey = $key; $lastAt = [DateTime]::UtcNow
     }
     if ($media) { $k = "$($media.title)|$($media.artist)"; if ($k -ne $artKey) { $artKey = $k; Emit @{ type = 'art'; key = $k; data = (Artwork) } } }

@@ -15,7 +15,7 @@ const SERVER_SAYS = {
   'That code is not right.': t => t('That code is not right.')
 };
 // what travels; dotted names take one field of an object
-const SYNC = ['lang', 'country', 'agentLanguage', 'buddyAgent', 'hiddenTabs', 'homeStyle', 'mascot', 'sounds', 'lyrics', 'songInfo',
+const SYNC = ['lang', 'country', 'agentLanguage', 'buddyAgent', 'hiddenTabs', 'homeStyle', 'mascot', 'sounds', 'motionSounds', 'iphone', 'lyrics', 'songInfo',
   'weather', 'calendarUrl', 'note', 'guard', 'modes', 'shortcut',
   'island.mode', 'island.opacity', 'island.brightness', 'island.scale', 'island.openOn', 'island.clock', 'island.radios', 'island.artGlow'];
 

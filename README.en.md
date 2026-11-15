@@ -34,6 +34,8 @@ newer Pip is uploaded to pip.bang.co.tz, Pip shows a notification (click it to d
 | Lyrics you can scroll, a click on a line jumps the song there | Drawn and checked on Windows with sample lyrics; seeking not tried on a live song |
 | A file arriving from the phone: progress in the island, confetti when it lands | Drawn on Windows; not yet tried with a real phone upload |
 | An agent error turns Pip's eyes and the glow red in the folded island | Drawn on Windows |
+| Phone as the music source: Windows becomes a Bluetooth speaker for a paired phone (no song name, so no lyrics); on a Mac, AirPlay from an iPhone shows the song and lyrics | Windows: connecting a Pixel tested; Mac AirPlay not yet tried |
+| iPhone on a Mac: new messages (sender and first line) and incoming calls on the island, read on the Mac only (Messages and Contacts need Full Disk Access, the call alert Accessibility) | Not yet tried on a Mac |
 | Music: now playing, cover art (fetched when missing), release year, controls, synced lyrics view | Tested on Windows with Media Player; the seek bar and fetched cover art not yet seen on a live song |
 | Focus timer, Modes (Work, Study, Sleep, Game) and the focus guard | Tested on Windows |
 | Calendar (day and month) and unread email count with Google sign-in | Tested end to end with a real Google account |

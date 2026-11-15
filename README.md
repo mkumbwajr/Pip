@@ -33,6 +33,10 @@ Pip mpya ikitoka kwenye pip.bang.co.tz, Pip inakuletea notification (bonyeza u-d
 **Kila siku**
 - **Muziki:** wimbo unaopiga, picha ya album (inajazwa yenyewe ikikosekana), mwaka wa wimbo, play/pause/ruka,
   kusogeza wimbo, na **lyrics** zinazoenda na wimbo: zi-scroll, bonyeza mstari wimbo uende hapo.
+- **Simu kama chanzo cha muziki:** Windows: unganisha simu kwenye Bluetooth, kisha PC inakuwa spika yake (jina la wimbo
+  halipiti, kwa hiyo hakuna lyrics). Mac: AirPlay kutoka iPhone, wimbo na lyrics zinaonekana.
+- **iPhone kwenye Mac:** meseji mpya (aliyetuma na mstari wa kwanza) na simu inayoingia zinaonekana kwenye kisiwa. Zinasomwa
+  kwenye Mac tu (Messages na Contacts kwa Full Disk Access, alert ya simu kwa Accessibility); hakuna kinachotoka nje.
 - **Focus na Modes:** chora mstari wa dakika 1–60; modes za Kazi, Kusoma, Kulala na Game zenye timer, kuzuia YouTube
   na TikTok, na kurudisha kila kitu ukimaliza. **Mlinzi wa focus** anakuomba upumue kabla ya kufungua tovuti hizo.
 - **Kalenda na Barua:** ingia na Google uone mchongo wa leo na mwezi, na idadi ya email ambazo hujasoma.

@@ -12,6 +12,7 @@ const { Hub } = require('./hooks-hub.js');
 const hooks = require('./hook-install.js');
 const { WinHelper } = require('./win-helper.js');
 const { MacHelper } = require('./mac-helper.js');
+const { MacAlerts } = require('./mac-alerts.js');
 const { Share } = require('./share.js');
 const firewall = require('./firewall.js');
 const { nextEvent } = require('./ics.js');
@@ -85,6 +86,7 @@ function hasNode() { if (nodeOk === null) { try { nodeOk = spawnSync('node', ['-
 const hookScript = name => path.join(__dirname, '..', 'hooks', name).replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
 const claudeScripts = () => (hasNode() ? { reply: hookScript(hooks.REPLY_SCRIPT), status: hookScript(hooks.STATUS_SCRIPT) } : {});
 const helper = process.platform === 'darwin' ? new MacHelper() : new WinHelper(); // the same events and commands on both
+const alerts = new MacAlerts();
 // A Mac app opened from the Dock gets a bare PATH (/usr/bin:/bin...), without Homebrew or npm's folders, so node,
 // claude and codex would not be found. Ask the login shell once for the PATH a terminal would have.
 if (process.platform === 'darwin') try {
@@ -178,6 +180,7 @@ function applySettings(patch) {
   if (before.weather.place !== after.weather.place && !(patch.weather && 'lat' in patch.weather)) { store.set({ weather: { lat: null, lon: null } }); weatherCache.at = 0; }
   if (before.lang !== after.lang) { loadLanguage(); tray?.refresh(); }
   if (after.autoUpdate && !before.autoUpdate) checkForUpdate(); // switched back on: look now, not in six hours
+  if (JSON.stringify(before.iphone) !== JSON.stringify(after.iphone)) alerts.set(after.iphone.messages, after.iphone.calls);
   helper.watch = Boolean(after.guard.on); // the Mac reads browser tabs only while the focus guard is on
   hub.context = agentContext(); changed(); for (const w of [settingsWin, welcomeWin]) if (w && !w.isDestroyed()) w.webContents.send('app:changed');
   return store.all();
@@ -348,7 +351,7 @@ const ours = e => String(e.senderFrame?.url || '').startsWith(pathToFileURL(REND
 const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e) ? fn(...args) : null));
 
 function wireIpc() {
-  handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, notch: notchInfo(), settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
+  handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, iphoneAccess: alerts.access, notch: notchInfo(), settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
     art: helper.art, tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
     strings, languages: languages(), node: hasNode(), spotify: spotify.connected, google: google.connected, googleBuiltIn: Boolean(clientFor(null)), account: account.status(), license: license.view() }));
   handle('app:strings', () => strings);
@@ -418,6 +421,12 @@ function wireIpc() {
   handle('google:openInbox', () => shell.openExternal('https://mail.google.com/mail/u/0/#inbox'));
   // Updates: asks GitHub (only when you press the button) for the newest release, and opens its page to download it
   handle('app:update', async () => { try { return { ok: true, ...(await latestRelease({ current: app.getVersion(), fetchImpl: webFetch })) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  // the macOS settings pane for iPhone messages (Full Disk Access), calls (Accessibility) or music (AirPlay Receiver)
+  handle('iphone:allow', kind => {
+    if (process.platform !== 'darwin') return null;
+    const pane = { calls: 'com.apple.preference.security?Privacy_Accessibility', messages: 'com.apple.preference.security?Privacy_AllFiles', airplay: 'com.apple.AirDrop-Handoff-Settings.extension' }[kind];
+    return pane ? shell.openExternal('x-apple.systempreferences:' + pane) : null;
+  });
   handle('app:release', url => (isReleaseUrl(url) ? shell.openExternal(String(url)) : null));
   // links in Settings and the welcome: only Pip's own website and its GitHub page
   handle('app:link', url => (/^https:\/\/(pip\.bang\.co\.tz|github\.com\/mkumbwajr\/Pip)(\/|$)/.test(String(url)) ? shell.openExternal(String(url)) : null));
@@ -430,6 +439,8 @@ function wireIpc() {
     return list.filter(s => s.name && s.name !== 'Pip' && !s.thumbnail.isEmpty()).slice(0, 12).map(s => ({ id: s.id, name: s.name, thumb: s.thumbnail.toDataURL() }));
   });
   handle('media:cmd', action => ['toggle', 'next', 'prev'].includes(action) && helper.send({ cmd: 'media', action }));
+  // a paired phone plays through this PC (Windows only); an empty id disconnects it
+  handle('phone:connect', id => helper.send({ cmd: 'phone', id: typeof id === 'string' ? id.slice(0, 400) : '' }));
   handle('media:seek', ms => helper.send({ cmd: 'seek', ms: Math.max(0, Math.round(Number(ms) || 0)) }));
   handle('volume:set', level => helper.send({ cmd: 'volume', level: Math.max(0, Math.min(100, Math.round(Number(level) || 0))) }));
   handle('lyrics:get', song => (store.get('lyrics') ? fetchLyrics(song || {}, { cacheDir: data('lyrics'), fetchImpl: webFetch }).catch(() => null) : [])); // null only when lrclib could not be reached
@@ -636,6 +647,11 @@ app.whenReady().then(async () => {
     lastPoint = key; const b = island.getBounds(), k = islandScale(); send('cursor', { x: (p.x - b.x) / k, y: (p.y - b.y) / k }); // in the page's own (zoomed) pixels
   }, 33);
   helper.watch = Boolean(store.get('guard').on); helper.start();
+  // iPhone messages and calls on a Mac (mac-alerts.js): shown in the island; settings shows whether macOS allows them
+  alerts.on('message', m => send('island:alert', { kind: 'message', ...m }));
+  alerts.on('call', c => send('island:alert', c ? { kind: 'call', ...c } : { kind: 'call-end' }));
+  alerts.on('access', () => { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('app:changed'); });
+  alerts.set(store.get('iphone').messages, store.get('iphone').calls);
   screen.on('display-metrics-changed', placeIsland); screen.on('display-added', placeIsland); screen.on('display-removed', placeIsland);
   // Starting Pip again from the Start menu shows its settings. If the one being started is a different copy (a newer
   // version or build, e.g. dragged over the old one on a Mac while it ran), this one restarts from disk as that copy.
@@ -646,6 +662,6 @@ app.whenReady().then(async () => {
   });
   watchForReplacement();
 });
-app.on('before-quit', () => { quitting = true; helper.stop(); hub?.stop(); share?.stop(); relay?.stop(); });
+app.on('before-quit', () => { quitting = true; helper.stop(); alerts.stop(); hub?.stop(); share?.stop(); relay?.stop(); });
 app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed', () => {});

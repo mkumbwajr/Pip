@@ -23,7 +23,7 @@ const weatherName = c => (c === 0 ? t('Clear') : c <= 3 ? t('Cloudy') : c <= 48 
 const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: 'idle', history: [], usage: null }, agents: {}, win: { media: null, volume: null, net: null }, tray: [], clips: [],
   weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', lyricsAt: 0, share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
-  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false,
+  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false, awakeUntil: 0, alert: null, alertTimer: 0, mood: '', pillDrawn: false, restTimer: 0, wakeTimer: 0,
   mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {},
   google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0 }, menuView: 'main', update: null,
   chat: { log: [], busy: false, screen: false }, recv: null };
@@ -39,13 +39,40 @@ const time = ms => { const s = Math.max(0, Math.round(ms / 1000)); return Math.f
 const ago = at => { const m = Math.round((Date.now() - at) / 60000); return m < 1 ? t('just now') : m < 60 ? t('{n} min ago', { n: m }) : t('{n} h ago', { n: Math.round(m / 60) }); };
 const size = b => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
 const typing = () => { const a = document.activeElement; return page.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'range'; };
-function chime(ok) {
-  if (!S.settings?.sounds) return;
+// ---------- sounds: one small synthesised sound per animation (no audio files) ----------
+// Alerts (asking, done, error, timers, payments, files) follow "sounds". The quiet ones for the island's own movement
+// (wake, rest, open, fold, music, phone) also need "motionSounds", so they can be switched off on their own.
+let audio = null;
+const ALERTS = new Set(['asking', 'done', 'error', 'working', 'focus', 'sparkle', 'message', 'ring']);
+// each sound: notes as [frequency Hz, start s, length s, volume, wave, glide-to Hz]
+const SFX = {
+  wake: [[520, 0, .09, .05, 'sine', 780], [880, .08, .12, .04, 'sine']],          // eyes pop open: a small rising "boop"
+  rest: [[440, 0, .45, .03, 'sine', 300]],                                         // a soft sigh down to sleep
+  open: [[300, 0, .14, .035, 'triangle', 620]],                                    // the island grows
+  fold: [[560, 0, .14, .03, 'triangle', 280]],                                     // and shrinks back
+  working: [[990, 0, .05, .035, 'square'], [1320, .06, .05, .025, 'square']],      // an agent starts: a busy little tick
+  asking: [[660, 0, .16, .11, 'sine'], [880, .15, .24, .11, 'sine', 990]],          // "hey?" going up like a question
+  done: [[523, 0, .14, .1, 'sine'], [659, .11, .14, .1, 'sine'], [784, .22, .32, .11, 'sine']], // a happy three-note smile
+  error: [[330, 0, .2, .1, 'triangle'], [247, .16, .34, .1, 'triangle', 220]],      // two notes down
+  music: [[392, 0, .08, .04, 'sine'], [523, .1, .1, .04, 'sine']],                  // a song starts: Pip bops
+  phoneOn: [[740, 0, .07, .05, 'sine'], [988, .08, .07, .05, 'sine'], [1318, .16, .14, .045, 'sine']], // phone connected
+  phoneOff: [[988, 0, .08, .045, 'sine'], [659, .09, .16, .04, 'sine']],
+  focus: [[784, 0, .5, .09, 'sine'], [1175, .02, .6, .04, 'sine']],                 // a timer ends: a bell
+  message: [[880, 0, .07, .06, 'sine'], [1175, .07, .14, .06, 'sine']],             // a message pops in: "ding-ding"
+  ring: [[1047, 0, .06, .05, 'sine'], [1319, .06, .06, .05, 'sine'], [1047, .12, .06, .05, 'sine'], [1319, .18, .08, .05, 'sine']], // a call: a soft trill (the iPhone rings too)
+  sparkle: [[1047, 0, .08, .06, 'sine'], [1319, .07, .08, .06, 'sine'], [1568, .14, .08, .06, 'sine'], [2093, .21, .3, .05, 'sine']], // confetti
+};
+function sfx(name) {
+  const st = S.settings; if (!st?.sounds || !SFX[name] || (!ALERTS.has(name) && st.motionSounds === false)) return;
   try {
-    const ctx = new AudioContext(), notes = ok ? [660, 880] : [330, 247];
-    notes.forEach((f, i) => { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
-      const at = ctx.currentTime + i * 0.14; g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.12, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.3); o.start(at); o.stop(at + 0.32); });
-    setTimeout(() => ctx.close(), 900);
+    audio = audio || new AudioContext(); if (audio.state === 'suspended') audio.resume();
+    const now = audio.currentTime + .01;
+    for (const [f, at, len, vol, wave, to] of SFX[name]) {
+      const o = audio.createOscillator(), g = audio.createGain(); o.type = wave; o.frequency.setValueAtTime(f, now + at);
+      if (to) o.frequency.exponentialRampToValueAtTime(to, now + at + len);
+      g.gain.setValueAtTime(.0001, now + at); g.gain.exponentialRampToValueAtTime(vol, now + at + .012); g.gain.exponentialRampToValueAtTime(.0001, now + at + len);
+      o.connect(g); g.connect(audio.destination); o.start(now + at); o.stop(now + at + len + .02);
+    }
   } catch {}
 }
 /** Song and artist as people read them: some players send "Artist - Title" as the title with no artist. */
@@ -62,7 +89,13 @@ function drawPill() {
   const top = S.ai.sessions[0], m = S.win.media;
   island.className = [S.ai.top, S.settings?.island.mode === 'detach' ? 'detach' : 'attach', S.open ? 'open' : '', S.pinned ? 'pinned' : ''].join(' ');
   const mood = S.ai.top !== 'idle' ? S.ai.top : (m?.playing ? 'music' : 'idle');
-  pip.className = 'pip ' + mood + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
+  // nothing to do: Pip rests (eyes half shut, slow breathing) until the pointer comes near; then it wakes with a blink
+  const resting = mood === 'idle' && !S.open && !S.hover && !S.alert && Date.now() >= S.awakeUntil;
+  if (resting && !pip.classList.contains('resting') && S.pillDrawn) sfx('rest');
+  if (!resting && pip.classList.contains('resting')) { sfx('wake'); pip.classList.add('waking'); clearTimeout(S.wakeTimer); S.wakeTimer = setTimeout(() => { pip.classList.remove('waking'); }, 700); }
+  if (mood !== S.mood && S.pillDrawn && ['working', 'music'].includes(mood)) sfx(mood); // done, asking and error ring from their own events
+  S.mood = mood; S.pillDrawn = true;
+  pip.className = 'pip ' + mood + (resting ? ' resting' : '') + (pip.classList.contains('waking') ? ' waking' : '') + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
   let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock();
   const pillAsk = !S.open && top?.state === 'asking' && top.ask?.canAnswer ? top : null; // a permission: answer it right in the pill
@@ -72,6 +105,7 @@ function drawPill() {
   else if (top && top.state === 'done') text = t('{agent} is done', { agent: AGENT[top.agent] });
   else if (top && top.state === 'error') text = t('{agent} hit an error', { agent: AGENT[top.agent] });
   else if (S.recv) { text = t('Receiving {name}', { name: S.recv.name }); side = S.recv.pct + '%'; }
+  else if (S.alert && !S.open) { text = S.alert.kind === 'call' ? S.alert.from : S.alert.from + (S.alert.text ? ': ' + S.alert.text : ''); side = S.alert.kind === 'call' ? t('Calling…') : (S.alert.count > 1 ? '+' + (S.alert.count - 1) : ''); }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; // beside a notch: the title only, to stay compact
   if (top && (top.state === 'working' || top.state === 'asking')) side = ''; // a task is running: the strip shows only what it does
@@ -85,6 +119,7 @@ function drawPill() {
     const w = S.ai.usage?.sevenDay; // both windows on hover; the chip itself shows the one that runs out first
     $('#pill-chip').title = u ? `${t('Claude usage')}: ${t('5 hours')} ${u.pct}%${w ? ` · ${t('Week')} ${w.pct}%` : ''}` : '';
   }
+  island.classList.toggle('alert-msg', S.alert?.kind === 'message' && !S.open); island.classList.toggle('alert-call', S.alert?.kind === 'call' && !S.open);
   island.classList.toggle('notched', Boolean(S.notch)); // set again because className was rebuilt above
   island.classList.toggle('has-update', Boolean(S.update?.newer));
   island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
@@ -136,7 +171,16 @@ const pages = {
   music() {
     const m = S.win.media, sp = S.spotify, on = S.settings.lyrics;
     if (S.platform !== 'win32' && S.platform !== 'darwin') return `<div class="cl-empty">${esc(t('Music controls need Windows or a Mac.'))}</div>`; // the Mac reads Spotify and Music (mac-helper.js)
-    if (!m) return `<div class="mu"><span class="mu-art">${icon('music')}</span><div class="mu-info"><span class="label">${esc(t('Playing'))}</span><h3>${esc(t('Nothing is playing.'))}</h3></div></div>`;
+    const ph = S.win.phones;
+    // a paired phone playing through this PC: Windows passes on the sound but not the song's name, so say which phone
+    if (ph?.on && !m?.playing) return `<div class="mu"><span class="mu-art ph-art">${icon('phone')}<span class="eq"><i></i><i></i><i></i><i></i></span></span>
+      <div class="mu-info"><span class="label">${esc(t('Playing from your phone'))}</span><h3 class="cut" title="${esc(ph.name)}">${esc(ph.name || t('Phone'))}</h3>
+        <div class="mu-meta">${esc(t('The sound plays on this PC. Change songs on the phone.'))}</div>
+        <div class="mu-foot"><button class="mu-chip" data-phone="">${icon('power')}${esc(t('Disconnect'))}</button></div></div></div>`;
+    const phones = S.platform === 'win32' && ph ? (ph.list.length
+      ? `<div class="ph-list"><span class="label">${esc(t('Play from your phone'))}</span>${ph.list.map(d => `<button class="mu-chip" data-phone="${esc(d.id)}">${icon('phone')}<span class="cut">${esc(d.name)}</span></button>`).join('')}</div>`
+      : `<div class="mu-meta ph-hint">${esc(t('Pair your phone in Bluetooth settings to play its music here.'))}</div>`) : '';
+    if (!m) return `<div class="mu"><span class="mu-art">${icon('music')}</span><div class="mu-info"><span class="label">${esc(t('Playing'))}</span><h3>${esc(t('Nothing is playing.'))}</h3>${phones}</div></div>`;
     const song = songOf(m), art = S.art?.key === m.title + '|' + m.artist ? S.art.data : '', year = S.years[song.title + '|' + song.artist];
     const controls = `<button class="mu-btn" data-media="prev" aria-label="${esc(t('Previous'))}">${icon('prev')}</button>
             <button class="mu-btn play" data-media="toggle" aria-label="${esc(t('Play or pause'))}">${icon(m.playing ? 'pause' : 'play')}</button>
@@ -370,7 +414,7 @@ function go(tab) {
     so the morph never shows an empty panel. */
 function setOpen(open, tab) {
   if (open === S.open) return;
-  S.open = open;
+  S.open = open; sfx(open ? 'open' : 'fold');
   // Home every time it opens, unless something asked for a tab, or it folded away on the lyrics while the song plays on
   if (open) go(tab || (S.license?.locked ? 'ai' : S.backToLyrics && S.settings?.lyrics && S.win.media?.playing ? 'music' : 'home'));
   else { S.backToLyrics = S.tab === 'music' && Boolean(S.settings?.lyrics); S.pinned = false; S.auto = false; showMenu(false); showVolume(false); showBright(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
@@ -430,6 +474,9 @@ function pointer(inside) {
   if (inside !== mouseSent) { mouseSent = inside; api.mouse(inside); }
   if (inside === S.hover) return;
   S.hover = inside; clearTimeout(openTimer); clearTimeout(closeTimer);
+  // after the pointer leaves, Pip stays awake a few seconds before resting again
+  clearTimeout(S.restTimer); if (!inside) { S.awakeUntil = Date.now() + 6000; S.restTimer = setTimeout(drawPill, 6100); }
+  drawPill();
   if (inside) { if (!S.open && S.settings?.island.openOn !== 'click') openTimer = setTimeout(() => setOpen(true), 70); } // 'click': only a click opens it
   else closeTimer = setTimeout(maybeClose, 280);
 }
@@ -439,7 +486,7 @@ function second() {
   if (S.focus.running) {
     S.focus.left--;
     if (S.focus.left <= 0) {
-      S.focus.running = false; S.focus.left = S.focus.total; chime(true);
+      S.focus.running = false; S.focus.left = S.focus.total; sfx('focus');
       if (S.mode) stopMode(); else if (S.tab === 'focus') draw(true);
     }
   }
@@ -637,6 +684,7 @@ function drawRecv() {
   drawPill();
 }
 function confetti() {
+  sfx('sparkle');
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const c = $('#confetti'), g = c.getContext('2d'), W = c.width = innerWidth, H = c.height = innerHeight;
   const r = shell.getBoundingClientRect(), ox = r.left + r.width / 2, oy = r.top + Math.min(r.height, 36) / 2;
@@ -712,6 +760,7 @@ page.addEventListener('click', async e => {
   const b = e.target.closest('button, .item'); if (!b) return;
   const d = b.dataset;
   if (d.settings !== undefined) openSettings();
+  else if (d.phone !== undefined) { b.disabled = true; b.classList.add('busy'); await api.phone(d.phone); }
   else if (d.lyrics !== undefined) { await save({ lyrics: !S.settings.lyrics }); S.lyricsFor = ''; refreshLyrics(); draw(true); }
   else if (d.decide) await api.decide(d.id, d.decide);
   else if (d.reply) sendReply(d.reply);
@@ -806,13 +855,23 @@ island.addEventListener('drop', async e => {
 api.onAi(snap => {
   const was = S.ai.top; S.ai = snap;
   // a permission waits in the folded pill with Allow / Deny; a question that needs typing opens the island by itself
-  if (snap.top === 'asking' && was !== 'asking') { chime(true); if (!S.open && !snap.sessions[0]?.ask?.canAnswer) { S.auto = true; setOpen(true, 'ai'); } }
+  if (snap.top === 'asking' && was !== 'asking') { sfx('asking'); if (!S.open && !snap.sessions[0]?.ask?.canAnswer) { S.auto = true; setOpen(true, 'ai'); } }
   else if (was === 'asking' && snap.top !== 'asking' && S.auto) { S.auto = false; setTimeout(maybeClose, 900); }
   draw();
 });
-api.onFinish(entry => chime(entry.state === 'done'));
-api.onWin(state => { const was = S.win.media?.title; S.win = state; if (state.media?.title !== was) applyArtColor(); refreshLyrics(); refreshSongInfo(); draw(); });
+api.onFinish(entry => sfx(entry.state === 'done' ? 'done' : 'error'));
+api.onWin(state => { const was = S.win.media?.title, phoneWas = S.win.phones?.on; S.win = state;
+  if (state.phones && phoneWas !== undefined && Boolean(state.phones.on) !== Boolean(phoneWas)) sfx(state.phones.on ? 'phoneOn' : 'phoneOff'); if (state.media?.title !== was) applyArtColor(); refreshLyrics(); refreshSongInfo(); draw(); });
 // the license changed (checked, bought, signed in or out): the tabs lock or unlock
+// an iPhone message (shown 7 s) or call (shown while it rings) on a Mac: the pill grows to show who, like a live activity
+api.onAlert(a => {
+  clearTimeout(S.alertTimer);
+  if (a.kind === 'call-end') { if (S.alert?.kind === 'call') S.alert = null; return drawPill(); }
+  if (a.kind === 'message' && S.alert?.kind === 'call') return; // a ringing call stays in front
+  if (a.kind !== S.alert?.kind || a.from !== S.alert?.from) sfx(a.kind === 'call' ? 'ring' : 'message');
+  S.alert = a; drawPill();
+  if (a.kind === 'message') S.alertTimer = setTimeout(() => { S.alert = null; S.awakeUntil = Date.now() + 3000; drawPill(); }, 7000);
+});
 api.onLicense(v => { S.license = v; drawTabs(); if (S.open && !typing()) draw(true); });
 api.onBuy(() => (S.open ? go('buy') : setOpen(true, 'buy')));
 api.onArt(art => { S.art = art; applyArtColor(); if (S.tab === 'music') draw(); });
@@ -825,7 +884,7 @@ api.onCursor(p => {
 });
 api.onTray(list => { S.tray = list; draw(); });
 api.onShareProgress(p => {
-  if (p.done) { S.recv = null; drawRecv(); chime(true); confetti(); return; }
+  if (p.done) { S.recv = null; drawRecv(); confetti(); return; }
   if (p.failed) { S.recv = null; return drawRecv(); }
   S.recv = { name: p.name, pct: p.total ? Math.min(99, Math.round(100 * p.got / p.total)) : 0 }; drawRecv();
 });

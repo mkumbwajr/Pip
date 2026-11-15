@@ -17,6 +17,8 @@ const DEFAULTS = {
   country: '',           // from the welcome; only used to suggest the language
   mascot: { name: 'Pip', color: '#7c5cff', hat: 'none' },
   sounds: true,
+  motionSounds: true,
+  iphone: { messages: true, calls: true }, // Mac: iPhone messages (sender and first line) and incoming calls on the island    // the quiet sounds of the island moving (wake, rest, open, fold, music, phone)
   lyrics: true,
   songInfo: true,        // release year from iTunes Search (song title and artist are sent)
   weather: { place: '', lat: null, lon: null },

@@ -555,3 +555,36 @@ h3, .tr-side h3, .mu-info h3, .cal-next h3 { font-family: var(--display); }
 .by-card svg { flex: none; width: 17px; height: 17px; } .by-card svg:last-child { width: 13px; height: 13px; margin-left: auto; color: var(--dim); }
 .by-card b { font-size: 14px; } .by-card span { color: var(--dim); font-size: 12px; }
 .by-r { gap: 7px; }
+
+/* a phone playing through the PC: the phone with a small moving equaliser */
+.ph-art { position: relative; } .ph-art > svg { width: 44px; height: 44px; }
+.ph-art .eq { position: absolute; bottom: 26px; display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+.ph-art .eq i { width: 3px; height: 100%; border-radius: 2px; background: var(--tint, #fff); transform-origin: bottom; animation: eq 1s ease-in-out infinite; }
+.ph-art .eq i:nth-child(2) { animation-delay: -.3s; } .ph-art .eq i:nth-child(3) { animation-delay: -.6s; } .ph-art .eq i:nth-child(4) { animation-delay: -.15s; }
+@keyframes eq { 0%, 100% { transform: scaleY(.25); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .ph-art .eq i { animation: none; transform: scaleY(.6); } }
+.ph-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: auto; padding-bottom: 6px; }
+.ph-list .label { width: 100%; } .ph-list .mu-chip { max-width: 220px; } .mu-chip.busy { opacity: .5; cursor: wait; }
+.ph-hint { margin-top: auto; padding-bottom: 8px; white-space: normal; }
+
+/* Resting: no task and the pointer is away. The eyes sink to sleepy slits that breathe slowly and stop following the
+   pointer; the glow dims. Waking: the eyes pop open with a blink when the pointer arrives. */
+.pip.resting .eye { animation: rest 4.2s ease-in-out infinite; translate: 0 1px; }
+@keyframes rest { 0%, 100% { transform: scaleY(.22); opacity: .55; } 50% { transform: scaleY(.32); opacity: .9; } }
+#island:not(.open) .pip.resting .eye { box-shadow: 0 0 3px 0 var(--pip), 0 0 7px 1px color-mix(in srgb, var(--pip) 45%, transparent); }
+.pip.waking .eye { animation: wake .65s var(--ease, ease-out) both; }
+@keyframes wake { 0% { transform: scaleY(.22); } 45% { transform: scaleY(1.2); } 62% { transform: scaleY(.15); } 100% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .pip.resting .eye { animation: none; transform: scaleY(.28); } .pip.waking .eye { animation: none; } }
+
+/* iPhone on a Mac: a message pops Pip in with a blue glow; a call rings with green pulses around the island */
+#island.alert-msg #pill-text { color: #fff; font-weight: 600; }
+#island.alert-msg .pip { animation: msgpop .5s var(--ease, ease-out); } @keyframes msgpop { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+#island.alert-msg #shell { box-shadow: 0 0 18px -4px #2fa8ff; }
+#island.alert-call #pill-text { color: #fff; font-weight: 700; }
+#island.alert-call #pill-side { color: #34c759; font-weight: 600; }
+#island.alert-call .pip { animation: ringshake .9s ease-in-out infinite; }
+@keyframes ringshake { 0%, 50%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(-12deg); } 20%, 40% { transform: rotate(12deg); } }
+#island.alert-call #shell { animation: ringglow 1.2s ease-out infinite; }
+@keyframes ringglow { 0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, .55); } 100% { box-shadow: 0 0 0 12px rgba(52, 199, 89, 0); } }
+#island.alert-call .pip .eye { background: #fff; box-shadow: 0 0 4px 1px #34c759, 0 0 10px 2px rgba(52, 199, 89, .7); }
+@media (prefers-reduced-motion: reduce) { #island.alert-call .pip, #island.alert-call #shell, #island.alert-msg .pip { animation: none; } }
