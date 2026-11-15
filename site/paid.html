@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="sw">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0e">
+<meta name="robots" content="noindex">
+<title>Pip</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<!-- Where EvPay's card page sends the buyer back. Pip itself learns the result from Pip's server and unlocks by
+     itself; this page only says what to do next. No script, nothing read from the link. -->
+<style>
+  :root { --pip: #7c5cff; --bg: #0b0b0e; --soft: #b6b6be; --mute: #86868f; }
+  html { background: var(--bg); }
+  body { margin: 0 auto; padding: 18vh 22px 40px; max-width: 460px; color: #f2f2f5; text-align: center; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .pip { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 64px; height: 56px; border-radius: 19px; background: var(--pip); }
+  .pip i { width: 8px; height: 15px; border-radius: 4px; background: #fff; animation: blink 5s infinite; }
+  @keyframes blink { 0%, 96%, 100% { transform: scaleY(1); } 98% { transform: scaleY(.1); } }
+  h1 { margin: 22px 0 8px; font-size: 26px; letter-spacing: -.02em; } p { margin: 0 0 10px; color: var(--soft); }
+  small { display: block; margin-top: 26px; color: var(--mute); font-size: 13px; }
+</style>
+</head>
+<body>
+  <span class="pip" aria-hidden="true"><i></i><i></i></span>
+  <h1>Asante! Rudi kwenye Pip.</h1>
+  <p>Malipo yakikamilika, Pip inafunguka yenyewe ndani ya sekunde chache, kwenye kila PC au Mac yenye akaunti yako.</p>
+  <p lang="en">Thanks! Go back to Pip: once the payment goes through it unlocks by itself.</p>
+  <small>Kama malipo hayakupita, jaribu tena ndani ya Pip. Msaada: info@bang.co.tz</small>
+</body>
+</html>

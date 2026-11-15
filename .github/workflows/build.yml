@@ -9,6 +9,7 @@ jobs:
         with: { node-version: 22 }
       - run: npm install --no-audit --no-fund
       - run: npm test
+      - run: python3 -m unittest server/test_license.py   # the license and EvPay flow, against a pretend EvPay
   windows:
     runs-on: windows-latest
     steps:

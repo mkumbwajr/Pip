@@ -10,12 +10,21 @@ Runs on BANG DIGITAL's server behind Nginx (https://pip.bang.co.tz/api/...), as 
   POST   /api/logout   ends this device's session
   DELETE /api/account  deletes your preferences and every session, on every device
 
+The license (server/license.py): a 7-day trial per device, then a one-time purchase through EvPay.
+  POST /api/license/status {"device": sha256}   (signed in or not) -> {licensed, trialEndsAt, now, priceTzs}
+  POST /api/pay/mobile     {"phone", "operator"?} (signed in)  a mobile-money prompt on that phone -> {order}
+  POST /api/pay/card       {"email"?}             (signed in)  -> {order, checkoutUrl} (EvPay's own card page)
+  GET  /api/pay/<order>                           (signed in)  -> {status: pending|paid|failed|on_hold|refunded, licensed}
+  POST /api/evpay/webhook  EvPay's signed result (X-EvPay-Signature); grants or takes back the license
+  python3 pip-api.py grant <email>               give an account a license by hand (support, gifts)
+
 Who you are comes only from Google (an ID token checked with Google, for Pip's own OAuth client). No passwords.
 Users are stored under a hash of their Google ID; session tokens are stored as hashes too.
 """
 import hashlib, hmac, json, os, re, shutil, secrets, sys, threading, time, urllib.parse, urllib.request
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mail  # server/mail.py: the sign-in code email
+import license as lic  # server/license.py: trial, license, EvPay
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(os.environ.get('PIP_API_PORT', '48620'))
@@ -29,6 +38,9 @@ RELAY_BOX_MAX = 600 * 1024 * 1024  # all files in one box
 ID_RE = re.compile(r'^[A-Za-z0-9_-]{16,40}$')
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 codes = {}                       # email -> {hash, expires, tries}: sign-in codes, in memory only
+store = None                     # lic.Store, set at start
+evpay = lic.EvPay()
+checked = {}                     # order -> when EvPay was last asked directly
 sent = {}                        # 'mail:<email>' / 'mailip:<ip>' -> [times]: codes sent in the last hour
 lock = threading.Lock()
 hits = {}                       # ip -> [window start, count]
@@ -117,6 +129,11 @@ class Api(BaseHTTPRequestHandler):
         try: return json.loads(self.rfile.read(n) or b'{}')
         except ValueError: return None
 
+    def raw(self):
+        n = int(self.headers.get('Content-Length') or 0)
+        if n > MAX_BODY: self.rfile.read(min(n, 2 * 1024 * 1024)); self.close_connection = True; return None
+        return self.rfile.read(n)
+
     def who(self):
         a = self.headers.get('Authorization', '')
         if not a.startswith('Bearer '): return None, None
@@ -163,8 +180,13 @@ class Api(BaseHTTPRequestHandler):
                 token = secrets.token_urlsafe(32); s = sessions()
                 s[h(token)] = {'user': h('email:' + email), 'created': now_ms(), 'expires': now_ms() + SESSION_DAYS * 86400000}; save_sessions(s)
             return self.reply(200, {'token': token, 'email': email})
+        if method == 'POST' and p == '/api/evpay/webhook': return self.webhook()
+        if method == 'POST' and p == '/api/license/status':  # works signed out too: the trial belongs to the device
+            b = self.body() or {}; device = str(b.get('device', '')).lower()
+            return self.reply(200, store.status(self.who()[0], device if lic.DEVICE_RE.match(device) else None))
         user, key = self.who()
         if not user: return self.reply(401, {'error': 'Sign in again'})
+        if p.startswith('/api/pay'): return self.pay(method, p, user)
         file = path('users', user + '.json')
         if method == 'GET' and p == '/api/prefs':
             d = read_json(file, None)
@@ -186,6 +208,55 @@ class Api(BaseHTTPRequestHandler):
                 s = {k: v for k, v in sessions().items() if v.get('user') != user}; save_sessions(s)
             return self.reply(200, {'ok': True})
         return self.reply(404, {'error': 'Not found'})
+
+    # ---------- buying the license ----------
+    def pay(self, method, p, user):
+        if method == 'POST' and p in ('/api/pay/mobile', '/api/pay/card'):
+            if store.license(user): return self.reply(409, {'error': 'This account already has a license'})
+            if not evpay.ready: return self.reply(503, {'error': 'Payments are not set up yet'})
+            if too_many('pay:' + user, 10): return self.reply(429, {'error': 'Too many payment attempts. Try again in an hour.'})
+            b = self.body() or {}
+            if p == '/api/pay/mobile':
+                phone = lic.normalize_phone(b.get('phone'))
+                if not phone: return self.reply(400, {'error': 'That phone number does not look right'})
+                op = b.get('operator') if b.get('operator') in lic.OPERATORS else lic.operator_for(phone)
+                if not op: return self.reply(400, {'error': 'That network is not supported'})
+                o = store.new_order(user, 'mobile:' + op)
+                try: r = evpay.mobile(o, phone, op)
+                except lic.EvPayError as e: o['status'] = 'failed'; store.save_order(o); return self.reply(502, {'error': str(e)})
+                o['evpayId'] = str(r.get('id') or ''); store.save_order(o)
+                return self.reply(200, {'order': o['ref'], 'status': 'pending', 'operator': op, 'amountTzs': o['amountTzs']})
+            email = str(b.get('email', '')).strip().lower()
+            o = store.new_order(user, 'card')
+            try: r = evpay.card(o, email if EMAIL_RE.match(email) else '')
+            except lic.EvPayError as e: o['status'] = 'failed'; store.save_order(o); return self.reply(502, {'error': str(e)})
+            url = r.get('checkoutUrl') or r.get('paymentUrl')
+            if not url or not str(url).startswith('https://'): o['status'] = 'failed'; store.save_order(o); return self.reply(502, {'error': 'EvPay did not return a card page'})
+            o['evpayId'] = str(r.get('id') or ''); store.save_order(o)
+            return self.reply(200, {'order': o['ref'], 'status': 'pending', 'checkoutUrl': url, 'amountTzs': o['amountTzs']})
+        if method == 'GET' and p.startswith('/api/pay/'):
+            o = store.order(p.split('/')[-1])
+            if not o or o['user'] != user: return self.reply(404, {'error': 'No such order'})
+            # the webhook normally settles it; while it is late, ask EvPay directly (at most every ten seconds)
+            if o['status'] == 'pending' and o.get('evpayId') and evpay.ready and time.time() - checked.get(o['ref'], 0) > 10:
+                checked[o['ref']] = time.time()
+                try:
+                    ev = lic.status_from_evpay(evpay.payment(o['evpayId']).get('status'))
+                    if ev: lic.apply_event(store, ev, {'requestId': o['ref']}); o = store.order(o['ref'])
+                except lic.EvPayError: pass
+            return self.reply(200, {'order': o['ref'], 'status': o['status'], 'licensed': bool(store.license(user))})
+        return self.reply(404, {'error': 'Not found'})
+
+    def webhook(self):
+        raw = self.raw()
+        if raw is None or not evpay.webhook_ok(raw, self.headers.get('X-EvPay-Signature')): return self.reply(401, {'error': 'Bad signature'})
+        event, delivery = self.headers.get('X-EvPay-Event', ''), self.headers.get('X-EvPay-Delivery', '')
+        try: payload = json.loads(raw or b'{}')
+        except ValueError: payload = {}
+        if event and (not delivery or store.first_delivery(delivery)):  # EvPay retries: each delivery counts once
+            if lic.apply_event(store, event, payload if isinstance(payload, dict) else {}) is None:
+                print('evpay webhook for an unknown order:', event, file=sys.stderr)
+        return self.reply(200, {'status': 'OK'})  # always acknowledged once the signature is right, or EvPay retries
 
     # ---------- the file relay: phone and computer on different networks ----------
     # A box lives one hour. Everything in it was encrypted by the sender with a key that never reaches this server (it
@@ -271,6 +342,10 @@ class Api(BaseHTTPRequestHandler):
     def do_DELETE(self): self.route('DELETE')
 
 if __name__ == '__main__':
+    store = lic.Store(DATA)
+    if sys.argv[1:2] == ['grant']:  # by hand: python3 pip-api.py grant someone@example.com
+        email = sys.argv[2].strip().lower(); store.grant(h('email:' + email), 'manual', 'manual'); print('license granted to', email); sys.exit(0)
     if not CLIENT_IDS: sys.exit('PIP_GOOGLE_CLIENT_IDS is not set')
+    if not evpay.ready: print('EvPay is not configured: buying is off, trials still run', file=sys.stderr)
     os.makedirs(path('users'), exist_ok=True); os.makedirs(path('relay'), exist_ok=True)
     ThreadingHTTPServer(('127.0.0.1', PORT), Api).serve_forever()

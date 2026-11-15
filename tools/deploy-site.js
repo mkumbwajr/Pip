@@ -55,10 +55,10 @@ if (process.argv.includes('--api')) { // Pip accounts: server/pip-api.py as a sy
   const EARLIER = ['896184851986-tqo26d1bdsvth1e8rvilev49vtc4lnc2.apps.googleusercontent.com'];
   const env = path.join(os.tmpdir(), 'pip-api.env'); fs.writeFileSync(env, `PIP_GOOGLE_CLIENT_IDS=${[clientId, ...EARLIER.filter(id => id !== clientId)].join(',')}\n`);
   sh('mkdir -p /srv/pip-api');
-  copy(path.join(root, 'server', 'pip-api.py'), '/srv/pip-api/pip-api.py'); copy(path.join(root, 'server', 'mail.py'), '/srv/pip-api/mail.py');
+  for (const f of ['pip-api.py', 'mail.py', 'license.py']) copy(path.join(root, 'server', f), '/srv/pip-api/' + f);
   copy(path.join(root, 'server', 'pip-api.service'), '/etc/systemd/system/pip-api.service');
   copy(env, '/etc/pip-api.env'); fs.rmSync(env);
-  sh(`set -e; chmod 755 /srv/pip-api; chmod 644 /srv/pip-api/pip-api.py /srv/pip-api/mail.py /etc/systemd/system/pip-api.service; chmod 600 /etc/pip-api.env
+  sh(`set -e; chmod 755 /srv/pip-api; chmod 644 /srv/pip-api/pip-api.py /srv/pip-api/mail.py /srv/pip-api/license.py /etc/systemd/system/pip-api.service; [ -f /etc/pip-api-evpay.env ] && chmod 600 /etc/pip-api-evpay.env || true; chmod 600 /etc/pip-api.env
     systemctl daemon-reload; systemctl enable pip-api >/dev/null 2>&1; systemctl restart pip-api; sleep 2
     code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:48620/api/prefs); echo "pip-api answers $code (401 = running, nobody signed in)"; [ "$code" = 401 ]`);
   installVhost(path.join(root, 'site', 'nginx-pip.conf'));
@@ -83,7 +83,7 @@ const siteOnly = process.argv.includes('--site'); // pages, styles, scripts and 
 if (!siteOnly && !fs.existsSync(installer)) { console.error('missing ' + installer + ': run npm run dist:win first'); process.exit(1); }
 // pack the site
 const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pip-site-'));
-for (const f of ['index.html', 'privacy.html', 'terms.html', 'send.html', 'send.js', 'site.css', 'site.js', 'theme.js']) fs.copyFileSync(path.join(root, 'site', f), path.join(out, f));
+for (const f of ['index.html', 'privacy.html', 'terms.html', 'send.html', 'paid.html', 'send.js', 'site.css', 'site.js', 'theme.js']) fs.copyFileSync(path.join(root, 'site', f), path.join(out, f));
 // a version stamp on the stylesheet and script links, so no browser keeps an old copy after a deploy
 const stamp = require('node:crypto').createHash('sha1').update(['site.css', 'site.js', 'theme.js'].map(f => fs.readFileSync(path.join(out, f), 'utf8')).join('')).digest('hex').slice(0, 8);
 for (const f of ['index.html', 'privacy.html', 'terms.html']) { const p = path.join(out, f); fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replace(/\/(site\.css|site\.js|theme\.js)"/g, `/$1?v=${stamp}"`)); }
