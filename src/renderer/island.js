@@ -364,7 +364,9 @@ bar.addEventListener('mouseover', e => {
   const b = e.target.closest('[data-tip]');
   if (!b || b.classList.contains('on')) return hideTip();
   const r = b.getBoundingClientRect(), base = bar.getBoundingClientRect();
-  tip.textContent = b.dataset.tip; tip.style.left = (r.left + r.width / 2 - base.left) + 'px'; tip.classList.add('show');
+  // centred over the button, but kept inside the bar: the end buttons (brightness, volume) cut it off otherwise
+  tip.textContent = b.dataset.tip; const half = tip.offsetWidth / 2, edge = 8;
+  tip.style.left = Math.max(edge + half, Math.min(base.width - edge - half, r.left + r.width / 2 - base.left)) + 'px'; tip.classList.add('show');
 });
 bar.addEventListener('mouseleave', hideTip);
 
