@@ -76,11 +76,11 @@ app.whenReady().then(async () => {
   const settingsSays = await sjs(`[...document.querySelectorAll('[data-go]')].map(b => (b.click(), document.body.innerText)).join(' ')`);
   if (/peep/i.test(settingsSays + await sjs('document.title'))) peepOnScreen.push('settings window');
   const share = await js(`window.pipApp.shareStart()`);
-  const sharePage = share?.ok ? await (await fetch(share.url)).text() : '';
+  const sharePage = share?.ok && share.lan ? await (await fetch(share.lan)).text() : ''; // the same-Wi-Fi page (the QR link is the relay page on the website)
   await js(`window.pipApp.shareStop()`);
   const update = await js(`window.pipApp.checkUpdate()`);
   console.log(JSON.stringify({ legacyHookCall: legacy, hooksMentionPeep: /peep/i.test(hooksText.split(path.join(__dirname, '..').split(path.sep).join('/')).join('')), hooksUsePipScripts: hooksText.includes('pip-reply.cjs') && hooksText.includes('pip-status.cjs'),
-    peepOnScreen, windowTitles: BrowserWindow.getAllWindows().map(w => w.getTitle()), sharePage: share?.ok ? { port: new URL(share.url).port, saysPip: /<title>Pip<\/title>/.test(sharePage), saysPeep: /peep/i.test(sharePage) } : share,
+    peepOnScreen, windowTitles: BrowserWindow.getAllWindows().map(w => w.getTitle()), sharePage: share?.ok ? { anyNetwork: share.anyNetwork, port: share.lan && new URL(share.lan).port, saysPip: /<title>Pip<\/title>/.test(sharePage), saysPeep: /peep/i.test(sharePage) } : share,
     update: update?.ok ? { latest: update.latest, url: update.url } : update }, null, 1));
   console.log(JSON.stringify({ claudeHookEvents: Object.keys(config.hooks).length, stopHooks: config.hooks.Stop.length, statusLine: config.statusLine?.command.includes('pip-status.cjs') || false,
     sessionStartContext: (start.hookSpecificOutput?.additionalContext || '').slice(0, 60), statusLineText: status.out, decision, replyExit: woke.code, replyText: woke.err.trim().split('\n').pop(), rendererErrors: errors }, null, 1));

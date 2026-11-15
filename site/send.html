@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="sw">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0e">
+<meta name="robots" content="noindex">
+<title>Pip</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/icon.png">
+<style>
+  :root { --pip: #7c5cff; --bg: #0b0b0e; --card: #16161b; --line: #26262d; --soft: #b6b6be; --mute: #86868f; }
+  * { box-sizing: border-box; } html { background: var(--bg); }
+  body { margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 18px 40px; max-width: 560px; color: #f2f2f5; font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; margin: 6px 0 22px; }
+  .pip { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 42px; height: 38px; border-radius: 13px; background: var(--pip); }
+  .pip i { width: 6px; height: 11px; border-radius: 3px; background: #fff; animation: blink 5s infinite; }
+  @keyframes blink { 0%, 96%, 100% { transform: scaleY(1); } 98% { transform: scaleY(.1); } }
+  header b { display: block; font-size: 20px; } header span { display: block; font-size: 13px; color: var(--mute); }
+  .lock { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 18px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; color: var(--soft); }
+  h2 { margin: 24px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--mute); }
+  .row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; margin: 8px 0; background: var(--card); border: 1px solid var(--line); border-radius: 16px; color: #f2f2f5; font: inherit; text-align: left; cursor: pointer; }
+  .name { flex: 1; min-width: 0; word-break: break-word; } .name small { display: block; color: var(--mute); font-size: 12px; margin-top: 2px; }
+  .get { flex: none; padding: 7px 12px; border-radius: 10px; background: #fff; color: #000; font-size: 14px; font-weight: 600; }
+  .empty { color: var(--mute); font-size: 14px; }
+  .pick { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 26px; border: 1.5px dashed #3a3a44; border-radius: 18px; background: var(--card); text-align: center; cursor: pointer; }
+  .pick b { font-size: 17px; } .pick span { color: var(--mute); font-size: 13px; } .pick input { display: none; }
+  .bar { height: 6px; margin-top: 8px; border-radius: 3px; background: #2a2a31; overflow: hidden; } .bar i { display: block; height: 100%; width: 0; background: var(--pip); transition: width .2s; }
+  .ok { color: #2fbf71; } .bad { color: #ff6b78; }
+  #state { min-height: 20px; margin-top: 10px; font-size: 14px; }
+</style>
+</head>
+<body>
+<header><span class="pip"><i></i><i></i></span><div><b>Pip</b><span>Tuma na pokea mafaili</span></div></header>
+<p class="lock">🔒 <span>Mafaili yanafungwa (encrypted) hapa kwenye simu yako kabla ya kutoka. Server ya Pip haiwezi kuyasoma, na link hii inakufa baada ya saa moja.</span></p>
+<h2>Tuma kwenye kompyuta</h2>
+<label class="pick"><b>Chagua mafaili</b><span>Picha, video, document, chochote (mpaka 200 MB kila moja)</span><input type="file" id="files" multiple></label>
+<div id="up"></div><p id="state"></p>
+<h2>Kutoka kwenye kompyuta</h2>
+<div id="list"><p class="empty">Inatafuta…</p></div>
+<script src="/send.js"></script>
+</body>
+</html>
