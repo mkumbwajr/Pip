@@ -109,8 +109,8 @@ test('update: version comparison and the "no release yet" answer', async () => {
   assert.equal(isNewer('0.10.0', '0.9.9'), true); assert.equal(isNewer('0.3.9', '0.4.0'), false); assert.equal(isNewer('1.0', '0.9.9'), true);
   assert.deepEqual(await latestRelease({ current: '0.4.0', fetchImpl: async () => ({ status: 404, ok: false }) }), { current: '0.4.0', latest: '0.4.0', newer: false });
   // the site answers first
-  const site = await latestRelease({ current: '0.4.0', fetchImpl: async u => (u.startsWith('https://pip.bang.co.tz/') ? { ok: true, status: 200, json: async () => ({ version: '0.5.0', url: 'https://pip.bang.co.tz/download/Pip-Setup-0.5.0.exe' }) } : assert.fail('github asked')) });
-  assert.deepEqual(site, { current: '0.4.0', latest: '0.5.0', newer: true, url: 'https://pip.bang.co.tz/download/Pip-Setup-0.5.0.exe' });
+  const site = await latestRelease({ current: '0.4.0', fetchImpl: async u => (u.startsWith('https://pip.bang.co.tz/') ? { ok: true, status: 200, json: async () => ({ version: '0.5.0', url: 'https://pip.bang.co.tz/download/Pip-Setup-0.5.0.exe', mac: 'https://pip.bang.co.tz/download/Pip-0.5.0-mac.dmg' }) } : assert.fail('github asked')) });
+  assert.deepEqual(site, { current: '0.4.0', latest: '0.5.0', newer: true, url: process.platform === 'darwin' ? 'https://pip.bang.co.tz/download/Pip-0.5.0-mac.dmg' : 'https://pip.bang.co.tz/download/Pip-Setup-0.5.0.exe' }); // each system gets its own download
   // site down: GitHub Releases
   const r = await latestRelease({ current: '0.4.0', fetchImpl: async u => (u.startsWith('https://pip.bang.co.tz/') ? { ok: false, status: 502 } : { status: 200, ok: true, json: async () => ({ tag_name: 'v0.5.0', html_url: 'https://github.com/mkumbwajr/Pip/releases/tag/v0.5.0' }) }) });
   assert.equal(r.newer, true); assert.equal(r.latest, '0.5.0');
