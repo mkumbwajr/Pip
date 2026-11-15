@@ -127,7 +127,7 @@ const pages = {
   },
   music() {
     const m = S.win.media, sp = S.spotify, on = S.settings.lyrics;
-    if (S.platform !== 'win32') return `<div class="cl-empty">${esc(t('Music controls need Windows.'))}</div>`;
+    if (S.platform !== 'win32' && S.platform !== 'darwin') return `<div class="cl-empty">${esc(t('Music controls need Windows or a Mac.'))}</div>`; // the Mac reads Spotify and Music (mac-helper.js)
     if (!m) return `<div class="mu"><span class="mu-art">${icon('music')}</span><div class="mu-info"><span class="label">${esc(t('Playing'))}</span><h3>${esc(t('Nothing is playing.'))}</h3></div></div>`;
     const song = songOf(m), art = S.art?.key === m.title + '|' + m.artist ? S.art.data : '', year = S.years[song.title + '|' + song.artist];
     const controls = `<button class="mu-btn" data-media="prev" aria-label="${esc(t('Previous'))}">${icon('prev')}</button>

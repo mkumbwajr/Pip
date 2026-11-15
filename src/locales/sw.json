@@ -65,7 +65,6 @@
   "Nothing running. Start Claude Code or Codex in a terminal.": "Hakuna kinachoendelea. Washa Claude Code au Codex kwenye terminal.",
   "History": "Zilizopita",
   "Finished jobs appear here.": "Kazi zikiisha zitaonekana hapa.",
-  "Music controls need Windows.": "Controls za muziki zinahitaji Windows.",
   "Previous": "Iliyopita",
   "Play or pause": "Play au simamisha",
   "Volume": "Sauti",
@@ -358,5 +357,6 @@
   "Open Pip": "Fungua Pip",
   "Use this one": "Tumia huu",
   "Placement": "Mahali",
-  "Open at login": "Fungua ukiingia kwenye Mac"
+  "Open at login": "Fungua ukiingia kwenye Mac",
+  "Music controls need Windows or a Mac.": "Controls za muziki zinahitaji Windows au Mac."
 }
