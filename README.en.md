@@ -13,7 +13,8 @@ need a one-time license of TSh 5,000 (mobile money or card, through EvPay). The 
 **Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · macOS (Intel and Apple silicon) · version 1.0.1
 
 The installer is not code-signed yet, so Windows SmartScreen warns: choose "More info", then "Run anyway". The Mac
-DMG is not signed either: the first time, right-click Pip in Applications and choose **Open**. When a
+app is signed ad hoc but not notarized by Apple: the first time, open System Settings → Privacy & Security and press
+**Open Anyway**. When updating, quit the old Pip first. When a
 newer Pip is uploaded to pip.bang.co.tz, Pip shows a notification (click it to download) and a dot on the `•••` menu →
 **Updates**. It looks at start and every six hours; switch it off in Settings → General. Each build carries a stamp
 (`tools/stamp.js`), so an installer rebuilt under the same version number is offered too.

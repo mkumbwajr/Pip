@@ -13,7 +13,8 @@ cha Tanzania; English ipo kwenye Settings. [English README](README.en.md)
 **Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · macOS (Intel na Apple silicon) · toleo 1.0.1
 
 Installer haina signature bado, kwa hiyo Windows SmartScreen itakuonya: bonyeza "More info" kisha "Run anyway".
-Kwenye Mac, DMG nayo haina signature: mara ya kwanza bonyeza kulia Pip kwenye Applications kisha **Open**.
+Kwenye Mac, Pip bado haijathibitishwa na Apple: mara ya kwanza fungua System Settings → Privacy & Security, shuka chini
+ubonyeze **Open Anyway**. Ukisasisha, funga Pip ya zamani kwanza (Quit Pip).
 Pip mpya ikitoka kwenye pip.bang.co.tz, Pip inakuletea notification (bonyeza u-download) na kidoti kwenye menu ya `•••` →
 **Updates**. Inaangalia ikiwaka na kila baada ya masaa sita; unaweza kuzima kwenye Settings → General.
 

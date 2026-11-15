@@ -23,6 +23,7 @@
   "build": {
     "appId": "tz.co.bang.pip",
     "productName": "Pip",
+    "afterPack": "build/after-pack.cjs",
     "extraMetadata": {
       "description": "Pip"
     },

@@ -42,9 +42,11 @@ jobs:
       - name: Google client (optional)
         env: { GOOGLE_CLIENT_JSON: "${{ secrets.GOOGLE_CLIENT_JSON }}" }
         run: '[ -n "$GOOGLE_CLIENT_JSON" ] && printf "%s" "$GOOGLE_CLIENT_JSON" > src/main/google-client.json || echo "no GOOGLE_CLIENT_JSON secret: users bring their own Google client"'
-      - name: DMG (Intel and Apple silicon, not signed)
+      - name: DMG (Intel and Apple silicon, signed ad hoc by build/after-pack.cjs, not notarized)
         run: npm run dist:mac
         env: { CSC_IDENTITY_AUTO_DISCOVERY: "false" }
+      # the app inside must carry a valid signature, or macOS may call it damaged: fail the build otherwise
+      - run: codesign --verify --deep --strict --verbose=2 dist/mac-universal/Pip.app && codesign -dv dist/mac-universal/Pip.app
       # the build's stamp next to the disk image: the website's latest.json takes it, so Macs see a rebuild as an update
       - run: cp src/build.json dist/Pip-mac-build.json
       - uses: actions/upload-artifact@v4

@@ -28,7 +28,8 @@ const { makeT } = require('../shared/i18n.js');
 
 // Pip.exe --remove-hooks: take Pip's entries out of the agents' config files and leave. The uninstaller runs this.
 if (process.argv.includes('--remove-hooks')) { try { hooks.uninstallClaude(); } catch {} try { hooks.uninstallCodex(); } catch {} app.exit(0); return; }
-if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+// the version and build go along, so a newer copy started next to a running older one can take over (see 'second-instance')
+if (!app.requestSingleInstanceLock({ version: app.getVersion(), build: require('./update.js').ownBuild() })) { app.quit(); return; }
 // Pip was called Peep before 0.5. On the first start after the update, bring the user's things over from Peep's
 // folder: settings, the hook token, history, the files in the tray, Google and Spotify logins (encrypted with a key
 // kept in "Local State", so that file comes too) and the lyrics, song and cover caches. Runs before Electron reads
@@ -491,6 +492,19 @@ function wireIpc() {
 }
 
 // ---------- start ----------
+// ---------- replaced while running ----------
+// On a Mac, an update is the new Pip.app dragged over the old one. The old process keeps running from files that are
+// gone, and macOS then refuses to open the new one ("can't be opened") until the old one quits. So Pip watches its own
+// Info.plist and, when it changes, restarts as the new copy.
+function restartAsNewCopy() { quitting = true; app.relaunch(); app.exit(0); }
+function watchForReplacement() {
+  if (process.platform !== 'darwin' || !app.isPackaged) return;
+  const plist = path.join(path.dirname(process.execPath), '..', 'Info.plist');
+  const stamp = () => { try { const s = fs.statSync(plist); return s.mtimeMs + ':' + s.size; } catch { return ''; } };
+  const first = stamp(); if (!first) return;
+  setInterval(() => { const now = stamp(); if (now && now !== first) setTimeout(restartAsNewCopy, 4000); }, 20000); // a few seconds for the copy to finish
+}
+
 // ---------- the license ----------
 // This device's ID for the trial: Windows' MachineGuid, the Mac's hardware UUID, or a random one Pip keeps. Only a
 // hash of it ever leaves the computer (license.js).
@@ -623,7 +637,14 @@ app.whenReady().then(async () => {
   }, 33);
   helper.watch = Boolean(store.get('guard').on); helper.start();
   screen.on('display-metrics-changed', placeIsland); screen.on('display-added', placeIsland); screen.on('display-removed', placeIsland);
-  app.on('second-instance', openSettings); // starting Pip again from the Start menu shows its settings
+  // Starting Pip again from the Start menu shows its settings. If the one being started is a different copy (a newer
+  // version or build, e.g. dragged over the old one on a Mac while it ran), this one restarts from disk as that copy.
+  app.on('second-instance', (_e, _argv, _cwd, extra) => {
+    const mine = { version: app.getVersion(), build: require('./update.js').ownBuild() };
+    if (extra && (extra.version !== mine.version || (extra.build && extra.build !== mine.build))) return restartAsNewCopy();
+    openSettings();
+  });
+  watchForReplacement();
 });
 app.on('before-quit', () => { quitting = true; helper.stop(); hub?.stop(); share?.stop(); relay?.stop(); });
 app.on('will-quit', () => globalShortcut.unregisterAll());
