@@ -35,7 +35,7 @@ test('codex: command hooks via curl, removed cleanly', () => {
   const file = path.join(tmp(), 'hooks.json');
   hi.installCodex({ token: 'T', file });
   const c = JSON.parse(fs.readFileSync(file, 'utf8'));
-  assert.match(c.hooks.Stop[0].hooks[0].command, /^curl\.exe .*agent=codex"$/);
+  assert.match(c.hooks.Stop[0].hooks[0].command, process.platform === 'win32' ? /^curl\.exe .*agent=codex"$/ : /^curl .*agent=codex"$/); // curl.exe on Windows, curl elsewhere
   assert.equal(hi.codexInstalled({ file }), true);
   hi.uninstallCodex({ file }); assert.equal(hi.codexInstalled({ file }), false);
 });
