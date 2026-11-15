@@ -1,0 +1,30 @@
+# Pip accounts (server/pip-api.py), installed by: node tools/deploy-site.js --api
+[Unit]
+Description=Pip accounts API (pip.bang.co.tz/api)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /srv/pip-api/pip-api.py
+# PIP_GOOGLE_CLIENT_IDS: Pip's own Google OAuth client ID(s), written by the deploy script
+EnvironmentFile=/etc/pip-api.env
+Restart=on-failure
+RestartSec=3
+# no fixed user, its own data folder (/var/lib/pip-api), and nothing else on the server writable or readable
+DynamicUser=yes
+StateDirectory=pip-api
+StateDirectoryMode=0700
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target

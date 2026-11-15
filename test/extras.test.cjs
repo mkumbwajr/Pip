@@ -170,3 +170,26 @@ test('mac helper: the AppleScript it runs is valid JavaScript, and unknown comma
   if (process.platform !== 'darwin') { h.start(); assert.equal(h.timer, null); } // does nothing off the Mac (on a Mac it would poll for ever and keep the test run open)
   h.stop();
 });
+
+test('account: only preferences travel; sign-in restores an account that has some; newer changes win', async () => {
+  const { Account, pick } = require('../src/main/account.js');
+  const all = { lang: 'en', note: 'n', agents: { claude: true }, google: { clientId: 'x', secret: 'y' }, firstRunDone: true, island: { display: 2, scale: 1.2, mode: 'detach' }, mascot: { name: 'Bob' } };
+  assert.deepEqual(pick(all), { lang: 'en', note: 'n', island: { scale: 1.2, mode: 'detach' }, mascot: { name: 'Bob' } }); // no agents, logins or screen
+  let server = { data: { lang: 'sw', mascot: { name: 'Pipo' } }, updatedAt: 500 }, saved = null, applied = [];
+  const fake = async (url, o) => {
+    const p = new URL(url).pathname;
+    if (p === '/api/login') return { ok: true, status: 200, json: async () => ({ token: 'tok', email: 'a@b.c' }) };
+    if (p === '/api/prefs' && o.method === 'GET') return { ok: true, status: 200, json: async () => server };
+    if (p === '/api/prefs' && o.method === 'PUT') { server = JSON.parse(o.body); return { ok: true, status: 200, json: async () => ({ updatedAt: server.updatedAt }) }; }
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const acc = new Account({ load: () => null, save: v => { saved = v; }, getSettings: () => all, apply: p => applied.push(p), fetchImpl: fake, base: 'https://x/api' });
+  assert.equal(await acc.signIn('id'), 'restored');
+  assert.deepEqual(applied[0], { lang: 'sw', mascot: { name: 'Pipo' } }); assert.equal(saved.token, 'tok'); assert.equal(saved.syncedAt, 500);
+  assert.equal(await acc.pull(), false); // nothing newer
+  server = { data: { lang: 'en' }, updatedAt: 900 }; assert.equal(await acc.pull(), true); assert.equal(saved.syncedAt, 900);
+  await acc.push(); assert.equal(server.data.mascot.name, 'Bob'); assert.ok(server.updatedAt > 900);
+  // an empty account takes this device's preferences
+  server = { data: null, updatedAt: 0 }; const acc2 = new Account({ load: () => null, save: () => {}, getSettings: () => all, apply: () => assert.fail('nothing to apply'), fetchImpl: fake, base: 'https://x/api' });
+  assert.equal(await acc2.signIn('id'), 'saved'); assert.equal(server.data.lang, 'en');
+});

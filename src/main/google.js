@@ -12,9 +12,13 @@ const REDIRECT_PORT = 48613, REDIRECT = `http://127.0.0.1:${REDIRECT_PORT}`;
 // calendar.readonly cannot change anything; gmail.labels gives the unread count and cannot open any message
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.labels';
 
-function authorizeUrl(clientId, challenge, state) {
-  return 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({ client_id: clientId, response_type: 'code', redirect_uri: REDIRECT, scope: SCOPES,
-    code_challenge_method: 'S256', code_challenge: challenge, state, access_type: 'offline', prompt: 'consent' });
+// The Pip account: only who you are (your Google ID and email), nothing from your calendar or mail
+const ID_SCOPES = 'openid email';
+
+function authorizeUrl(clientId, challenge, state, scope = SCOPES) {
+  const offline = scope === SCOPES; // calendar and mail keep working later; the account sign-in is used once
+  return 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({ client_id: clientId, response_type: 'code', redirect_uri: REDIRECT, scope,
+    code_challenge_method: 'S256', code_challenge: challenge, state, ...(offline ? { access_type: 'offline', prompt: 'consent' } : { prompt: 'select_account' }) });
 }
 /** Google's event shape to Pip's: { title, start, end (ms), allDay }. Cancelled events are left out. */
 function toEvents(items) {
@@ -29,16 +33,32 @@ class Google {
   constructor({ load, save, open, fetchImpl = fetch, t = s => s }) { Object.assign(this, { load, save, open, fetchImpl, t }); this.tokens = load() || null; this.server = null; }
   get connected() { return Boolean(this.tokens?.refresh); }
 
-  async token(body) {
+  /** Google's token endpoint: a code or a refresh token in, tokens out. */
+  async exchange(body) {
     const r = await this.fetchImpl('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body), signal: AbortSignal.timeout(15000) });
     if (!r.ok) throw new Error(this.t('Google said no ({code}).', { code: r.status }));
-    const j = await r.json();
+    return r.json();
+  }
+  async token(body) {
+    const j = await this.exchange(body);
     this.tokens = { clientId: body.client_id, secret: body.client_secret, access: j.access_token, refresh: j.refresh_token || this.tokens?.refresh, expires: Date.now() + (j.expires_in - 60) * 1000 };
     this.save(this.tokens);
   }
 
   /** Opens the browser for login and waits (up to 3 minutes) for Google to send the user back. */
-  login(clientId, secret) {
+  async login(clientId, secret) {
+    const j = await this.flow(clientId, secret, SCOPES);
+    this.tokens = { clientId, secret, access: j.access_token, refresh: j.refresh_token || this.tokens?.refresh, expires: Date.now() + (j.expires_in - 60) * 1000 };
+    this.save(this.tokens); return true;
+  }
+  /** The Pip account: a Google ID token that says who you are. Nothing is kept here; Pip's server checks it once. */
+  async identity(clientId, secret) {
+    const j = await this.flow(clientId, secret, ID_SCOPES);
+    if (!j.id_token) throw new Error(this.t('Google did not say who you are.'));
+    return j.id_token;
+  }
+  /** The browser part of a login, for any scope: PKCE, a one-time server on 127.0.0.1, the code exchanged for tokens. */
+  flow(clientId, secret, scope) {
     clientId = String(clientId || '').trim(); secret = String(secret || '').trim();
     if (!/\.apps\.googleusercontent\.com$/.test(clientId) || !secret) return Promise.reject(new Error(this.t('Paste the client ID and client secret of your Google desktop app first.')));
     const { verifier, challenge } = pkce(), state = randomBytes(12).toString('hex');
@@ -50,11 +70,11 @@ class Google {
         if (url.pathname !== '/' || url.searchParams.get('state') !== state) { res.writeHead(404).end(); return; }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end('<body style="font:18px system-ui;padding:40px">Pip: tayari. Unaweza kufunga tab hii.</body>');
         const code = url.searchParams.get('code'); if (!code) return done(reject, new Error(this.t('Login was cancelled.')));
-        try { await this.token({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: clientId, client_secret: secret, code_verifier: verifier }); done(resolve, true); } catch (e) { done(reject, e); }
+        try { done(resolve, await this.exchange({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT, client_id: clientId, client_secret: secret, code_verifier: verifier })); } catch (e) { done(reject, e); }
       });
       const timer = setTimeout(() => done(reject, new Error(this.t('Login took too long.'))), 3 * 60 * 1000);
       server.once('error', e => done(reject, e));
-      server.listen(REDIRECT_PORT, '127.0.0.1', () => this.open(authorizeUrl(clientId, challenge, state)));
+      server.listen(REDIRECT_PORT, '127.0.0.1', () => this.open(authorizeUrl(clientId, challenge, state, scope)));
     });
   }
   logout() { this.tokens = null; this.save(null); }
@@ -83,4 +103,4 @@ function clientFor(own) {
   return null;
 }
 
-module.exports = { Google, authorizeUrl, toEvents, clientFor, REDIRECT, SCOPES };
+module.exports = { Google, authorizeUrl, toEvents, clientFor, REDIRECT, SCOPES, ID_SCOPES };

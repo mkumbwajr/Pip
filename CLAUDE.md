@@ -13,7 +13,8 @@ Publisher: BANG DIGITAL LTD. Repo: https://github.com/mkumbwajr/Pip
    `src/locales/sw.json` and must be Tanzanian street Swahili mixed with the English tech words people really use
    (Swanglish): not textbook Swahili, not Kenyan usage. `test/more.test.cjs` fails if a text is missing or unused.
    The owner reviews wording: list every new string in your summary.
-3. **No account, no paywall, no telemetry.** Anything that leaves the PC must be switched on by the user and named
+3. **No account required, no paywall, no telemetry.** The Pip account (Google sign-in, preferences sync, `server/`) is
+   optional and Pip must work fully without it. Anything that leaves the PC must be switched on by the user and named
    in the README's "Kinachotoka nje ya PC yako" section.
 4. **Never break the user's agent config.** `hook-install.js` only touches its own entries, keeps a `.pip-backup`,
    never replaces an existing status line and refuses to write JSON it cannot parse. Keep those guarantees and

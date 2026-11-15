@@ -67,12 +67,12 @@
   <p class="meta">Pip for Windows &middot; BANG DIGITAL LTD, Tanzania &middot; Last updated 14 November 2026</p>
 
   <div class="box">
-    <p><strong>Short version.</strong> Pip runs on your own PC. It has no accounts, no ads and no analytics. Information
-      leaves your PC only for a feature you choose to use, and then only what that feature needs. BANG DIGITAL does not
-      sell, share or keep your data.</p>
-    <p lang="sw"><strong>Kwa ufupi.</strong> Pip inafanya kazi kwenye PC yako. Hakuna akaunti, matangazo wala telemetry.
-      Kinachotoka nje ya PC ni kile tu kinachohitajika na kipengele ulichochagua kutumia. BANG DIGITAL haiuzi, haigawi wala
-      haihifadhi data yako.</p>
+    <p><strong>Short version.</strong> Pip runs on your own PC. No account is needed, and it has no ads and no analytics.
+      Information leaves your PC only for a feature you choose to use, and then only what that feature needs. BANG DIGITAL
+      does not sell or share your data, and keeps only what an optional Pip account holds (section 2), until you delete it.</p>
+    <p lang="sw"><strong>Kwa ufupi.</strong> Pip inafanya kazi kwenye PC yako. Huhitaji akaunti, na hakuna matangazo wala
+      telemetry. Kinachotoka nje ya PC ni kile tu kinachohitajika na kipengele ulichochagua kutumia. BANG DIGITAL haiuzi wala
+      haigawi data yako, na inahifadhi tu kilicho kwenye akaunti ya Pip ukiamua kuwa nayo (sehemu ya 2), mpaka uifute.</p>
   </div>
 
   <h2>1. Google account (optional)</h2>
@@ -93,14 +93,31 @@
     <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
     including the Limited Use requirements.</strong></p>
 
-  <h2>2. Sending files between your phone and your PC</h2>
+  <h2>2. Pip account (optional)</h2>
+  <p>You can sign in to a Pip account so another PC or Mac with Pip picks up your setup. Pip works fully without one.</p>
+  <table>
+    <tr><th>What</th><th>Details</th></tr>
+    <tr><td>Sign-in</td><td>With Google, asking only who you are (<code>openid email</code>): your Google ID and email address. No password is
+      created or stored, and this sign-in gives no access to your calendar or mail.</td></tr>
+    <tr><td>What is kept</td><td>Your Pip preferences (language, island look and behaviour, Home layout, Pip's name, colour and hat, tabs,
+      modes, focus guard list, sounds, music switches, shortcut), the text of your Note, your weather town, and your calendar
+      link if you set one. Never: your files, what you copy, your agents' work, chats, Google or Spotify logins.</td></tr>
+    <tr><td>Where</td><td>On BANG DIGITAL's own server (pip.bang.co.tz, Vultr), stored under a one-way hash of your Google ID, reached only
+      over HTTPS. Your email is shown to you in Pip but is not stored on the server. Session tokens are stored as hashes.</td></tr>
+    <tr><td>Deleting</td><td>Settings, Connections, Delete my Pip account removes everything the server holds for you and signs out every
+      device, at once. Your PCs keep their own settings.</td></tr>
+  </table>
+  <p>Your calendar link is private: anyone who has it can read your calendar. Leave it out of Pip, or use Google sign-in for the
+    calendar instead, if you do not want it on the server.</p>
+
+  <h2>3. Sending files between your phone and your PC</h2>
   <p>When you choose <strong>Get from your phone</strong>, Pip makes a private link and QR code that works for one hour, or
     until you stop sharing. So that it also works when your phone is not on the same Wi-Fi, the files travel through Pip's
     relay at <code>pip.bang.co.tz</code>, encrypted on the way (HTTPS). The relay only passes them along as they move: it
     does not save files, does not keep copies, and does not record file names or contents. Anyone who has the link can open
     it while it works, so only share it with your own devices.</p>
 
-  <h2>3. Other features that use the internet</h2>
+  <h2>4. Other features that use the internet</h2>
   <p>Each of these runs only when you turn it on or use it.</p>
   <table>
     <tr><th>Feature</th><th>What is sent</th><th>Sent to</th></tr>
@@ -115,20 +132,20 @@
   </table>
   <p>Everything else, including what your AI agents are doing, your notes, copied text, files and settings, stays on your PC.</p>
 
-  <h2>4. This website</h2>
+  <h2>5. This website</h2>
   <p>pip.bang.co.tz serves the installer, this page, the update check and the file relay. Like any web server it briefly
     keeps standard access logs (IP address, time, page requested, browser name) to keep the service working and safe. They
     are deleted after 14 days and are never shared or sold. The website uses no cookies and no trackers.</p>
 
-  <h2>5. Children</h2>
+  <h2>6. Children</h2>
   <p>Pip is a tool for developers and is not directed at children under 13.</p>
 
-  <h2>6. Your choices</h2>
-  <p>You can use Pip without any of the online features above. You can sign out of Google or Spotify, switch off lyrics,
+  <h2>7. Your choices</h2>
+  <p>You can use Pip without any of the online features above. You can delete your Pip account, sign out of Google or Spotify, switch off lyrics,
     the song year and the weather in Settings, and uninstall Pip at any time; uninstalling removes Pip and its changes to
     your AI agents' settings.</p>
 
-  <h2>7. Changes and contact</h2>
+  <h2>8. Changes and contact</h2>
   <p>If this policy changes, the new version is published on this page with a new date. Questions about your data:
     <a href="mailto:info@bang.co.tz">info@bang.co.tz</a> &middot; BANG DIGITAL LTD, Tanzania.</p>
 

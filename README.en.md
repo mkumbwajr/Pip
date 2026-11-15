@@ -6,9 +6,9 @@ The interface is in Tanzanian Swahili by default; English is in Settings.
 
 ![Pip open: clock, an agent at work, music and focus](site/img/pip-home.png)
 
-MIT licence. No account, no paywall, no telemetry.
+MIT licence. No account needed (an optional Pip account syncs your setup between devices), no paywall, no telemetry.
 
-**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · version 0.6.0
+**Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · version 0.7.0
 
 The installer is not code-signed yet, so Windows SmartScreen warns: choose "More info", then "Run anyway". Inside
 Pip, the `•••` menu → **Updates** tells you when a newer version is out.
@@ -37,6 +37,7 @@ Pip, the `•••` menu → **Updates** tells you when a newer version is out.
 | Island brightness, size (80–140 %), transparency, Pip's colour and hat, hide tabs | Tested on Windows |
 | Spotify device switching (your own client ID, PKCE) | Token refresh and device list tested with a fake server; login not run |
 | Installer and uninstaller (plain NSIS, `build/pip.nsi`) | Built and opened on Windows |
+| Optional Pip account: Google sign-in, preferences / note / town / calendar link synced through pip.bang.co.tz (`server/pip-api.py`) | Server tested live (refuses bad tokens) and locally end to end; sync logic unit-tested; a real Google sign-in into an account not yet tried |
 | **macOS build** (DMG for Intel and Apple silicon, built by GitHub Actions; Spotify and Music through AppleScript, volume) | Written, never run on a Mac. No focus guard, Wi-Fi or Bluetooth on the Mac yet. Not signed: right-click the app and choose Open the first time |
 
 ## Run it
@@ -44,7 +45,7 @@ Pip, the `•••` menu → **Updates** tells you when a newer version is out.
 ```
 npm install
 npm start           # Ctrl+Alt+Space toggles the island
-npm test            # 34 Node tests, any OS
+npm test            # 35 Node tests, any OS
 npm run dist:win    # on Windows: Pip.exe and the installer in dist/ (needs makensis on PATH)
 npm run dist:mac    # on a Mac: dist/Pip-<version>-mac.dmg (GitHub Actions builds it on every push)
 PIP_HUB_PORT=48699 npx electron --no-sandbox tools/smoke.js out/   # full smoke test, next to a running Pip
@@ -79,7 +80,8 @@ replaces them with its own on its first start.
 
 Only what you switch on: the town you type (Open-Meteo), song title and artist (lrclib.net for lyrics, iTunes Search
 for the year and cover art), your private calendar link, a screenshot and question, or a chat with Pip, to the agent you
-chose (through your own login), Spotify if you connect it, Google if
+chose (through your own login), your Pip preferences, note, town and calendar link if you
+sign in to a Pip account (stored on pip.bang.co.tz under a hash of your Google ID), Spotify if you connect it, Google if
 you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz when you check
 for updates. Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 

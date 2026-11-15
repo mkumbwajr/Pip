@@ -37,6 +37,21 @@ if (process.argv.includes('--mac')) { // the Mac disk image from this version's 
   sh(`set -e; cd /srv/pip/download; ln -sf Pip-${version}-mac.dmg Pip-mac.dmg; printf '%s\n' '${latest}' > /srv/pip/latest.json; chmod -R a+rX /srv/pip`);
   console.log('published the Mac build of Pip ' + version); process.exit(0);
 }
+if (process.argv.includes('--api')) { // Pip accounts: server/pip-api.py as a systemd service, then the Nginx route to it
+  let clientId = '';
+  try { clientId = require('../src/main/google-client.json').clientId || ''; } catch {}
+  if (!/\.apps\.googleusercontent\.com$/.test(clientId)) { console.error('src/main/google-client.json is missing: the server must know Pip\'s Google client ID'); process.exit(1); }
+  const env = path.join(os.tmpdir(), 'pip-api.env'); fs.writeFileSync(env, `PIP_GOOGLE_CLIENT_IDS=${clientId}\n`);
+  sh('mkdir -p /srv/pip-api');
+  copy(path.join(root, 'server', 'pip-api.py'), '/srv/pip-api/pip-api.py');
+  copy(path.join(root, 'server', 'pip-api.service'), '/etc/systemd/system/pip-api.service');
+  copy(env, '/etc/pip-api.env'); fs.rmSync(env);
+  sh(`set -e; chmod 755 /srv/pip-api; chmod 644 /srv/pip-api/pip-api.py /etc/systemd/system/pip-api.service; chmod 600 /etc/pip-api.env
+    systemctl daemon-reload; systemctl enable pip-api >/dev/null 2>&1; systemctl restart pip-api; sleep 2
+    code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:48620/api/prefs); echo "pip-api answers $code (401 = running, nobody signed in)"; [ "$code" = 401 ]`);
+  installVhost(path.join(root, 'site', 'nginx-pip.conf'));
+  console.log('accounts API live at https://' + DOMAIN + '/api/'); process.exit(0);
+}
 if (process.argv.includes('--nginx')) { // only the Nginx file for pip.bang.co.tz (tested, rolled back if the test fails)
   installVhost(path.join(root, 'site', 'nginx-pip.conf')); console.log('nginx updated'); process.exit(0);
 }

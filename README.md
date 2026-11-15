@@ -5,10 +5,10 @@
 
 ![Pip ikiwa imefunguka: saa, agent kazini, muziki na focus](site/img/pip-home.png)
 
-Bure na open source (MIT). Hakuna akaunti, hakuna malipo, hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani
+Bure na open source (MIT). Huhitaji akaunti (akaunti ya Pip ni hiari, ina-sync mipangilio kati ya vifaa), hakuna malipo, hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani
 cha Tanzania; English ipo kwenye Settings. [English README](README.en.md)
 
-**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · toleo 0.6.0
+**Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · toleo 0.7.0
 
 Installer haina signature bado, kwa hiyo Windows SmartScreen itakuonya: bonyeza "More info" kisha "Run anyway".
 Ndani ya Pip, menu ya `•••` → **Updates** inakuambia toleo jipya likitoka.
@@ -41,7 +41,7 @@ Ndani ya Pip, menu ya `•••` → **Updates** inakuambia toleo jipya likitok
 ```
 npm install
 npm start           # kisiwa kinatokea juu ya screen; Ctrl+Alt+Space kinakifungua na kukifunga
-npm test            # tests 34 za Node (OS yoyote)
+npm test            # tests 35 za Node (OS yoyote)
 npm run dist:win    # kwenye Windows: Pip.exe na installer ndani ya dist/ (inahitaji makensis kwenye PATH)
 npm run dist:mac    # kwenye Mac: dist/Pip-<version>-mac.dmg (GitHub Actions inaitengeneza kila push)
 PIP_HUB_PORT=48699 npx electron --no-sandbox tools/smoke.js out/   # smoke test kamili, pembeni ya Pip inayo-run
@@ -68,7 +68,8 @@ mpaka Pip izibadilishe kwa zake mara ya kwanza inapowaka.
 
 Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo (hali ya hewa); jina la wimbo na msanii vinaenda lrclib.net
 (lyrics) na iTunes Search (mwaka na picha ya wimbo); link ya kalenda inasomwa; swali la screen na chat ya Pip vinaenda kwa
-agent uliyemchagua kupitia akaunti yako; Spotify ukiiunganisha;
+agent uliyemchagua kupitia akaunti yako; mipangilio, noti, mji na link ya kalenda ukiingia kwenye akaunti ya Pip
+(inahifadhiwa pip.bang.co.tz); Spotify ukiiunganisha;
 Google ukiingia (kalenda yako na idadi tu ya email ambazo hujasoma, sio nani wala nini); na pip.bang.co.tz ukibonyeza
 Updates. Hooks, ulivyo-copy, noti na mafaili vinabaki kwenye PC. Sera kamili: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 

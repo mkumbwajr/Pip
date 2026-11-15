@@ -20,6 +20,7 @@ const { fetchSongInfo } = require('./songinfo.js');
 const buddy = require('./buddy.js');
 const { Spotify } = require('./spotify.js');
 const { Google, clientFor } = require('./google.js');
+const { Account } = require('./account.js');
 const { latestRelease, isReleaseUrl } = require('./update.js');
 const { makeT } = require('../shared/i18n.js');
 
@@ -55,7 +56,7 @@ const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
 const WIN_ICON = path.join(__dirname, '..', '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
 const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
-let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, quitting = false;
+let store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, account = null, quitting = false;
 let strings = {}, t = makeT(strings);
 
 // ---------- language ----------
@@ -152,7 +153,20 @@ function createIsland() {
   island.on('close', e => { if (!quitting) e.preventDefault(); });
 }
 
-// ---------- the welcome: six short steps the first time Pip starts ----------
+// A change to the settings, from the settings window, the island or another device (the Pip account): saved, then
+// whatever depends on it follows (shortcut, island size and place, weather, language, the agents' language line).
+function applySettings(patch) {
+  if (!patch || typeof patch !== 'object') return store.all();
+  const before = store.all(), after = store.set(patch);
+  if (before.shortcut !== after.shortcut) bindShortcut();
+  if (before.island.display !== after.island.display || before.island.scale !== after.island.scale) placeIsland();
+  if (before.weather.place !== after.weather.place && !(patch.weather && 'lat' in patch.weather)) { store.set({ weather: { lat: null, lon: null } }); weatherCache.at = 0; }
+  if (before.lang !== after.lang) { loadLanguage(); tray?.refresh(); }
+  hub.context = agentContext(); changed(); for (const w of [settingsWin, welcomeWin]) if (w && !w.isDestroyed()) w.webContents.send('app:changed');
+  return store.all();
+}
+
+// ---------- the welcome: seven short steps the first time Pip starts ----------
 let welcomeWin = null;
 function openWelcome() {
   if (welcomeWin && !welcomeWin.isDestroyed()) { welcomeWin.show(); welcomeWin.focus(); return; }
@@ -318,18 +332,20 @@ const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e)
 function wireIpc() {
   handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
     art: helper.art, tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
-    strings, languages: languages(), node: hasNode(), spotify: spotify.connected, google: google.connected, googleBuiltIn: Boolean(clientFor(null)) }));
+    strings, languages: languages(), node: hasNode(), spotify: spotify.connected, google: google.connected, googleBuiltIn: Boolean(clientFor(null)), account: account.status() }));
   handle('app:strings', () => strings);
-  handle('settings:set', patch => {
-    if (!patch || typeof patch !== 'object') return store.all();
-    const before = store.all(), after = store.set(patch);
-    if (before.shortcut !== after.shortcut) bindShortcut();
-    if (before.island.display !== after.island.display || before.island.scale !== after.island.scale) placeIsland();
-    if (before.weather.place !== after.weather.place) { store.set({ weather: { lat: null, lon: null } }); weatherCache.at = 0; }
-    if (before.lang !== after.lang) { loadLanguage(); tray?.refresh(); }
-    hub.context = agentContext(); changed();
-    return store.all();
+  handle('settings:set', patch => { const all = applySettings(patch); account?.changed(); return all; });
+  // the Pip account (optional): Google says who you are, Pip's server keeps your preferences for your other devices
+  handle('account:status', () => account.status());
+  handle('account:signin', async () => {
+    const c = clientFor(null); // the account server knows only the Google client Pip ships with
+    if (!c) return { ok: false, error: t('This build of Pip has no Google sign-in, so it cannot use a Pip account.') };
+    try { const how = await account.signIn(await google.identity(c.clientId, c.secret)); return { ok: true, how, ...account.status() }; }
+    catch (e) { return { ok: false, error: String(e.message || e) }; }
   });
+  handle('account:sync', async () => { try { if (!(await account.pull())) await account.push(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
+  handle('account:signout', async () => { await account.signOut(); return account.status(); });
+  handle('account:delete', async () => { try { await account.remove(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('settings:open', () => openSettings());
   handle('autostart:set', on => { app.setLoginItemSettings({ openAtLogin: Boolean(on) }); return app.getLoginItemSettings().openAtLogin; });
   handle('agents:connect', (agent, on) => { const r = connect(String(agent), Boolean(on)); changed(); return r; });
@@ -445,6 +461,15 @@ app.whenReady().then(async () => {
     load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(vault))); } catch { return null; } },
     save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(vault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(vault, { force: true }); } catch {} }
   });
+  const avault = data('account.bin');
+  account = new Account({
+    t: (...a) => t(...a), fetchImpl: webFetch, getSettings: () => store.all(), apply: patch => applySettings(patch),
+    load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(avault))); } catch { return null; } },
+    save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(avault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(avault, { force: true }); } catch {} }
+  });
+  // another device may have changed something: look shortly after start, then every ten minutes
+  const pullAccount = () => account.pull().catch(e => { account.error = String(e.message || e); });
+  setTimeout(pullAccount, 5000); setInterval(pullAccount, 10 * 60e3);
   const gvault = data('google.bin');
   google = new Google({
     t: (...a) => t(...a), fetchImpl: webFetch, open: url => shell.openExternal(url),

@@ -7,7 +7,7 @@ const $ = sel => document.querySelector(sel);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const page = $('#page');
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#14a3a8', '#f0435a', '#e8e8ee'];
-let t = window.makeT({}), S = null, current = 'home', query = '', confirmReset = false;
+let t = window.makeT({}), S = null, current = 'home', query = '', confirmReset = false, confirmDelete = false, accountBusy = false;
 
 // ---------- building blocks ----------
 const group = (title, rows, extra = '') => `<section class="grp">${title ? `<h2>${esc(title)}</h2>` : ''}<div class="card ${extra}">${rows.join('')}</div></section>`;
@@ -54,8 +54,14 @@ const views = {
   connections() {
     const agents = AGENTS.map(([id, name, file]) => row(id === 'claude' ? 'ai' : 'apps', name, S.agents[id] ? t('Connected') + ' · ' + file : file,
       `<button type="button" class="btn ${S.agents[id] ? '' : 'primary'}" data-agent="${id}">${esc(S.agents[id] ? t('Disconnect') : t('Connect'))}</button>`));
-    const s = S.settings;
-    return group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
+    const s = S.settings, a = S.account || {};
+    const when = a.syncedAt ? new Date(a.syncedAt).toLocaleString(S.settings.lang === 'sw' ? 'sw-TZ' : undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+    const account = group(t('Pip account'), a.signedIn ? [
+        row('check', a.email, (when ? t('Synced {when}', { when }) : t('Signed in')) + (a.error ? ' · ' + a.error : ''), button('acct-sync', accountBusy ? t('Syncing…') : t('Sync now')) + button('acct-out', t('Sign out'))),
+        row('trash', t('Delete my Pip account'), t('Removes your saved preferences from Pip\'s server and signs out every device. This PC keeps its settings.'), button('acct-del', confirmDelete ? t('Sure? Delete') : t('Delete'), 'danger'))
+      ] : [row('link', t('Pip account'), t('Optional. Saves your preferences, note, town and calendar link, so any PC or Mac with Pip can pick them up.'),
+        button('acct-in', accountBusy ? t('Finish the login in your browser…') : t('Sign in with Google'), 'primary'))]) + `<div class="err" id="acct-error"></div>`;
+    return account + group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
       + `<div class="err" id="ag-error"></div>`
       + group(t('Accounts'), [
         row('calendar', 'Google', t('For your calendar and the number of unread emails (never who or what).'), button('go-go', S.google ? t('Sign out') : t('Sign in with Google'), S.google ? '' : 'primary')),
@@ -232,6 +238,17 @@ page.addEventListener('click', async e => {
   if (d.link) return api.openLink(d.link);
   if (d.siteX !== undefined) { const sites = S.settings.guard.sites.filter((_, n) => n !== +d.siteX); await save({ guard: { sites } }); return draw(); }
   switch (b.id) {
+    case 'acct-in': case 'acct-sync': {
+      accountBusy = true; draw();
+      const r = b.id === 'acct-in' ? await api.accountSignIn() : await api.accountSync(); accountBusy = false;
+      if (r.ok) { S.account = r; const init = await api.init(); S.settings = init.settings; if (init.settings.lang !== document.documentElement.lang) return location.reload(); }
+      draw(); if (!r.ok) showError('acct-error', r.error); return;
+    }
+    case 'acct-out': S.account = await api.accountSignOut(); return draw();
+    case 'acct-del': {
+      if (!confirmDelete) { confirmDelete = true; draw(); setTimeout(() => { confirmDelete = false; if (current === 'connections') draw(); }, 4000); return; }
+      confirmDelete = false; const r = await api.accountDelete(); if (r.ok) S.account = r; draw(); if (!r.ok) showError('acct-error', r.error); return;
+    }
     case 'w-go': return checkWeather();
     case 'show-welcome': return api.openWelcome();
     case 'restart': return api.restart();
@@ -276,6 +293,16 @@ page.addEventListener('change', async e => {
   else if (el.id === 'm-custom') { await save({ mascot: { color: el.value } }); draw(); }
   else if (el.id === 's-place') checkWeather();
   else if (el.id === 's-cal') save({ calendarUrl: el.value.trim() });
+});
+
+// settings changed somewhere else (the island, or another device through the Pip account): show them, unless you are
+// typing here right now
+api.onChanged(async () => {
+  const init = await api.init(), lang = S.settings.lang;
+  Object.assign(S, { settings: init.settings, agents: init.agents, account: init.account, google: init.google, spotify: init.spotify });
+  if (init.settings.lang !== lang) return location.reload();
+  const a = document.activeElement; if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'range') return;
+  draw();
 });
 
 (async () => {
