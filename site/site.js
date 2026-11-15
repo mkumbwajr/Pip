@@ -12,14 +12,14 @@ if ('IntersectionObserver' in window) {
 fetch('/latest.json', { cache: 'no-store' }).then(r => r.json()).then(j => {
   if (!j.version) return;
   const v = document.getElementById('ver'); if (v) v.textContent = j.version;
-  const v2 = document.getElementById('ver2'); if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Siku 7 bure';
+  const v2 = document.getElementById('ver2'); if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Jaribu siku 7 bure';
   if (j.url) for (const a of document.querySelectorAll('[data-download]')) a.href = j.url;
   // once there is a Mac build: its own button next to the Windows one (first on a Mac), and the line under the last one
   if (j.mac) {
     const onMac = /Mac/.test(navigator.platform || navigator.userAgent);
     for (const a of document.querySelectorAll('[data-mac]')) { a.href = j.mac; a.hidden = false; if (onMac) { a.classList.remove('ghost'); a.parentNode.querySelector('[data-download]')?.classList.add('ghost'); a.parentNode.prepend(a); } }
     const p = document.getElementById('platforms'); if (p) p.textContent = 'Pip kwa Windows na Mac';
-    if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Mac · Siku 7 bure';
+    if (v2) v2.textContent = 'Toleo ' + j.version + ' · Windows 10 na 11 · Mac · Jaribu siku 7 bure';
   }
 }).catch(() => {});
 
