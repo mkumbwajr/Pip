@@ -11,7 +11,8 @@ let t = window.makeT({}), S = null, current = 'home', query = '', confirmReset =
 
 // ---------- building blocks ----------
 const group = (title, rows, extra = '') => `<section class="grp">${title ? `<h2>${esc(title)}</h2>` : ''}<div class="card ${extra}">${rows.join('')}</div></section>`;
-const row = (ico, title, sub, control = '', cls = '') => `<div class="row ${cls}" data-find="${esc((title + ' ' + sub).toLowerCase())}">${ico ? `<span class="ri">${icon(ico)}</span>` : ''}<div class="rt"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${control ? `<div class="rc">${control}</div>` : ''}</div>`;
+// ico: an icon name from icons.js, or a company's own logo (an <svg> from a brand helper there)
+const row = (ico, title, sub, control = '', cls = '') => `<div class="row ${cls}" data-find="${esc((title + ' ' + sub).toLowerCase())}">${ico ? (ico.startsWith('<svg') ? `<span class="ri ri-logo">${ico}</span>` : `<span class="ri">${icon(ico)}</span>`) : ''}<div class="rt"><b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>${control ? `<div class="rc">${control}</div>` : ''}</div>`;
 const toggle = (key, on, label) => `<button type="button" class="tg ${on ? 'on' : ''}" data-toggle="${key}" role="switch" aria-checked="${on ? 'true' : 'false'}" aria-label="${esc(label)}"><i></i></button>`;
 const seg = (key, value, options) => `<div class="sg" data-seg="${key}">${options.map(([v, l]) => `<button type="button" data-v="${esc(v)}" class="${String(v) === String(value) ? 'on' : ''}">${esc(l)}</button>`).join('')}</div>`;
 const slider = (id, min, max, step, value, suffix = '%') => `<div class="sl"><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${value}"><span id="${id}-n">${value}${suffix}</span></div>`;
@@ -52,7 +53,7 @@ const views = {
       ]);
   },
   connections() {
-    const agents = AGENTS.map(([id, name, file]) => row(id === 'claude' ? 'ai' : 'apps', name, S.agents[id] ? t('Connected') + ' · ' + file : file,
+    const agents = AGENTS.map(([id, name, file]) => row(id === 'claude' ? claudeLogo() : openaiLogo(), name, S.agents[id] ? t('Connected') + ' · ' + file : file,
       `<button type="button" class="btn ${S.agents[id] ? '' : 'primary'}" data-agent="${id}">${esc(S.agents[id] ? t('Disconnect') : t('Connect'))}</button>`));
     const s = S.settings, a = S.account || {};
     const when = a.syncedAt ? new Date(a.syncedAt).toLocaleString(S.settings.lang === 'sw' ? 'sw-TZ' : undefined, { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '';
@@ -72,9 +73,9 @@ const views = {
     return account + (L.selling || L.licensed ? licence : '') + group(t('Agents'), [...agents, row('shield', t('Only the status is read, on your own PC.'), t('Pip adds its own small hooks and keeps a backup of your file.'), '', 'note')], 'agents')
       + `<div class="err" id="ag-error"></div>`
       + group(t('Accounts'), [
-        row('calendar', 'Google', t('For your calendar and the number of unread emails (never who or what).'), button('go-go', S.google ? t('Sign out') : t('Sign in with Google'), S.google ? '' : 'primary')),
+        row(googleG(), 'Google', t('For your calendar and the number of unread emails (never who or what).'), button('go-go', S.google ? t('Sign out') : t('Sign in with Google'), S.google ? '' : 'primary')),
         ...(S.googleBuiltIn ? [] : [row('', t('Your own Google client'), t('Client ID and secret of a Desktop app client.'), `<input type="text" id="go-id" placeholder="Client ID" value="${esc(s.google.clientId)}"><input type="password" id="go-secret" placeholder="Client secret" value="${esc(s.google.secret)}">`, 'wide')]),
-        row('music', 'Spotify', t('Only for choosing which device plays. Needs your own free client ID from developer.spotify.com, with this redirect address:') + ' http://127.0.0.1:48612/callback',
+        row(spotifyLogo(), 'Spotify', t('Only for choosing which device plays. Needs your own free client ID from developer.spotify.com, with this redirect address:') + ' http://127.0.0.1:48612/callback',
           `<input type="text" id="sp-id" placeholder="Client ID" value="${esc(s.spotifyClientId)}">${button('sp-go', S.spotify ? t('Disconnect') : t('Connect'), S.spotify ? '' : 'primary')}`, 'wide')
       ]) + `<div class="err" id="acc-error"></div>`;
   },

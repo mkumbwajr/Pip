@@ -142,3 +142,6 @@ input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; } input[type=col
 .found { max-width: 760px; } .found h4 { margin: 4px 4px 10px; font: 700 14px/1 var(--display); color: #fff; } .none { color: var(--mute); }
 @media (max-width: 980px) { .stats { grid-template-columns: repeat(2, 1fr); } .search { width: 190px; } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* company logos (Claude, OpenAI, Google, Spotify) on a light-neutral tile, in their own colours */
+.ri.ri-logo { background: rgba(255, 255, 255, .08); color: #fff; } .ri.ri-logo svg { width: 18px; height: 18px; } /* not .brand: that is the sidebar header */
