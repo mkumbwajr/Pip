@@ -30,6 +30,10 @@ const { makeT } = require('../shared/i18n.js');
 // Pip.exe --remove-hooks: take Pip's entries out of the agents' config files and leave. The uninstaller runs this.
 if (process.argv.includes('--remove-hooks')) { try { hooks.uninstallClaude(); } catch {} try { hooks.uninstallCodex(); } catch {} app.exit(0); return; }
 // the version and build go along, so a newer copy started next to a running older one can take over (see 'second-instance')
+// Mac: Pip is signed ad hoc, a signature that changes with every build, so macOS would ask for the login keychain
+// password ("Pip Safe Storage") after each update. Pip keeps no key in the keychain on a Mac: Chromium's own storage
+// uses a fixed stand-in key, and Pip's sign-ins are files only this Mac user can read (see secretFile below).
+if (process.platform === 'darwin') app.commandLine.appendSwitch('use-mock-keychain');
 if (!app.requestSingleInstanceLock({ version: app.getVersion(), build: require('./update.js').ownBuild() })) { app.quit(); return; }
 // Pip was called Peep before 0.5. On the first start after the update, bring the user's things over from Peep's
 // folder: settings, the hook token, history, the files in the tray, Google and Spotify logins (encrypted with a key
@@ -54,6 +58,23 @@ const APP_ID = app.isPackaged ? 'tz.co.bang.pip' : 'tz.co.bang.pip.dev';
 app.setAppUserModelId(APP_ID);
 
 const data = (...p) => path.join(app.getPath('userData'), ...p);
+/** Where a sign-in (Spotify, Pip account, Google) is kept. Windows: encrypted with the user's Windows login (DPAPI,
+    never asks). Mac: a file only this user can read (mode 600), because the keychain asks for a password after every
+    update while Pip has no Developer ID. A Mac sign-in from before (encrypted .bin) can no longer be read: signed out once. */
+function secretFile(name) {
+  if (process.platform === 'darwin') {
+    const file = data(name + '.json'); fs.rmSync(data(name + '.bin'), { force: true });
+    return {
+      load: () => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } },
+      save: v => { try { if (v) { fs.writeFileSync(file, JSON.stringify(v), { mode: 0o600 }); fs.chmodSync(file, 0o600); } else fs.rmSync(file, { force: true }); } catch {} }
+    };
+  }
+  const file = data(name + '.bin');
+  return {
+    load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(file))); } catch { return null; } },
+    save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(file, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(file, { force: true }); } catch {} }
+  };
+}
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const ICON = path.join(__dirname, '..', '..', 'assets', 'icon.png');
 // windows and the tray on Windows use the same multi-size .ico as Pip.exe, so every place shows the same Pip
@@ -582,18 +603,16 @@ app.whenReady().then(async () => {
     const had = ['electron.app.Peep', 'Peep'].filter(v => spawnSync('reg', ['query', run, '/v', v], { windowsHide: true }).status === 0);
     if (had.length) { app.setLoginItemSettings({ openAtLogin: true }); for (const v of had) spawnSync('reg', ['delete', run, '/v', v, '/f'], { windowsHide: true }); }
   }
-  const vault = data('spotify.bin');
+  const vault = secretFile('spotify');
   spotify = new Spotify({
     t: (...a) => t(...a), fetchImpl: webFetch,
     open: url => shell.openExternal(url),
-    load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(vault))); } catch { return null; } },
-    save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(vault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(vault, { force: true }); } catch {} }
+    load: vault.load, save: vault.save
   });
-  const avault = data('account.bin');
+  const avault = secretFile('account');
   account = new Account({
     t: (...a) => t(...a), fetchImpl: webFetch, getSettings: () => store.all(), apply: patch => applySettings(patch),
-    load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(avault))); } catch { return null; } },
-    save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(avault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(avault, { force: true }); } catch {} }
+    load: avault.load, save: avault.save
   });
   // another device may have changed something: look shortly after start, then every ten minutes
   const pullAccount = () => account.pull().catch(e => { account.error = String(e.message || e); });
@@ -606,11 +625,10 @@ app.whenReady().then(async () => {
     save: v => { try { fs.writeFileSync(data('license.json'), JSON.stringify(v)); } catch {} }
   });
   setTimeout(checkLicense, 3000); setInterval(checkLicense, 6 * 3600e3);
-  const gvault = data('google.bin');
+  const gvault = secretFile('google');
   google = new Google({
     t: (...a) => t(...a), fetchImpl: webFetch, open: url => shell.openExternal(url),
-    load: () => { try { return JSON.parse(safeStorage.decryptString(fs.readFileSync(gvault))); } catch { return null; } },
-    save: v => { try { if (v && safeStorage.isEncryptionAvailable()) fs.writeFileSync(gvault, safeStorage.encryptString(JSON.stringify(v))); else fs.rmSync(gvault, { force: true }); } catch {} }
+    load: gvault.load, save: gvault.save
   });
   try { const t = JSON.parse(fs.readFileSync(trayFile(), 'utf8')); if (Array.isArray(t)) trayFiles = t.map(String); } catch {}
   hub = new Hub({ token: token(), historyFile: data('history.json') });
