@@ -112,7 +112,7 @@ function drawPill() {
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; // beside a notch: the title only, to stay compact
   else if (phone) text = t('Playing from {phone}', { phone: phone.name || t('Phone') });
-  if (top && (top.state === 'working' || top.state === 'asking')) side = ''; // a task is running: the strip shows only what it does
+  if (top && (top.state === 'working' || top.state === 'asking' || top.state === 'done')) side = ''; // a task is running or just finished: the strip shows only that
   $('#pill-text').textContent = text;
   island.classList.toggle('asking-pill', Boolean(pillAsk)); $('#pill-ask').hidden = !pillAsk;
   if (pillAsk) for (const b of $('#pill-ask').children) b.dataset.id = pillAsk.id; $('#pill-side').textContent = S.open ? clock() : side;

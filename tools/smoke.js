@@ -69,6 +69,10 @@ app.whenReady().then(async () => {
   const phoneState = `{ on: true, name: "Ali's Pixel 10", list: [], outputs: { current: 'b', list: [{ id: 'a', name: 'Headphones (AD-G550)' }, { id: 'b', name: 'C34H89x (NVIDIA High Definition Audio)' }] } }`;
   await js(`(() => { S.win = { ...S.win, media: null, phones: ${phoneState} }; S.pinned = true; setOpen(true, 'music'); draw(true); })()`); await wait(400); await shot('7-phone-music');
   await js(`(() => { S.ai = { ...S.ai, top: 'idle', sessions: [] }; S.hover = false; setOpen(false); drawPill(); })()`); await wait(700); await shot('7-phone-pill');
+  // an agent at work, folded: Pip's eyes in line with the activity text
+  await js(`(() => { S.win = { ...S.win, phones: null, media: null }; S.ai = { ...S.ai, top: 'working', sessions: [{ id: 'w', agent: 'claude', state: 'working', title: 'x', activity: { verb: 'edit', detail: 'island.css' } }] }; drawPill(); })()`); await wait(700); await shot('8-working-pill');
+  // an agent just finished: Pip smiles in the folded pill, in line with the text
+  await js(`(() => { S.win = { ...S.win, phones: null }; S.ai = { ...S.ai, top: 'done', sessions: [{ id: 'd', agent: 'claude', state: 'done', title: 'x' }] }; drawPill(); })()`); await wait(700); await shot('8-done-pill');
   // the rename: Peep's old hook calls still land, nothing on screen or in the hooks says Peep, sharing and updates answer
   const legacy = (await fetch(`http://127.0.0.1:${HUB}/peep/event`, { method: 'POST', headers: { 'X-Peep-Token': token, 'Content-Type': 'application/json' }, body: JSON.stringify({ hook_event_name: 'UserPromptSubmit', session_id: 'old', prompt: 'x' }) })).status;
   const hooksText = fs.readFileSync(path.join(process.env.HOME, '.claude', 'settings.json'), 'utf8');

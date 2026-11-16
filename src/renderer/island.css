@@ -36,7 +36,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 /* flex, anchored left: a button centres content that is too wide, which cut into Pip's eyes on long song titles */
 #pill { display: flex; justify-content: flex-start; overflow: hidden; width: 100%; height: 36px; padding: 0; border: 0; background: transparent; cursor: pointer; text-align: left; outline: 0; }
 #pill-inner > .pip, #pill-side { flex: none; }
-#pill-inner { flex: none; display: inline-flex; align-items: center; gap: 9px; height: 36px; padding: 0 14px 0 8px; white-space: nowrap; max-width: 640px; }
+#pill-inner { flex: none; display: inline-flex; align-items: center; gap: 9px; height: 36px; padding: 0 16px 0 16px; white-space: nowrap; max-width: 640px; } /* the same room on both ends, so Pip is not pressed against the left edge */
 #pill-text { overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
 #pill-text:empty { display: none; }
 #pill-side { color: var(--dim); font-variant-numeric: tabular-nums; }
@@ -240,6 +240,8 @@ body.window { background: var(--bg); overflow: auto; user-select: none; } body.w
 #island:not(.open) .pip { background: transparent; scale: 1.15; transition: background .3s; }
 #island:not(.open) .pip .eye, #island:not(.open) .pip .mouth { background: #fff; box-shadow: 0 0 4px 1px var(--pip), 0 0 10px 2px color-mix(in srgb, var(--pip) 70%, transparent); }
 #island:not(.open) .pip .hat { display: none; }
+/* the smile hangs under the eyes: folded, the eyes and mouth move up together so the face sits in line with the text */
+#island:not(.open) .pip.done .eye { margin-top: -5px; } #island:not(.open) .pip.done .mouth { bottom: 7px; }
 
 /* Display sans: big numbers keep equal-width digits so the timers do not jitter */
 .fz-time, .md-time, .hm-clock, .cal-big { font-variant-numeric: tabular-nums; letter-spacing: -.02em; font-weight: 600; }
