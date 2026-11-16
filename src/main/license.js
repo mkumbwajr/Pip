@@ -40,26 +40,35 @@ class License {
     this.save(this.state); return this.view();
   }
 
-  /** What the island and Settings show. locked: the trial is over and there is no license. */
+  /** What the island and Settings show. The paywall is removed (2026-11-16): every field below still computes as
+      before, in case it is ever needed again, but `locked` is now always false, so nothing is ever gated. */
   view() {
     const s = this.state, at = this.now() + (s.offset || 0);
     const licensed = Boolean(s.licensed) && this.now() - (s.checkedAt || 0) < OFFLINE_DAYS * DAY;
     const ends = s.trialEndsAt || (s.localStart + TRIAL_DAYS * DAY);
-    // selling: the server can take payments. Until it says so, nothing locks (and Settings shows no trial)
-    return { licensed, selling: Boolean(s.selling), locked: Boolean(s.selling) && !licensed && at > ends, trialEndsAt: ends, daysLeft: licensed ? 0 : Math.max(0, Math.ceil((ends - at) / DAY)),
+    return { licensed, selling: Boolean(s.selling), locked: false, trialEndsAt: ends, daysLeft: licensed ? 0 : Math.max(0, Math.ceil((ends - at) / DAY)),
       priceTzs: s.priceTzs || 5000, signedIn: Boolean(this.token()), checkedAt: s.checkedAt || 0 };
   }
 
-  /** Mobile money: EvPay sends a prompt to this phone. Returns { order, operator }. */
+  /** Mobile money: EvPay sends a prompt to this phone. Returns { order, operator }. (Kept for an account that bought
+      before the paywall was removed; see donateMobile for the current flow.) */
   payMobile(phone, operator) { return this.call('POST', '/pay/mobile', { phone: String(phone || ''), ...(operator ? { operator } : {}) }); }
   /** Card: EvPay's own page, opened in the browser. Returns { order, checkoutUrl }. */
   payCard(email) { return this.call('POST', '/pay/card', email ? { email } : {}); }
-  /** How a payment is going; once it is paid, the license is checked again so Pip unlocks. */
+  /** How a payment is going; once it is paid, the license is checked again (kept for display only now). */
   async order(ref) {
     const j = await this.call('GET', '/pay/' + encodeURIComponent(String(ref)));
     if (j.status === 'paid' || j.licensed) await this.check().catch(() => {});
     return { ...j, ...this.view() };
   }
+
+  // ---------- donations: any amount, through the same EvPay integration, unlocks nothing ----------
+  /** Mobile money donation of `amountTzs`. Returns { order, operator, amountTzs }. */
+  donateMobile(phone, operator, amountTzs) { return this.call('POST', '/donate/mobile', { phone: String(phone || ''), amountTzs, ...(operator ? { operator } : {}) }); }
+  /** Card donation of `amountTzs`, EvPay's own page opened in the browser. Returns { order, checkoutUrl, amountTzs }. */
+  donateCard(email, amountTzs) { return this.call('POST', '/donate/card', { amountTzs, ...(email ? { email } : {}) }); }
+  /** How a donation is going. Never touches the license. */
+  async donateOrder(ref) { return this.call('GET', '/donate/' + encodeURIComponent(String(ref))); }
 }
 
 module.exports = { License, deviceHash, BASE, TRIAL_DAYS, OFFLINE_DAYS };

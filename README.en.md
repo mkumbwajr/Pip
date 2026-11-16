@@ -6,9 +6,9 @@ The interface is in Tanzanian Swahili by default; English is in Settings.
 
 ![Pip open: clock, an agent at work, music and focus](site/img/pip-home.png)
 
-MIT licence. Free for 7 days with everything open; after that the island and agent status stay free and the other tabs
-need a one-time license of TSh 5,000 (mobile money or card, through EvPay). The license belongs to your Pip account
-(Google or email), which also syncs your setup between devices. No telemetry.
+MIT licence and free for everyone — every tab open, no trial, nothing to buy. If you'd like to support development,
+there's an optional donation of any amount (mobile money or card, through EvPay) in Settings, under Support. The
+optional Pip account (Google or email) just syncs your setup between devices. No telemetry.
 
 **Download:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 and 11 · macOS (Intel and Apple silicon) · version 1.0.1
 
@@ -97,7 +97,8 @@ the code), files sent to or from your phone across networks (end-to-end encrypte
 an hour), Spotify if you connect it, Google if
 you sign in (your calendar and only the number of unread emails, never who or what), and pip.bang.co.tz to see whether a
 newer Pip is out (at start and every six hours, can be switched off), the license check (a one-way hash of this
-device's ID, and your Pip account's session when signed in, at start and every six hours), and, when you buy Pip with
-mobile money, the phone number you type, to EvPay through pip.bang.co.tz (a card is paid on EvPay's own page). Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
+device's ID, and your Pip account's session when signed in, at start and every six hours — this no longer unlocks
+anything, since there's nothing to unlock), and, when you choose to donate with mobile money, the amount and the
+phone number you type, to EvPay through pip.bang.co.tz (a card is paid on EvPay's own page). Full policy: [pip.bang.co.tz/privacy](https://pip.bang.co.tz/privacy).
 
 Code comments are in English so contributors outside Tanzania can read them.

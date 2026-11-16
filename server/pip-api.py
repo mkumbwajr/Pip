@@ -10,13 +10,20 @@ Runs on BANG DIGITAL's server behind Nginx (https://pip.bang.co.tz/api/...), as 
   POST   /api/logout   ends this device's session
   DELETE /api/account  deletes your preferences and every session, on every device
 
-The license (server/license.py): a 7-day trial per device, then a one-time purchase through EvPay.
+The license (server/license.py): kept for an account that bought before the paywall was removed (2026-11-16); it
+unlocks nothing new today, and every tab is free regardless.
   POST /api/license/status {"device": sha256}   (signed in or not) -> {licensed, trialEndsAt, now, priceTzs}
   POST /api/pay/mobile     {"phone", "operator"?} (signed in)  a mobile-money prompt on that phone -> {order}
   POST /api/pay/card       {"email"?}             (signed in)  -> {order, checkoutUrl} (EvPay's own card page)
   GET  /api/pay/<order>                           (signed in)  -> {status: pending|paid|failed|on_hold|refunded, licensed}
-  POST /api/evpay/webhook  EvPay's signed result (X-EvPay-Signature); grants or takes back the license
-  python3 pip-api.py grant <email>               give an account a license by hand (support, gifts)
+  python3 pip-api.py grant <email>               give an account a license by hand (legacy support, gifts)
+
+Donations: any amount, through the same EvPay integration, from Settings -> Support. Grants nothing.
+  POST /api/donate/mobile  {"phone", "operator"?, "amountTzs"} (signed in)  -> {order, operator, amountTzs}
+  POST /api/donate/card    {"email"?, "amountTzs"}             (signed in)  -> {order, checkoutUrl, amountTzs}
+  GET  /api/donate/<order>                                     (signed in)  -> {status: pending|paid|failed|on_hold|refunded}
+
+  POST /api/evpay/webhook  EvPay's signed result (X-EvPay-Signature); grants or takes back the license (donations: status only)
 
 Who you are comes only from Google (an ID token checked with Google, for Pip's own OAuth client). No passwords.
 Users are stored under a hash of their Google ID; session tokens are stored as hashes too.
@@ -188,6 +195,7 @@ class Api(BaseHTTPRequestHandler):
         user, key = self.who()
         if not user: return self.reply(401, {'error': 'Sign in again'})
         if p.startswith('/api/pay'): return self.pay(method, p, user)
+        if p.startswith('/api/donate'): return self.donate(method, p, user)
         file = path('users', user + '.json')
         if method == 'GET' and p == '/api/prefs':
             d = read_json(file, None)
@@ -246,6 +254,46 @@ class Api(BaseHTTPRequestHandler):
                     if ev: lic.apply_event(store, ev, {'requestId': o['ref']}); o = store.order(o['ref'])
                 except lic.EvPayError: pass
             return self.reply(200, {'order': o['ref'], 'status': o['status'], 'licensed': bool(store.license(user))})
+        return self.reply(404, {'error': 'Not found'})
+
+    # ---------- donating to Pip: any amount, unlocks nothing ----------
+    def donate(self, method, p, user):
+        if method == 'POST' and p in ('/api/donate/mobile', '/api/donate/card'):
+            if not evpay.ready: return self.reply(503, {'error': 'Payments are not set up yet'})
+            if too_many('donate:' + user, 10): return self.reply(429, {'error': 'Too many payment attempts. Try again in an hour.'})
+            b = self.body() or {}
+            try: amount = int(b.get('amountTzs') or 0)
+            except (TypeError, ValueError): amount = 0
+            if amount < lic.MIN_DONATE_TZS or amount > lic.MAX_DONATE_TZS:
+                return self.reply(400, {'error': 'That amount does not look right'})
+            if p == '/api/donate/mobile':
+                phone = lic.normalize_phone(b.get('phone'))
+                if not phone: return self.reply(400, {'error': 'That phone number does not look right'})
+                op = b.get('operator') if b.get('operator') in lic.OPERATORS else lic.operator_for(phone)
+                if not op: return self.reply(400, {'error': 'That network is not supported'})
+                o = store.new_order(user, 'mobile:' + op, amount, 'donation')
+                try: r = evpay.mobile(o, phone, op)
+                except lic.EvPayError as e: o['status'] = 'failed'; store.save_order(o); return self.reply(502, {'error': str(e)})
+                o['evpayId'] = str(r.get('id') or ''); store.save_order(o)
+                return self.reply(200, {'order': o['ref'], 'status': 'pending', 'operator': op, 'amountTzs': o['amountTzs']})
+            email = str(b.get('email', '')).strip().lower()
+            o = store.new_order(user, 'card', amount, 'donation')
+            try: r = evpay.card(o, email if EMAIL_RE.match(email) else '')
+            except lic.EvPayError as e: o['status'] = 'failed'; store.save_order(o); return self.reply(502, {'error': str(e)})
+            url = r.get('checkoutUrl') or r.get('paymentUrl')
+            if not url or not str(url).startswith('https://'): o['status'] = 'failed'; store.save_order(o); return self.reply(502, {'error': 'EvPay did not return a card page'})
+            o['evpayId'] = str(r.get('id') or ''); store.save_order(o)
+            return self.reply(200, {'order': o['ref'], 'status': 'pending', 'checkoutUrl': url, 'amountTzs': o['amountTzs']})
+        if method == 'GET' and p.startswith('/api/donate/'):
+            o = store.order(p.split('/')[-1])
+            if not o or o['user'] != user: return self.reply(404, {'error': 'No such order'})
+            if o['status'] == 'pending' and evpay.ready and time.time() - checked.get(o['ref'], 0) > 10:
+                checked[o['ref']] = time.time()
+                try:
+                    ev = lic.status_from_evpay(evpay.payment(o.get('evpayId') if o['method'] == 'card' and o.get('evpayId') else o['ref']).get('status'))
+                    if ev: lic.apply_event(store, ev, {'requestId': o['ref']}); o = store.order(o['ref'])
+                except lic.EvPayError: pass
+            return self.reply(200, {'order': o['ref'], 'status': o['status']})
         return self.reply(404, {'error': 'Not found'})
 
     def webhook(self):

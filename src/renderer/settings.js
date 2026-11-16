@@ -8,6 +8,9 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const page = $('#page');
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#14a3a8', '#f0435a', '#e8e8ee'];
 let t = window.makeT({}), S = null, current = 'home', query = '', confirmReset = false, confirmDelete = false, accountBusy = false, mail = { stage: 'enter', address: '', busy: false };
+const DONATE_PRESETS = [2000, 5000, 10000];
+let donate = { amount: DONATE_PRESETS[1], custom: '', phone: '', busy: false, error: '', order: '', status: '' };
+const donateAmount = () => { const c = Math.round(Number(donate.custom)); return c > 0 ? c : donate.amount; };
 
 // ---------- building blocks ----------
 const group = (title, rows, extra = '') => `<section class="grp">${title ? `<h2>${esc(title)}</h2>` : ''}<div class="card ${extra}">${rows.join('')}</div></section>`;
@@ -27,7 +30,7 @@ const tabNames = () => [['ai', t('Agents')], ['pip', 'Pip'], ['music', t('Music'
 const sections = () => [
   ['home', 'Pip', 'home', t('Home'), t('Pip on this PC at a glance'), 'var(--pip)'],
   ['connections', 'Pip', 'link', t('Connections'), t('The agents and accounts Pip follows'), '#f5a524'],
-  ['license', 'Pip', 'key', t('Pip license'), t('Your trial and your license'), '#2fbf71'],
+  ['license', 'Pip', 'key', t('Pip license'), t('Free for everyone now'), '#2fbf71'],
   ['chat', 'Pip', 'chat', t('AI & Chat'), t('How the agents and Pip answer you'), '#2f9bff'],
   ['mascot', 'Pip', 'pip', S.settings.mascot.name || 'Pip', t('Name and colour'), 'var(--pip)'],
   ['wardrobe', 'Pip', 'hat', t('Wardrobe'), t('Something for Pip to wear'), '#ff5c8a'],
@@ -77,19 +80,13 @@ const views = {
       ]) + `<div class="err" id="acc-error"></div>`;
   },
   license() {
-    const L = S.license || {}, a = S.account || {}, price = 'TSh ' + Number(L.priceTzs || 5000).toLocaleString('en');
-    const status = L.licensed ? t('Bought') : !L.selling ? t('Free for now') : L.locked ? t('The trial is over') : t('Trial: {n} days left', { n: L.daysLeft ?? 7 });
+    const L = S.license || {};
     return group(t('Pip license'), [
-        row(L.licensed ? 'check' : 'key', status,
-          L.licensed ? t('Every tab is open, on every PC and Mac with your Pip account.') : t('After 7 days, the island and agent status keep working; the other tabs need the license ({price}, once).', { price }),
-          L.licensed ? '' : button('lic-buy', t('Buy Pip'), 'primary')),
-        a.signedIn ? row('link', a.email, t('The license lives in your Pip account, so it works on every PC and Mac you sign in to.'), button('lic-check', t('Check again')))
-          : row('link', t('Pip account'), t('The license lives in your Pip account, so it works on every PC and Mac you sign in to.'), button('lic-signin', t('Sign in first')))
+        row('check', t('Pip is free'), t('Every tab is open for everyone now, with nothing to buy and no trial.'), ''),
+        ...(L.licensed ? [row('key', t('Thank you for buying Pip'), t('You bought a license before this changed — your support helped get Pip this far.'), '')] : [])
       ])
-      + group(t('How to pay'), [
-        row('phone', t('Mobile money'), 'M-Pesa · Mixx by Yas · Airtel Money · HaloPesa'),
-        row('card', t('Card'), 'Visa · Mastercard'),
-        row('help', t('No refunds'), t('Payment is final, so try every tab in the free 7 days first. Paid but still locked? Email info@bang.co.tz.'))
+      + group(t('Want to help more?'), [
+        row('heart', t('Donate'), t('Pip stays free either way. A donation just helps keep it going — any amount, through the same mobile money or card you would have paid with.'), button('lic-to-support', t('Go to Support'), 'primary'))
       ]);
   },
   chat() {
@@ -179,13 +176,29 @@ const views = {
   },
   support() {
     const link = (ico, title, sub, url) => row(ico, title, sub, `<button type="button" class="btn" data-link="${esc(url)}">${icon('external')}${esc(t('Open'))}</button>`);
-    return group(t('Help'), [
+    const price = n => 'TSh ' + Number(n).toLocaleString('en');
+    const d = donate, amt = donateAmount();
+    const donateGroup = group(t('Support Pip'), [
+        row('heart', t('Donate'), t('Pip is free, for everyone, with nothing locked. If you would like to help keep it going, send any amount you like — it changes nothing either way.'), ''),
+        `<div class="row wide"><div class="amts">${DONATE_PRESETS.map(a => `<button type="button" class="amt ${!d.custom && d.amount === a ? 'on' : ''}" data-donate-amt="${a}">${esc(price(a))}</button>`).join('')}
+          <input type="number" id="donate-custom" min="0" step="500" placeholder="${esc(t('Other amount (TSh)'))}" value="${esc(d.custom)}"></div></div>`,
+        ...(d.order ? [
+          d.status === 'paid'
+            ? row('check', t('Thank you!'), t('Your donation means a lot.'), '')
+            : row('help', t('Waiting for the payment…'), t('Approve it on your phone, or finish it on the page that opened in your browser.'), button('donate-cancel', t('Cancel')))
+        ] : [
+          row('phone', t('Mobile money'), 'M-Pesa · Mixx by Yas · Airtel Money · HaloPesa',
+            `<input type="tel" id="donate-phone" inputmode="tel" autocomplete="tel" placeholder="07XX XXX XXX" value="${esc(d.phone)}">${button('donate-mobile', d.busy ? t('Sending…') : t('Donate {price}', { price: price(amt) }), 'primary')}`, 'wide'),
+          row('card', t('Card'), 'Visa · Mastercard', button('donate-card', d.busy ? t('Opening…') : t('Donate by card')))
+        ])
+      ]) + `<div class="err" id="donate-error">${esc(d.error)}</div>`;
+    return donateGroup + group(t('Help'), [
         link('globe', t('Website'), 'pip.bang.co.tz', 'https://pip.bang.co.tz'),
         link('help', t('Report a problem'), t('On GitHub, in English or Swahili.'), 'https://github.com/mkumbwajr/Pip/issues'),
         link('shield', t('Privacy'), t('What leaves your PC, and when.'), 'https://pip.bang.co.tz/privacy'),
         link('heart', t('Source code'), t('Free and open source (MIT).'), 'https://github.com/mkumbwajr/Pip')
       ])
-      + `<div class="about">${mascot(S.settings.mascot.hat, true)}<b>Pip ${esc(S.version)}</b><span>© ${new Date().getFullYear()} BANG DIGITAL LTD</span><span>${esc(t('MIT licence. Free for 7 days, then a one-time license. No telemetry.'))}</span></div>`;
+      + `<div class="about">${mascot(S.settings.mascot.hat, true)}<b>Pip ${esc(S.version)}</b><span>© ${new Date().getFullYear()} BANG DIGITAL LTD</span><span>${esc(t('MIT licence. Free for everyone. No telemetry.'))}</span></div>`;
   }
 };
 
@@ -241,6 +254,18 @@ async function checkWeather() {
   if (w?.error || !w) out.className = 'out bad';
 }
 function showError(id, text) { const el = $('#' + id); if (el) el.textContent = text || ''; }
+// while a donation is pending: ask every four seconds, for up to ten minutes (mirrors island.js's pollOrder)
+async function pollDonate(ref) {
+  for (let i = 0; i < 150 && donate.order === ref; i++) {
+    await new Promise(r => setTimeout(r, 4000));
+    if (donate.order !== ref) return;
+    const r = await api.donateOrder(ref);
+    if (!r?.ok) continue;
+    if (r.status === 'paid') { donate = { ...donate, status: 'paid' }; if (current === 'support' && !query) draw(); return; }
+    if (r.status === 'failed' || r.status === 'refunded') { donate = { ...donate, order: '', status: '', error: t('The payment did not go through. Try again.') }; if (current === 'support' && !query) draw(); return; }
+  }
+  if (donate.order === ref) { donate = { ...donate, order: '', status: '', error: t('No answer from the payment yet. If you paid, it will still be recorded shortly.') }; if (current === 'support' && !query) draw(); }
+}
 
 // ---------- events ----------
 page.addEventListener('click', async e => {
@@ -266,6 +291,7 @@ page.addEventListener('click', async e => {
   if (d.color) { await save({ mascot: { color: d.color } }); return draw(); }
   if (d.hat) { await save({ mascot: { hat: d.hat } }); return draw(); }
   if (d.link) return api.openLink(d.link);
+  if (d.donateAmt) { donate = { ...donate, amount: Number(d.donateAmt), custom: '' }; return draw(); }
   if (d.siteX !== undefined) { const sites = S.settings.guard.sites.filter((_, n) => n !== +d.siteX); await save({ guard: { sites } }); return draw(); }
   switch (b.id) {
     case 'acct-in': case 'acct-sync': {
@@ -287,11 +313,23 @@ page.addEventListener('click', async e => {
     }
     case 'mail-back': mail.stage = 'enter'; return draw();
     case 'acct-out': S.account = await api.accountSignOut(); return draw();
-    case 'lic-buy': return api.buy();
+    case 'lic-to-support': current = 'support'; return draw();
     case 'iphone-allow': return api.iphoneAllow('alerts');
     case 'iphone-airplay': return api.iphoneAllow('airplay');
-    case 'lic-check': S.license = await api.licenseCheck(); return draw();
-    case 'lic-signin': current = 'connections'; return draw();
+    case 'donate-mobile': {
+      donate.phone = $('#donate-phone')?.value.trim() || '';
+      donate = { ...donate, busy: true, error: '' }; draw();
+      const r = await api.donateMobile(donate.phone, '', donateAmount()); donate.busy = false;
+      if (!r.ok) { donate.error = r.error; return draw(); }
+      donate = { ...donate, order: r.order, status: 'pending' }; draw(); pollDonate(r.order); return;
+    }
+    case 'donate-card': {
+      donate = { ...donate, busy: true, error: '' }; draw();
+      const r = await api.donateCard(donateAmount()); donate.busy = false;
+      if (!r.ok) { donate.error = r.error; return draw(); }
+      donate = { ...donate, order: r.order, status: 'pending' }; draw(); pollDonate(r.order); return;
+    }
+    case 'donate-cancel': donate = { ...donate, order: '', status: '' }; return draw();
     case 'acct-del': {
       if (!confirmDelete) { confirmDelete = true; draw(); setTimeout(() => { confirmDelete = false; if (current === 'connections') draw(); }, 4000); return; }
       confirmDelete = false; const r = await api.accountDelete(); if (r.ok) S.account = r; draw(); if (!r.ok) showError('acct-error', r.error); return;
@@ -327,7 +365,9 @@ page.addEventListener('keydown', async e => {
   }
 });
 page.addEventListener('input', e => {
-  const el = e.target; if (el.type !== 'range') return; fill(el);
+  const el = e.target;
+  if (el.id === 'donate-custom') { donate.custom = el.value; return; }
+  if (el.type !== 'range') return; fill(el);
   $('#' + el.id + '-n').textContent = el.value + '%';
   // live while dragging: the island follows the slider
   if (el.id === 'i-size') save({ island: { scale: el.value / 100 } });

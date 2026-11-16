@@ -229,13 +229,15 @@ test('relay: what one side seals only the same key opens, and a changed byte is 
   assert.equal(openName(key, sealName(key, 'picha.jpg')), 'picha.jpg'); assert.equal(openName(other, sealName(key, 'x')), '');
 });
 
-test('license: the trial, a wrong clock, offline use, and unlocking after a payment', async () => {
+test('license: the trial, a wrong clock, offline use, never locking, and donating', async () => {
   const { License, deviceHash, OFFLINE_DAYS } = require('../src/main/license.js');
   const DAY = 86400000; let clock = 1_000_000_000_000, saved = null, server = { licensed: false, selling: true, started: clock }, sent = [];
   const fake = async (url, o) => {
     sent.push({ url, auth: o.headers.Authorization || '', body: o.body ? JSON.parse(o.body) : null });
     if (url.endsWith('/license/status')) return { ok: true, status: 200, json: async () => ({ licensed: server.licensed, selling: server.selling, priceTzs: 5000, now: clock + 3 * DAY, trialEndsAt: server.started + 7 * DAY }) };
     if (url.includes('/pay/')) return { ok: true, status: 200, json: async () => ({ order: 'PIP-x', status: server.licensed ? 'paid' : 'pending', licensed: server.licensed }) };
+    if (url.endsWith('/donate/mobile') || url.endsWith('/donate/card')) return { ok: true, status: 200, json: async () => ({ order: 'PIP-d', status: 'pending', amountTzs: o.body ? JSON.parse(o.body).amountTzs : 0 }) };
+    if (url.includes('/donate/')) return { ok: true, status: 200, json: async () => ({ order: 'PIP-d', status: 'paid' }) };
     return { ok: false, status: 404, json: async () => ({}) };
   };
   let token = '';
@@ -244,13 +246,18 @@ test('license: the trial, a wrong clock, offline use, and unlocking after a paym
   assert.match(deviceHash('machine'), /^[0-9a-f]{64}$/); assert.notEqual(deviceHash('machine'), deviceHash('other'));
   // this computer's clock is 3 days behind the server's: the server's time counts
   await lic.check(); assert.equal(lic.view().daysLeft, 4); assert.equal(sent[0].body.device, deviceHash('machine')); assert.equal(sent[0].auth, '', 'signed out: no token sent');
-  clock += 5 * DAY; assert.equal(lic.view().locked, true, 'trial over');
-  server.selling = false; await lic.check(); assert.equal(lic.view().locked, false, 'payments not open: nothing locks'); server.selling = true; await lic.check();
-  // signs in and pays: the order check re-checks the license, and Pip unlocks
+  // the paywall is removed: locked is always false, trial over or not, selling or not, licensed or not
+  clock += 5 * DAY; assert.equal(lic.view().locked, false, 'the trial is over, but nothing locks any more');
+  server.selling = false; await lic.check(); assert.equal(lic.view().locked, false); server.selling = true; await lic.check();
   token = 'tok'; server.licensed = true;
   const o = await lic.order('PIP-x'); assert.equal(o.licensed, true); assert.equal(lic.view().locked, false); assert.equal(sent.at(-1).auth, 'Bearer tok');
-  // offline for a long time: a bought license holds for 30 days without a check, then needs one
-  clock += (OFFLINE_DAYS - 1) * DAY; assert.equal(lic.view().locked, false);
-  clock += 2 * DAY; assert.equal(lic.view().locked, true);
+  // offline for a long time: still never locks, even once an old (legacy) license goes stale offline
+  clock += (OFFLINE_DAYS + 5) * DAY; assert.equal(lic.view().locked, false);
   assert.ok(saved.checkedAt && saved.localStart, 'the last answer is kept for the next start');
+  // donating: any amount, through the same calls, grants nothing and never changes locked
+  const dm = await lic.donateMobile('0712345678', 'Mpesa', 2000);
+  assert.equal(dm.order, 'PIP-d'); assert.equal(sent.at(-1).body.amountTzs, 2000); assert.equal(lic.view().locked, false);
+  const dc = await lic.donateCard('me@example.com', 10000);
+  assert.equal(dc.order, 'PIP-d'); assert.equal(sent.at(-1).body.amountTzs, 10000);
+  assert.equal((await lic.donateOrder('PIP-d')).status, 'paid');
 });

@@ -408,6 +408,19 @@ function wireIpc() {
   });
   handle('license:order', async ref => { try { const r = await license.order(String(ref || '')); if (r.licensed) licenseChanged(); return { ok: true, ...r }; } catch (e) { return { ok: false, error: payError(e) }; } });
   handle('license:buy', () => { send('island:buy'); });
+  // donations: the paywall is removed, so these unlock nothing — just a voluntary amount through the same EvPay integration
+  handle('license:donateMobile', async (phone, operator, amount) => {
+    try { return { ok: true, ...(await license.donateMobile(String(phone || '').slice(0, 20), operator ? String(operator) : '', Math.round(Number(amount) || 0))) }; }
+    catch (e) { return { ok: false, error: payError(e) }; }
+  });
+  handle('license:donateCard', async amount => {
+    try {
+      const r = await license.donateCard(account.status().email || '', Math.round(Number(amount) || 0));
+      if (!/^https:\/\//.test(String(r.checkoutUrl || ''))) throw new Error('EvPay did not return a card page');
+      shell.openExternal(r.checkoutUrl); return { ok: true, order: r.order };
+    } catch (e) { return { ok: false, error: payError(e) }; }
+  });
+  handle('license:donateOrder', async ref => { try { return { ok: true, ...(await license.donateOrder(String(ref || ''))) }; } catch (e) { return { ok: false, error: payError(e) }; } });
   handle('account:delete', async () => { try { await account.remove(); checkLicense(); return { ok: true, ...account.status() }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('settings:open', section => openSettings(section));
   handle('autostart:set', on => { app.setLoginItemSettings({ openAtLogin: Boolean(on) }); return app.getLoginItemSettings().openAtLogin; });
@@ -559,11 +572,8 @@ let deviceId = null;
 function licenseChanged() {
   const v = license.view(); send('license:changed', v);
   if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send('app:changed');
-  // one notification the day before the trial ends
-  if (v.selling && !v.licensed && !v.locked && v.daysLeft === 1 && store.get('trialNotice') !== v.trialEndsAt) {
-    store.set({ trialNotice: v.trialEndsAt });
-    try { new Notification({ title: t('Your Pip trial ends tomorrow'), icon: ICON, body: t('Buy Pip once for TSh {price} to keep every tab.', { price: v.priceTzs.toLocaleString('en') }) }).show(); } catch {}
-  }
+  // The "trial ends tomorrow, buy to keep every tab" notice is gone with the paywall (v.locked is always false now):
+  // nothing is ever taken away, so warning about it would be misleading.
 }
 async function checkLicense() { try { await license.check(); } catch {} licenseChanged(); }
 // the server's answers (English), in the app's language

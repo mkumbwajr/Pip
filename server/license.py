@@ -1,10 +1,13 @@
-"""Pip's license: a 7-day trial per device, then a one-time purchase paid through EvPay (mobile money or card).
+"""Pip's license and donations. The paywall is removed (2026-11-16): Pip is free for everyone, every tab open. This
+file still keeps the trial/license machinery (for an account that bought before then) and adds donations of any
+amount, both paid through EvPay (mobile money or card).
 
 Used by pip-api.py. Python's standard library only.
 
   Trial      Counted by the server from the first time it sees a device (a one-way hash of the device's ID, sent by Pip),
-             so neither reinstalling nor changing the computer's clock restarts it.
-  License    Belongs to a Pip account (Google or email): every PC and Mac signed in to that account is unlocked.
+             so neither reinstalling nor changing the computer's clock restarts it. No longer locks anything.
+  License    Belongs to a Pip account (Google or email). Kept only for accounts that already bought one.
+  Donation   Any amount between MIN_DONATE_TZS and MAX_DONATE_TZS, from Settings -> Support. Grants nothing.
   Payment    EvPay, in Tanzanian shillings. Mobile money: a prompt on the payer's phone (USSD push). Card: EvPay's own
              hosted page (card details never touch Pip). EvPay tells this server the result with a signed webhook.
 
@@ -19,6 +22,10 @@ import hashlib, hmac, json, os, re, secrets, sys, threading, time, urllib.error,
 
 PRICE_TZS = int(os.environ.get('PIP_PRICE_TZS', '5000'))
 TRIAL_DAYS = int(os.environ.get('PIP_TRIAL_DAYS', '7'))
+# The paywall is removed (2026-11-16): PRICE_TZS/TRIAL_DAYS stay only for an account that already bought before then.
+# Donations use these instead - any amount in between, so a typo or a stray tap cannot send too little or too much.
+MIN_DONATE_TZS = int(os.environ.get('PIP_MIN_DONATE_TZS', '500'))
+MAX_DONATE_TZS = int(os.environ.get('PIP_MAX_DONATE_TZS', '2000000'))
 PUBLIC_URL = os.environ.get('PIP_PUBLIC_URL', 'https://pip.bang.co.tz').rstrip('/')
 DEVICE_RE = re.compile(r'^[0-9a-f]{64}$')  # Pip sends a SHA-256 of the machine ID, never the ID itself
 PRODUCT = 'Pip license'
@@ -77,8 +84,10 @@ class Store:
     def order(self, ref): return self.read(self.p('orders', ref + '.json')) if re.match(r'^PIP-[A-Za-z0-9_-]{8,40}$', ref or '') else None
     def save_order(self, o):
         with lock: self.write(self.p('orders', o['ref'] + '.json'), o)
-    def new_order(self, user, method):
-        o = {'ref': 'PIP-' + secrets.token_urlsafe(12), 'user': user, 'method': method, 'amountTzs': PRICE_TZS,
+    def new_order(self, user, method, amount_tzs=None, kind='license'):
+        """kind: 'license' (legacy purchase, still grants a license on payment) or 'donation' (grants nothing)."""
+        o = {'ref': 'PIP-' + secrets.token_urlsafe(12), 'user': user, 'method': method,
+             'amountTzs': int(amount_tzs) if amount_tzs else PRICE_TZS, 'kind': kind,
              'status': 'pending', 'created': now_ms(), 'evpayId': ''}
         self.save_order(o); return o
 
@@ -162,11 +171,14 @@ class EvPay:
         return j.get('data') or {}
 
     def mobile(self, order, phone, operator):
-        d = self.call('POST', '/api/v1/payment/ussd', {'fsOperator': operator, 'amount': order['amountTzs'], 'product': PRODUCT,
+        donation = order.get('kind') == 'donation'
+        d = self.call('POST', '/api/v1/payment/ussd', {'fsOperator': operator, 'amount': order['amountTzs'],
+            'product': 'Pip donation' if donation else PRODUCT,
             'callbackUrl': PUBLIC_URL + '/api/evpay/webhook', 'payerAccountId': phone, 'requestId': order['ref'], 'currency': 'TZS',
-            'narrative': 'Pip one-time license'})
+            'narrative': 'Pip donation' if donation else 'Pip one-time license'})
         return {**d, 'id': d.get('transactionId') or d.get('id') or ''}
     def card(self, order, email):
+        donation = order.get('kind') == 'donation'
         back = PUBLIC_URL + '/paid?order=' + order['ref']
         name = (email.split('@')[0] if email else 'Pip') or 'Pip'
         d = self.call('POST', '/api/v1/payment/card', {
@@ -175,7 +187,7 @@ class EvPay:
             # EvPay requires every billing field; the buyer's card details go only into EvPay's own page
             'customer': {'firstname': name[:40], 'lastname': 'Pip', 'email': email or 'info@bang.co.tz', 'address': 'Not provided',
                          'city': 'Dar es Salaam', 'state': 'DSM', 'postcode': '00000', 'country': 'TZ'},
-            'callbackUrl': PUBLIC_URL + '/api/evpay/webhook', 'metadata': {'orderId': order['ref']}})
+            'callbackUrl': PUBLIC_URL + '/api/evpay/webhook', 'metadata': {'orderId': order['ref'], 'donation': donation}})
         return {**d, 'id': d.get('reference') or d.get('id') or ''}
     def payment(self, evpay_id): return self.call('GET', '/api/v1/payment/' + evpay_id)
 
@@ -194,16 +206,22 @@ class EvPay:
 PAID = {'payment.succeeded', 'payment.settled'}
 UNDONE = {'payment.refunded', 'payment.reversed'}
 def apply_event(store, event, payload):
-    """Marks the order and grants or takes back the license. Returns the order's new status, or None if unknown."""
+    """Marks the order and, for a 'license' order only, grants or takes back the license (a donation never does).
+       Returns the order's new status, or None if unknown."""
     d = payload.get('data') if isinstance(payload.get('data'), dict) else {}
     ref = payload.get('requestId') or d.get('requestId') or d.get('orderReference') or (d.get('metadata') or {}).get('orderId')
     o = store.order(ref)
     if not o: return None
+    is_license = o.get('kind', 'license') == 'license'
     if event in PAID:
-        if o['status'] != 'paid': o.update(status='paid', paidAt=now_ms()); store.save_order(o); store.grant(o['user'], o['ref'], o['method'])
+        if o['status'] != 'paid':
+            o.update(status='paid', paidAt=now_ms()); store.save_order(o)
+            if is_license: store.grant(o['user'], o['ref'], o['method'])
     elif event == 'payment.failed' and o['status'] == 'pending': o['status'] = 'failed'; store.save_order(o)
     elif event == 'payment.on_hold' and o['status'] == 'pending': o['status'] = 'on_hold'; store.save_order(o)
-    elif event in UNDONE: o['status'] = 'refunded'; store.save_order(o); store.revoke(o['user'], o['ref'])
+    elif event in UNDONE:
+        o['status'] = 'refunded'; store.save_order(o)
+        if is_license: store.revoke(o['user'], o['ref'])
     return o['status']
 
 def reconcile(store, evpay, older_than_ms=600000, newest_ms=2 * 86400000):

@@ -5,10 +5,11 @@
 
 ![Pip ikiwa imefunguka: saa, agent kazini, muziki na focus](site/img/pip-home.png)
 
-Open source (MIT). Siku 7 za kwanza ni bure, kila kitu kikiwa wazi; baadaye island na hali ya ma-agent vinabaki bure, na tabs
-nyingine zinahitaji leseni ya TSh 5,000 mara moja (M-Pesa, Mixx by Yas, Airtel Money, HaloPesa au kadi, kupitia EvPay).
-Leseni inakaa kwenye akaunti ya Pip (Google au email), ambayo pia ina-sync mipangilio kati ya vifaa. Hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani
-cha Tanzania; English ipo kwenye Settings. [English README](README.en.md)
+Open source (MIT) na bure kabisa, kwa kila mtu — tabs zote wazi, hakuna trial wala cha kununua. Ukipenda kusaidia
+maendeleo yake, kuna option ya donation ya hiari (kiasi chochote, kwa M-Pesa, Mixx by Yas, Airtel Money, HaloPesa au
+kadi, kupitia EvPay) kwenye Settings, chini ya Support. Akaunti ya Pip (Google au email) ni hiari, inasync mipangilio
+kati ya vifaa. Hakuna telemetry. App nzima iko kwa Kiswahili cha mtaani cha Tanzania; English ipo kwenye Settings.
+[English README](README.en.md)
 
 **Pakua:** [pip.bang.co.tz](https://pip.bang.co.tz) · Windows 10 na 11 · macOS (Intel na Apple silicon) · toleo 1.0.1
 
