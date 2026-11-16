@@ -421,10 +421,10 @@ function wireIpc() {
   handle('google:openInbox', () => shell.openExternal('https://mail.google.com/mail/u/0/#inbox'));
   // Updates: asks GitHub (only when you press the button) for the newest release, and opens its page to download it
   handle('app:update', async () => { try { return { ok: true, ...(await latestRelease({ current: app.getVersion(), fetchImpl: webFetch })) }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
-  // the macOS settings pane for iPhone messages (Full Disk Access), calls (Accessibility) or music (AirPlay Receiver)
+  // the macOS settings pane for iPhone messages and calls (Accessibility) or music (AirPlay Receiver)
   handle('iphone:allow', kind => {
     if (process.platform !== 'darwin') return null;
-    const pane = { calls: 'com.apple.preference.security?Privacy_Accessibility', messages: 'com.apple.preference.security?Privacy_AllFiles', airplay: 'com.apple.AirDrop-Handoff-Settings.extension' }[kind];
+    const pane = { alerts: 'com.apple.preference.security?Privacy_Accessibility', airplay: 'com.apple.AirDrop-Handoff-Settings.extension' }[kind];
     return pane ? shell.openExternal('x-apple.systempreferences:' + pane) : null;
   });
   handle('app:release', url => (isReleaseUrl(url) ? shell.openExternal(String(url)) : null));

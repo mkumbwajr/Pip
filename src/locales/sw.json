@@ -456,16 +456,15 @@
   "Calling…": "Anapiga…",
   "iPhone on this Mac": "iPhone kwenye Mac hii",
   "Messages on the island": "Meseji kwenye kisiwa",
-  "Who wrote and the first line, from the Messages app. Stays on this Mac.": "Aliyetuma na mstari wa kwanza, kutoka app ya Messages. Inabaki kwenye Mac hii.",
-  "Allow Full Disk Access": "Ruhusu Full Disk Access",
-  "macOS keeps Messages private. Turn Pip on under Full Disk Access, then quit and open Pip again.": "macOS inaficha Messages. Washa Pip kwenye Full Disk Access, kisha funga Pip uifungue tena.",
   "Open settings": "Fungua settings",
   "Calls on the island": "Simu kwenye kisiwa",
   "Who is calling, while your iPhone rings on this Mac. Answer in Apple’s alert.": "Anayepiga, wakati iPhone yako inaita kwenye Mac hii. Pokea kwenye alert ya Apple.",
   "Allow Accessibility": "Ruhusu Accessibility",
-  "Pip sees the call alert through Accessibility. Turn Pip on there.": "Pip inaona alert ya simu kupitia Accessibility. Washa Pip hapo.",
   "Music from your iPhone": "Muziki kutoka kwenye iPhone",
   "Turn on AirPlay Receiver, then pick this Mac in AirPlay on the iPhone. The song and lyrics show on the island.": "Washa AirPlay Receiver, kisha chagua Mac hii kwenye AirPlay ya iPhone. Wimbo na lyrics zinaonekana kwenye kisiwa.",
   "Plays on": "Inaplay kwenye",
-  "Playing from {phone}": "Inaplay kutoka {phone}"
+  "Playing from {phone}": "Inaplay kutoka {phone}",
+  "Who wrote, from the Messages alert. Never the message itself.": "Aliyetuma, kutoka kwenye alert ya Messages. Si meseji yenyewe.",
+  "Pip sees these alerts through Accessibility. Turn Pip on there.": "Pip inaona alert hizi kupitia Accessibility. Washa Pip hapo.",
+  "Message": "Meseji"
 }

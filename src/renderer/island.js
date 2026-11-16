@@ -84,14 +84,14 @@ const richText = s => esc(s).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(
 let lyrUserAt = 0; // when you last scrolled the lyrics yourself: they stop following the song for a moment
 function mediaPosition() { const m = S.win.media; if (!m) return 0; return Math.min(m.durationMs || Infinity, m.positionMs + (m.playing ? Date.now() - S.win.at : 0)); }
 
-const REST_AFTER = 15000; // Pip rests once the pointer has been still this long (and there is no task)
+const REST_AFTER = 60000; // Pip rests once the pointer has been still this long (and there is no task)
 // ---------- the pill ----------
 function drawPill() {
   const top = S.ai.sessions[0], m = S.win.media;
   island.className = [S.ai.top, S.settings?.island.mode === 'detach' ? 'detach' : 'attach', S.open ? 'open' : '', S.pinned ? 'pinned' : ''].join(' ');
   const phone = S.win.phones?.on && !m?.playing ? S.win.phones : null; // a phone playing through this PC (Windows)
   const mood = S.ai.top !== 'idle' ? S.ai.top : (m?.playing || phone ? 'music' : 'idle');
-  // nothing to do and the pointer has not moved for 15 s: Pip rests (eyes half shut, slow breathing); it wakes with a
+  // nothing to do and the pointer has not moved for a minute: Pip rests (eyes half shut, slow breathing); it wakes with a
   // blink as soon as the pointer moves again
   const resting = mood === 'idle' && !S.open && !S.hover && !S.alert && Date.now() - S.cursorAt >= REST_AFTER && Date.now() >= S.awakeUntil;
   if (resting && !pip.classList.contains('resting') && S.pillDrawn) sfx('rest');
@@ -108,7 +108,7 @@ function drawPill() {
   else if (top && top.state === 'done') text = t('{agent} is done', { agent: AGENT[top.agent] });
   else if (top && top.state === 'error') text = t('{agent} hit an error', { agent: AGENT[top.agent] });
   else if (S.recv) { text = t('Receiving {name}', { name: S.recv.name }); side = S.recv.pct + '%'; }
-  else if (S.alert && !S.open) { text = S.alert.kind === 'call' ? S.alert.from : S.alert.from + (S.alert.text ? ': ' + S.alert.text : ''); side = S.alert.kind === 'call' ? t('Calling…') : (S.alert.count > 1 ? '+' + (S.alert.count - 1) : ''); }
+  else if (S.alert && !S.open) { text = S.alert.from; side = S.alert.kind === 'call' ? t('Calling…') : t('Message'); }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; // beside a notch: the title only, to stay compact
   else if (phone) text = t('Playing from {phone}', { phone: phone.name || t('Phone') });
@@ -882,7 +882,7 @@ api.onArt(art => { S.art = art; applyArtColor(); if (S.tab === 'music') draw(); 
 api.onUpdate(u => { S.update = u; island.classList.toggle('has-update', Boolean(u?.newer)); if (S.menu && S.menuView !== 'updates') showMenu(true, S.menuView); });
 // Pip looks at the pointer: the eyes shift a few pixels towards it, less when it is close
 api.onCursor(p => {
-  // the pointer moved (main sends it only when it moves): wake now, and look again once it has been still for 15 s
+  // the pointer moved (main sends it only when it moves): wake now, and look again once it has been still for a minute
   S.cursorAt = Date.now(); if (pip.classList.contains('resting')) drawPill();
   clearTimeout(S.restTimer); S.restTimer = setTimeout(drawPill, REST_AFTER + 100);
   const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);

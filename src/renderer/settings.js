@@ -119,10 +119,9 @@ const views = {
         row('keyboard', t('Shortcut'), t('Opens and folds the island from anywhere.'), `<span class="kbd">${s.shortcut.split('+').map(k => `<kbd>${esc(k.replace('Control', 'Ctrl'))}</kbd>`).join('')}</span>`)
       ])
       + (S.platform === 'darwin' ? group(t('iPhone on this Mac'), [
-        row('chat', t('Messages on the island'), t('Who wrote and the first line, from the Messages app. Stays on this Mac.'), toggle('iphone.messages', s.iphone?.messages !== false, t('Messages on the island'))),
-        ...(s.iphone?.messages !== false && S.iphoneAccess?.messages === 'denied' ? [row('shield', t('Allow Full Disk Access'), t('macOS keeps Messages private. Turn Pip on under Full Disk Access, then quit and open Pip again.'), button('iphone-allow-messages', t('Open settings')))] : []),
+        row('chat', t('Messages on the island'), t('Who wrote, from the Messages alert. Never the message itself.'), toggle('iphone.messages', s.iphone?.messages !== false, t('Messages on the island'))),
         row('phone', t('Calls on the island'), t('Who is calling, while your iPhone rings on this Mac. Answer in Apple’s alert.'), toggle('iphone.calls', s.iphone?.calls !== false, t('Calls on the island'))),
-        ...(s.iphone?.calls !== false && S.iphoneAccess?.calls === 'denied' ? [row('shield', t('Allow Accessibility'), t('Pip sees the call alert through Accessibility. Turn Pip on there.'), button('iphone-allow-calls', t('Open settings')))] : []),
+        ...((s.iphone?.messages !== false || s.iphone?.calls !== false) && S.iphoneAccess === 'denied' ? [row('shield', t('Allow Accessibility'), t('Pip sees these alerts through Accessibility. Turn Pip on there.'), button('iphone-allow', t('Open settings')))] : []),
         row('music', t('Music from your iPhone'), t('Turn on AirPlay Receiver, then pick this Mac in AirPlay on the iPhone. The song and lyrics show on the island.'), button('iphone-airplay', t('Open settings')))
       ]) : '')
       + group(t('App'), [
@@ -289,8 +288,7 @@ page.addEventListener('click', async e => {
     case 'mail-back': mail.stage = 'enter'; return draw();
     case 'acct-out': S.account = await api.accountSignOut(); return draw();
     case 'lic-buy': return api.buy();
-    case 'iphone-allow-messages': return api.iphoneAllow('messages');
-    case 'iphone-allow-calls': return api.iphoneAllow('calls');
+    case 'iphone-allow': return api.iphoneAllow('alerts');
     case 'iphone-airplay': return api.iphoneAllow('airplay');
     case 'lic-check': S.license = await api.licenseCheck(); return draw();
     case 'lic-signin': current = 'connections'; return draw();
