@@ -112,9 +112,11 @@ function drawPill() {
   if (mood !== S.mood && S.pillDrawn && ['working', 'music'].includes(mood)) sfx(mood); // done, asking and error ring from their own events
   S.mood = mood; S.pillDrawn = true;
   const waking = pip.classList.contains('waking');
-  const emotion = emotionFor(mood, resting, sleeping, waking), plain = emotion === 'default';
+  // folded and truly idle: just the glowing eyes, as before. Open, or anything worth a mood, shows the mascot face.
+  const emotion = emotionFor(mood, resting, sleeping, waking), plain = emotion === 'default' && !S.open;
   pip.className = 'pip ' + mood + (resting ? ' resting' : '') + (sleeping ? ' sleeping' : '') + (waking ? ' waking' : '') + (plain ? ' plain' : '') + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
-  if (emotion !== S.emotion) { S.emotion = emotion; if (!plain) $('#pip-face').innerHTML = moodSvg(emotion); }
+  const faceKey = plain ? '' : emotion; // the key includes plain so opening/folding redraws the face even if the mood itself didn't change
+  if (faceKey !== S.emotion) { S.emotion = faceKey; if (!plain) $('#pip-face').innerHTML = moodSvg(emotion); }
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
   let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock();
   const pillAsk = !S.open && top?.state === 'asking' && top.ask?.canAnswer ? top : null; // a permission: answer it right in the pill

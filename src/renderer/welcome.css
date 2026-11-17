@@ -26,6 +26,16 @@ h2 { margin: 6px 0 6px; font: 700 24px/1.2 var(--display); letter-spacing: -.015
 .mascot i { width: 10px; height: 18px; border-radius: 4px; background: #fff; animation: blink 4.6s infinite; }
 .mascot.huge { width: 116px; height: 104px; border-radius: 34px; gap: 20px; animation: float 4s ease-in-out infinite; } .mascot.huge i { width: 15px; height: 28px; border-radius: 6px; }
 .mascot.happy i { height: 10px; border-radius: 10px 10px 3px 3px; animation: none; }
+.mascot .face { display: none; width: 100%; height: 100%; color: var(--pip); } /* the artwork already draws Pip's whole rounded-square head, so the badge's own background below is dropped - no second rectangle behind it */
+.mascot.anim { background: transparent; box-shadow: none; }
+.mascot.anim i { display: none; } .mascot.anim .face { display: block; }
+/* a little demo of every mood, crossfading from one to the next (window.startMoodCycle, in moods.js) */
+.mood-cycle { position: relative; }
+.mood-cycle .mc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .5s ease; color: inherit; }
+.mood-cycle .mc.on { opacity: 1; animation: mc-pop .4s var(--ease, ease-out); } /* each mood comes alive as it arrives, not just a flat crossfade */
+.mood-cycle .mc svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.mood-cycle .mc.on svg path[fill="#fff"] { transform-box: fill-box; transform-origin: center; animation: blink 1.5s ease-in-out .3s 1; } /* a real blink while it's held, before the next mood fades in */
+@keyframes mc-pop { 0% { transform: scale(.88); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
 @keyframes float { 50% { transform: translateY(-8px); } }
 .hello { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding-bottom: 20px; text-align: center; }

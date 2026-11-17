@@ -19,4 +19,21 @@
   };
   window.moodSvg = (name, extra) => { const m = M[name] || M.default; return `<svg viewBox="${m.viewBox}" aria-hidden="true"${extra ? ' class="' + extra + '"' : ''}>${m.paths}</svg>`; };
   window.MOOD_NAMES = Object.keys(M);
+  // A little demo of every mood, crossfading from one to the next instead of cutting between stills. `el` needs
+  // its own size and `position: relative` (the .mood-cycle CSS in each window's stylesheet gives it both).
+  // Returns a function that stops the cycle - call it before the element is thrown away or redrawn.
+  window.startMoodCycle = (el, opts = {}) => {
+    const names = opts.names || window.MOOD_NAMES, interval = opts.interval || 1800;
+    el.classList.add('mood-cycle'); el.innerHTML = '<span class="mc mc-a"></span><span class="mc mc-b"></span>';
+    let front = el.querySelector('.mc-a'), back = el.querySelector('.mc-b'), i = 0;
+    front.innerHTML = window.moodSvg(names[0]); front.classList.add('on');
+    const id = setInterval(() => {
+      i = (i + 1) % names.length;
+      back.innerHTML = window.moodSvg(names[i]);
+      back.getBoundingClientRect(); // force layout before the opacity change, so it actually transitions
+      back.classList.add('on'); front.classList.remove('on');
+      [front, back] = [back, front];
+    }, interval);
+    return () => clearInterval(id);
+  };
 })();

@@ -203,15 +203,14 @@ function draw() {
   drawPreview();
   if (!query && now[0] === 'support') startAboutAnim(); else stopAboutAnim();
 }
-/** The About footer's mascot: cycles through every mood Pip can show, just to show them off. */
-let moodTimer = null, moodIdx = 0;
+/** The About footer's mascot: crossfades through every mood Pip can show, just to show them off. */
+let stopAboutCycle = null;
 function startAboutAnim() {
   stopAboutAnim();
   const face = $('#about-face'); if (!face) return;
-  const show = () => { face.innerHTML = moodSvg(MOOD_NAMES[moodIdx % MOOD_NAMES.length]); moodIdx++; };
-  show(); moodTimer = setInterval(show, 1100);
+  stopAboutCycle = window.startMoodCycle(face);
 }
-function stopAboutAnim() { clearInterval(moodTimer); moodTimer = null; }
+function stopAboutAnim() { stopAboutCycle?.(); stopAboutCycle = null; }
 /** The slider's track is coloured up to the thumb. */
 function fill(el) { el.style.setProperty('--fill', (100 * (el.value - el.min) / (el.max - el.min)) + '%'); }
 /** The copy of the folded island in the header: Pip's eyes, what it would say, the clock. */

@@ -105,9 +105,16 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
 .mascot { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 30px; height: 27px; border-radius: 9px; background: var(--pip); }
 .mascot i { width: 4.5px; height: 8px; border-radius: 2px; background: #fff; animation: blink 5s infinite; }
 .mascot.big { width: 72px; height: 64px; border-radius: 21px; gap: 12px; box-shadow: 0 12px 34px -12px var(--pip); } .mascot.big i { width: 10px; height: 18px; border-radius: 4px; }
-.mascot .face { display: none; width: 64%; height: 64%; color: #fff; }
-.mascot .face svg { display: block; width: 100%; height: 100%; }
+.mascot .face { display: none; width: 100%; height: 100%; color: var(--pip); } /* the artwork already draws Pip's whole rounded-square head, so the badge's own background below is dropped - no second rectangle behind it */
+.mascot.anim { background: transparent; box-shadow: none; }
 .mascot.anim i { display: none; } .mascot.anim .face { display: block; }
+/* a little demo of every mood, crossfading from one to the next (window.startMoodCycle, in moods.js) */
+.mood-cycle { position: relative; }
+.mood-cycle .mc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .5s ease; color: inherit; } /* some pages colour every span - this keeps the artwork on Pip's own colour */
+.mood-cycle .mc.on { opacity: 1; animation: mc-pop .4s var(--ease, ease-out); } /* each mood comes alive as it arrives, not just a flat crossfade */
+.mood-cycle .mc svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.mood-cycle .mc.on svg path[fill="#fff"] { transform-box: fill-box; transform-origin: center; animation: blink 1.5s ease-in-out .3s 1; } /* a real blink while it's held, before the next mood fades in */
+@keyframes mc-pop { 0% { transform: scale(.88); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 .mascot .hat { position: absolute; display: none; }
 .mascot.hat-cap .hat { display: block; top: -14%; left: 8%; width: 84%; height: 30%; border-radius: 99px 99px 0 0; background: #23232b; box-shadow: 30% 0 0 -2px #23232b; }
 .mascot.hat-crown .hat { display: block; top: -22%; left: 18%; width: 64%; height: 30%; background: #ffcc33; clip-path: polygon(0 100%, 0 0, 25% 60%, 50% 0, 75% 60%, 100% 0, 100% 100%); }

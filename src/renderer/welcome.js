@@ -28,7 +28,7 @@ function homeArt(id) {
 
 const views = {
   1() {
-    return `<div class="hello">${mascot('huge')}<h1>${esc(t('Hi, I am {name}.', { name: S.settings.mascot.name || 'Pip' }))}</h1>
+    return `<div class="hello"><span class="mascot huge anim"><i></i><i></i><span class="face" id="hello-face"></span></span><h1>${esc(t('Hi, I am {name}.', { name: S.settings.mascot.name || 'Pip' }))}</h1>
       <p>${esc(t('I sit at the top of your screen and show you what your AI agents are doing, right now.'))}</p></div>`;
   },
   2() {
@@ -86,12 +86,15 @@ const views = {
   }
 };
 
+let stopHelloCycle = null;
 function draw() {
   document.documentElement.style.setProperty('--pip', S.settings.mascot.color);
   $('#count').textContent = t('Setup {n}/{total}', { n: step, total: STEPS });
   $('#dots').innerHTML = Array.from({ length: STEPS }, (_, n) => `<i class="${n + 1 <= step ? 'on' : ''}"></i>`).join('');
+  stopHelloCycle?.(); stopHelloCycle = null;
   const box = $('#step'); box.innerHTML = `<div class="in">${views[step]()}</div>`;
   for (const el of box.querySelectorAll('[data-color]')) el.style.background = el.dataset.color;
+  const helloFace = $('#hello-face'); if (helloFace) stopHelloCycle = window.startMoodCycle(helloFace);
   $('#back').textContent = t('Back'); $('#back').hidden = step === 1 || step === STEPS;
   $('#skip').textContent = t('Skip for now'); $('#skip').hidden = !(step === ST.agents || (step === ST.account && !S.account?.signedIn));
   $('#next').textContent = step === ST.hello ? t('Let’s start') : step === STEPS ? t('Open Pip') : step === ST.home ? t('Use this one') : t('Next');
