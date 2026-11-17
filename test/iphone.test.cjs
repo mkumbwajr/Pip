@@ -1,5 +1,9 @@
 const test = require('node:test'), assert = require('node:assert');
-const { MacAlerts, callerFrom, senderFrom } = require('../src/main/mac-alerts.js');
+const { MacAlerts, callerFrom, senderFrom, READ } = require('../src/main/mac-alerts.js');
+
+test('mac alerts: the AppleScript it runs is valid JavaScript', () => {
+  assert.doesNotThrow(() => new Function(READ + '\nreturn run;'));
+});
 
 test('messages: a Messages alert gives only who wrote', () => {
   assert.equal(senderFrom(['Juma', 'Uko wapi?'], ['Messages, Juma, Uko wapi?']), 'Juma');

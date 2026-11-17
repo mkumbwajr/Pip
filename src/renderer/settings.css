@@ -105,6 +105,9 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
 .mascot { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 30px; height: 27px; border-radius: 9px; background: var(--pip); }
 .mascot i { width: 4.5px; height: 8px; border-radius: 2px; background: #fff; animation: blink 5s infinite; }
 .mascot.big { width: 72px; height: 64px; border-radius: 21px; gap: 12px; box-shadow: 0 12px 34px -12px var(--pip); } .mascot.big i { width: 10px; height: 18px; border-radius: 4px; }
+.mascot .face { display: none; width: 64%; height: 64%; color: #fff; }
+.mascot .face svg { display: block; width: 100%; height: 100%; }
+.mascot.anim i { display: none; } .mascot.anim .face { display: block; }
 .mascot .hat { position: absolute; display: none; }
 .mascot.hat-cap .hat { display: block; top: -14%; left: 8%; width: 84%; height: 30%; border-radius: 99px 99px 0 0; background: #23232b; box-shadow: 30% 0 0 -2px #23232b; }
 .mascot.hat-crown .hat { display: block; top: -22%; left: 18%; width: 64%; height: 30%; background: #ffcc33; clip-path: polygon(0 100%, 0 0, 25% 60%, 50% 0, 75% 60%, 100% 0, 100% 100%); }
@@ -133,12 +136,6 @@ input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; } input[type=col
 .chip button { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .1); color: inherit; font-size: 10px; cursor: pointer; }
 .chip button:hover { background: rgba(255, 255, 255, .22); }
 .chips input { flex: 1; min-width: 160px; height: 30px; border-radius: 999px; }
-
-/* donation amount chips: a preset pick, or type your own */
-.amts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 16px; }
-.amt { height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--text); font-weight: 600; font-size: 13px; cursor: pointer; }
-.amt.on { background: var(--pip); border-color: var(--pip); color: #fff; }
-.amts input { flex: 1; min-width: 160px; height: 32px; border-radius: 999px; border: 1px solid var(--line); background: var(--card2); color: var(--text); padding: 0 12px; }
 
 /* about */
 .about { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); text-align: center; }

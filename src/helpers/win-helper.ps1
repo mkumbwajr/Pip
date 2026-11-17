@@ -59,14 +59,55 @@ public static class PipWin {
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] static extern bool ShowWindowAsync(IntPtr h, int cmd);
+  [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool f);
+  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
   public static long Front() { return GetForegroundWindow().ToInt64(); }
   public static string Title(long h) { var s = new StringBuilder(512); GetWindowText(new IntPtr(h), s, 512); return s.ToString(); }
   public static uint Pid(long h) { uint p; GetWindowThreadProcessId(new IntPtr(h), out p); return p; }
   public static void Minimize(long h) { ShowWindowAsync(new IntPtr(h), 6); }
+  // Brings a specific window to the front so typed keys reach it, not whatever else has focus. Windows normally
+  // refuses SetForegroundWindow from a background process; attaching to the current foreground window's input
+  // queue first is the documented way round that. Returns false if the window is gone (closed since it was seen).
+  public static bool Focus(long h) {
+    IntPtr hw = new IntPtr(h); if (!IsWindow(hw)) return false;
+    IntPtr fg = GetForegroundWindow(); uint fgPid;
+    uint fgThread = fg == IntPtr.Zero ? 0 : GetWindowThreadProcessId(fg, out fgPid);
+    uint curThread = GetCurrentThreadId();
+    bool attached = fgThread != 0 && fgThread != curThread && AttachThreadInput(curThread, fgThread, true);
+    ShowWindowAsync(hw, 9); // SW_RESTORE, in case it was minimized
+    bool ok = SetForegroundWindow(hw);
+    if (attached) AttachThreadInput(curThread, fgThread, false);
+    return ok;
+  }
 }
 '@
 
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
+Add-Type -AssemblyName System.Windows.Forms
+# SendKeys treats + ^ % ~ ( ) { } [ ] as modifier/grouping syntax; each needs wrapping in {} to be typed literally.
+function EscapeKeys([string]$s) {
+  $sb = New-Object System.Text.StringBuilder
+  foreach ($ch in $s.ToCharArray()) {
+    switch ($ch) {
+      '{' { $sb.Append('{{}') | Out-Null }
+      '}' { $sb.Append('{}}') | Out-Null }
+      '+' { $sb.Append('{+}') | Out-Null }
+      '^' { $sb.Append('{^}') | Out-Null }
+      '%' { $sb.Append('{%}') | Out-Null }
+      '~' { $sb.Append('{~}') | Out-Null }
+      '(' { $sb.Append('{(}') | Out-Null }
+      ')' { $sb.Append('{)}') | Out-Null }
+      '[' { $sb.Append('{[}') | Out-Null }
+      ']' { $sb.Append('{]}') | Out-Null }
+      "`n" { $sb.Append('{ENTER}') | Out-Null }
+      "`r" { }
+      default { $sb.Append($ch) | Out-Null }
+    }
+  }
+  $sb.ToString()
+}
 $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
 function Await($op, $type) { $t = $asTask.MakeGenericMethod($type).Invoke($null, @($op)); $t.Wait(3000) | Out-Null; $t.Result }
 $mgrType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
@@ -165,6 +206,16 @@ while ($true) {
         'output' { if ($c.id -match '^\{0\.0\.0\.00000000\}\.\{[0-9a-fA-F-]+\}$') { [PipOutput]::Set([string]$c.id) | Out-Null }; $phones = PhoneState }
         'phone' { if ($c.id -and $apcType) { PhoneOn $c.id } else { PhoneOff }; $phones = PhoneState }
         'minimize' { [PipWin]::Minimize([long]$c.hwnd) }
+        'focusType' {
+          $ok = [PipWin]::Focus([long]$c.hwnd)
+          if ($ok) {
+            Start-Sleep -Milliseconds 150
+            [System.Windows.Forms.SendKeys]::SendWait((EscapeKeys([string]$c.text)))
+            Start-Sleep -Milliseconds 30
+            [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+          }
+          Emit @{ type = 'typed'; ok = $ok }
+        }
         'radio' {
           Await ($radioType::RequestAccessAsync()) $accessType | Out-Null
           $r = Radio "$($c.kind)"; $to = 'Off'; if ($c.on) { $to = 'On' }

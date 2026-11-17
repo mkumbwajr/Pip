@@ -133,6 +133,18 @@ class MacHelper extends EventEmitter {
     if (c?.cmd === 'minimize' && c.hwnd) { // the focus guard's "go back": the distracting app is hidden (Cmd+H), nothing is closed
       osa(`ObjC.import('AppKit'); var a = $.NSRunningApplication.runningApplicationsWithBundleIdentifier(${JSON.stringify(String(c.hwnd))}); if (a.count) a.objectAtIndex(0).hide;`); return true;
     }
+    // brings the named app to the front and types into whatever it then has focused - meant for a terminal running
+    // an agent. Activating by name (not bundle id) matches how every other command here already targets a player.
+    if (c?.cmd === 'focusType' && c.proc) {
+      const name = JSON.stringify(String(c.proc)), text = JSON.stringify(String(c.text || ''));
+      osa(`
+        var ok = false;
+        try { Application(${name}).activate(); delay(0.25);
+          var se = Application('System Events'); se.keystroke(${text}); delay(0.05); se.keyCode(36); ok = true;
+        } catch (e) {}
+        ok ? 'ok' : 'no'`).then(r => this.emit('typed', { ok: r === 'ok' }));
+      return true;
+    }
     if (c?.cmd === 'volume') { osa(`var a = Application.currentApplication(); a.includeStandardAdditions = true; a.setVolume(null, { outputVolume: ${Math.max(0, Math.min(100, Number(c.level) || 0))} })`); return true; }
     return false;
   }

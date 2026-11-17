@@ -72,6 +72,7 @@ node tools/check-helper.js                      # Windows: runs the PowerShell h
 | `src/renderer/welcome.*` | First-run welcome window (also where the first agent gets connected) |
 | `src/renderer/guard.*` | Focus-guard pause screen |
 | `src/renderer/icons.js` | Every tab/UI icon, drawn as original inline SVG |
+| `src/renderer/moods.js` | Pip's 12 emotion faces (inline SVG, from the owner's own artwork), picked by mood/resting/sleeping in `island.js`'s `emotionFor` |
 | `src/shared/i18n.js`, `src/locales/sw.json` | Translation helper and the Swahili strings |
 | `build/pip.nsi` | Windows installer (plain NSIS; per-user; uninstaller runs `Pip.exe --remove-hooks`) |
 | `server/` | The Python backend: `license.py` (EvPay checkout/webhook), `mail.py`, `pip-api.py` (account sync, relay) |
@@ -95,6 +96,31 @@ helper, media/Bluetooth, iPhone alerts, restart-on-replace for Mac app updates).
 Still just smoke-tested or read, not run for real: media controls/artwork/volume/Wi-Fi/Bluetooth on Windows and Mac
 beyond the two cases above, focus guard, screen questions, Spotify login, Google sign-in, the account sync, the
 any-network relay, and both installers.
+
+Two more additions today, both unverified beyond syntax/compile checks (no live Windows or Mac GUI to try them on):
+- **Send to terminal** (Agents tab, any time): types into whichever window was last in front before the island took
+  focus (`main.js` tracks it as `lastRealFront`, filtering out Pip's own windows), via new helper commands -
+  `focusType` on Windows (`SetForegroundWindow` with the documented `AttachThreadInput` workaround, then
+  `SendKeys`, properly escaped - the C# compiles and the escaping is unit-checked, but real focus-stealing and
+  SendKeys delivery needs a real terminal to confirm) and on Mac (`Application(name).activate()` then `System
+  Events keystroke`, same Accessibility grant as `mac-alerts.js`). This is separate from, and less reliable than,
+  the existing hook-based reply (which only works in the brief window after Claude would stop) - it can only ever
+  target "whatever window Pip last saw", never a specific agent by name, and Windows can refuse to steal focus.
+- **Meeting reminder**: `checkMeeting()` in `main.js` polls the ICS calendar and Google Calendar every minute and
+  fires a notification + an island pop (reusing the iPhone-message alert styling, kind: 'meeting') 5 minutes before
+  the next non-all-day event, once per event.
+- A finished task now also bursts confetti (`confetti()`), not just the sound it already played. Allow/Deny and the
+  hook-based reply were already built before today - they just needed the new mood faces, which they now have.
+
+Pip's 12 moods (`src/renderer/moods.js`, from the owner's own artwork) replace the old plain eyes everywhere (open,
+folded, resting, sleeping) as of 2026-11-16: idle/working/asking/done/error/music map to
+default/curious/worried/smiling/angry/happy, resting (5 min idle) is tired, sleeping (30 min further) is the
+sleeping face, waking is a wink. "confused" and "sad" are drawn but not wired to anything yet. Also touched: the
+Mac alerts script (`mac-alerts.js`) now matches the Notification Center process name loosely and walks deeper into
+each alert, since calls and messages were both failing to show even with Accessibility on — the real cause is
+still unconfirmed (no Mac to test on); if it's still broken, check whether macOS actually granted Accessibility to
+`osascript` itself (a separate entry from "Pip" in Privacy & Security), which is the other common cause of exactly
+this symptom. Neither of these has been run on a real Windows or Mac build yet, only smoke-tested.
 
 Known open bug (status unconfirmed since last reported): the weather card stayed empty for the owner. Settings has
 an "Angalia" button that shows the real error (`weather:get` returns `{error}}` on failure) — get that error and fix

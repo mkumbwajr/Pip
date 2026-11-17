@@ -10,7 +10,7 @@ const on = channel => fn => { const h = (_e, payload) => fn(payload); ipcRendere
 contextBridge.exposeInMainWorld('pipApp', {
   init: call('app:init'), hubError: call('hub:error'), strings: call('app:strings'),
   setSettings: call('settings:set'), openSettings: call('settings:open'), setAutostart: call('autostart:set'),
-  connectAgent: call('agents:connect'), decide: call('ai:decide'), reply: call('ai:reply'), setRadio: call('radio:set'),
+  connectAgent: call('agents:connect'), decide: call('ai:decide'), reply: call('ai:reply'), sendPrompt: call('agent:sendPrompt'), setRadio: call('radio:set'),
   spotifyLogin: call('spotify:login'), spotifyLogout: call('spotify:logout'), spotifyDevices: call('spotify:devices'), spotifyTransfer: call('spotify:transfer'),
   googleLogin: call('google:login'), googleLogout: call('google:logout'), googleEvents: call('google:events'), googleUnread: call('google:unread'), openInbox: call('google:openInbox'), chat: call('pip:chat'), fillArt: call('art:fill'), lastClip: () => ipcRenderer.invoke('clips:last'),
   checkUpdate: call('app:update'), openRelease: call('app:release'), openLink: call('app:link'), restart: call('app:restart'), resetSettings: call('settings:reset'),

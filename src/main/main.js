@@ -82,6 +82,7 @@ const WIN_ICON = path.join(__dirname, '..', '..', 'assets', process.platform ===
 const ISLAND = { width: 700, height: 312 }; // room for the open panel (640 x 288), its shoulders and its shadow
 
 let license = null, store, hub, island = null, settingsWin = null, guardWin = null, tray = null, share = null, spotify = null, google = null, account = null, relay = null, quitting = false;
+let lastRealFront = null; // the last window seen in front that was not Pip's own - where "send to terminal" types
 let strings = {}, t = makeT(strings);
 
 // ---------- language ----------
@@ -314,6 +315,25 @@ async function calendar() {
   }
   const e = nextEvent(calendarCache.text); return e ? { title: e.title, start: e.start.getTime(), allDay: e.allDay } : null;
 }
+// ---------- meeting reminder: a notification and an island pop a few minutes before the next event ----------
+const MEETING_LEAD_MS = 5 * 60e3;
+let meetingAlertedAt = 0; // the event's own start time last alerted for, so the same meeting is not announced twice
+async function checkMeeting() {
+  try {
+    const candidates = (await Promise.all([
+      calendar().catch(() => null),
+      google.connected ? google.events(Date.now(), Date.now() + MEETING_LEAD_MS + 60e3).then(l => l[0] || null).catch(() => null) : null
+    ])).filter(Boolean).filter(e => !e.allDay);
+    if (!candidates.length) return;
+    const next = candidates.reduce((a, b) => (a.start < b.start ? a : b));
+    const until = next.start - Date.now();
+    if (until > 0 && until <= MEETING_LEAD_MS && meetingAlertedAt !== next.start) {
+      meetingAlertedAt = next.start;
+      send('island:alert', { kind: 'meeting', from: next.title });
+      try { new Notification({ title: t('Meeting soon'), icon: ICON, body: next.title }).show(); } catch {}
+    }
+  } catch {}
+}
 let cpuPrev = null;
 function stats() {
   const now = os.cpus().reduce((a, c) => { const t = Object.values(c.times).reduce((x, y) => x + y, 0); return { idle: a.idle + c.times.idle, total: a.total + t }; }, { idle: 0, total: 0 });
@@ -371,6 +391,51 @@ function checkGuard(front) {
 const ours = e => String(e.senderFrame?.url || '').startsWith(pathToFileURL(RENDERER).href);
 const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => (ours(e) ? fn(...args) : null));
 
+// ---------- "send to terminal": types a prompt into the terminal the agent is running in ----------
+// A window's handle as the same kind of number win-helper.ps1 reports, so it can be compared to `front.hwnd`.
+function nativeHwnd(win) {
+  try { const b = win.getNativeWindowHandle(); return b.length >= 8 ? Number(b.readBigUInt64LE(0)) : b.readUInt32LE(0); } catch { return null; }
+}
+// Is this "front window" one of Pip's own, rather than whatever the user was last looking at (presumably a
+// terminal)? Windows: compared by native handle. Mac: "hwnd" there is a bundle id/app name (see mac-helper.js).
+function isPipWindow(front) {
+  if (!front) return true;
+  if (process.platform === 'win32') {
+    const h = Number(front.hwnd);
+    return [island, settingsWin, welcomeWin, guardWin].some(w => w && !w.isDestroyed() && nativeHwnd(w) === h);
+  }
+  return front.proc === 'Pip' || front.proc === app.getName();
+}
+// "lastRealFront" used to become literally whatever was front last - a markdown file, a browser tab, anything -
+// and "send to terminal" would then try to type into that. Only a window that actually looks like a terminal
+// updates it now. A code editor hosts its own integrated terminal in the same process as every file tab, so for
+// those the title is checked too (a shell prompt, not a filename) - a heuristic, and still not a real signal.
+const TERMINAL_PROCS = /^(windowsterminal|cmd|powershell|pwsh|conhost|wt|alacritty|wezterm|hyper|mintty|conemu64?|terminal|iterm2?|warp|kitty)$/i;
+const EDITOR_PROCS = /^(code|code - insiders|cursor)$/i;
+function looksLikeTerminal(front) {
+  if (!front) return false;
+  const proc = String(front.proc || '').trim();
+  if (TERMINAL_PROCS.test(proc)) return true;
+  if (EDITOR_PROCS.test(proc)) return /powershell|cmd\.exe|\bbash\b|\bzsh\b|\bwsl\b|\bnode\b|\bpython\b|\bnpm\b|claude|codex|[$>]\s*$/i.test(String(front.title || ''));
+  return false;
+}
+// Focuses that window and types the text into it, followed by Enter - unverified on both platforms (see
+// CLAUDE.md): Windows can refuse to focus a background window, and SendKeys/keystroke both need the window to
+// actually take the focus first. Resolves once the helper says what happened, or after a few seconds of silence.
+function sendToTerminal(text) {
+  text = String(text || '').slice(0, 4000).trim();
+  if (!text) return Promise.resolve({ ok: false, error: t('Type something first.') });
+  if (!lastRealFront) return Promise.resolve({ ok: false, error: t('Pip has not seen another window yet. Click into the terminal once, then try again.') });
+  const target = lastRealFront;
+  return new Promise(resolve => {
+    const done = r => { clearTimeout(timer); helper.removeListener('typed', onTyped); resolve(r); };
+    const onTyped = r => done({ ok: Boolean(r.ok), target: target.title || target.proc, error: r.ok ? '' : t('Could not bring {window} to the front.', { window: target.title || target.proc }) });
+    const timer = setTimeout(() => done({ ok: false, error: t('That window did not answer in time.') }), 3000);
+    helper.on('typed', onTyped);
+    if (!helper.send({ cmd: 'focusType', hwnd: target.hwnd, proc: target.proc, text })) done({ ok: false, error: t('Nothing to send this to right now.') });
+  });
+}
+
 function wireIpc() {
   handle('app:init', () => ({ version: app.getVersion(), platform: process.platform, iphoneAccess: alerts.access, notch: notchInfo(), settings: store.all(), ai: hub.snapshot(), agents: agentState(), win: helper.state,
     art: helper.art, tray: trayView(), clips, displays: screen.getAllDisplays().length, autostart: app.getLoginItemSettings().openAtLogin,
@@ -427,6 +492,7 @@ function wireIpc() {
   handle('agents:connect', (agent, on) => { const r = connect(String(agent), Boolean(on)); changed(); return r; });
   handle('ai:decide', (id, behavior) => hub.decide(String(id), String(behavior)));
   handle('ai:reply', (id, text) => hub.reply(String(id), String(text || '')));
+  handle('agent:sendPrompt', text => sendToTerminal(text));
   handle('radio:set', (kind, on) => ['WiFi', 'Bluetooth'].includes(kind) && helper.send({ cmd: 'radio', kind, on: Boolean(on) }));
   handle('spotify:login', async () => { try { await spotify.login(store.get('spotifyClientId')); changed(); return { ok: true }; } catch (e) { return { ok: false, error: String(e.message || e) }; } });
   handle('spotify:logout', () => { spotify.logout(); changed(); return { ok: true }; });
@@ -652,6 +718,7 @@ app.whenReady().then(async () => {
   let hubError = '';
   try { await hub.start(); } catch (e) { hubError = e.code === 'EADDRINUSE' ? t('Port 48611 is in use by another program.') : String(e.message || e); }
   setInterval(() => hub.sweep(), 30e3);
+  setInterval(checkMeeting, 60e3); setTimeout(checkMeeting, 8000);
   // hooks carry the current token: keep connected agents in step (a reinstall or a wiped profile makes a new one)
   // also when Peep (Pip's earlier name) was connected: its entries are replaced by Pip's own
   const a = agentState(), was = store.get('agents');
@@ -663,7 +730,8 @@ app.whenReady().then(async () => {
   let lastFront = null;
   let lastSong = '';
   helper.on('state', s => { const k = s.media ? s.media.title + '|' + s.media.artist : ''; if (k && k !== lastSong) { lastSong = k; prefetchSong(s.media); }
-    send('win:state', s); checkGuard(s.front); if (s.front?.hwnd !== lastFront) { lastFront = s.front?.hwnd; keepOnTop(); } });
+    send('win:state', s); checkGuard(s.front); if (s.front?.hwnd !== lastFront) { lastFront = s.front?.hwnd; keepOnTop(); }
+    if (s.front && !isPipWindow(s.front) && looksLikeTerminal(s.front)) lastRealFront = s.front; });
   // the Mac helper says when it installs blueutil (to switch Bluetooth), so a click that takes a while is explained
   helper.on('notice', what => { const body = { 'blueutil-installing': t('Installing blueutil with Homebrew, so Pip can switch Bluetooth…'), 'blueutil-ready': t('Bluetooth can now be switched from the island.'), 'blueutil-failed': t('Could not install blueutil. Opening Bluetooth settings instead.') }[what];
     if (body) try { new Notification({ title: 'Pip', icon: ICON, body, silent: true }).show(); } catch {} });

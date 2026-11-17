@@ -29,12 +29,19 @@ function senderFrom(texts, descs) {
 }
 
 // Every alert window of Notification Center: its texts, button names and the descriptions macOS gives each alert.
+// The process is matched by a loose, case-insensitive name check (not whose({name: 'NotificationCenter'})): some
+// macOS versions expose it under a slightly different name ("Notification Center", with a space), and whose() with
+// an exact name silently returns nothing rather than erroring, which looked identical to "no alerts right now" and
+// was never caught. Windows from every matching process are merged, and the walk goes two and a half times deeper
+// (80 -> 200 elements) in case of extra wrapper groups in newer macOS - both unverified without a real Mac to watch.
 const READ = `function run() {
-  var se = Application('System Events'), out = [];
-  var p = se.processes.whose({ name: 'NotificationCenter' }); if (!p.length) return '[]';
-  var wins = p[0].windows(); for (var w = 0; w < wins.length; w++) {
+  var se = Application('System Events'), out = [], procs = [];
+  var all = se.processes(); for (var pi = 0; pi < all.length; pi++) { try { if (/notification.?center/i.test(all[pi].name())) procs.push(all[pi]); } catch (x) {} }
+  if (!procs.length) return '[]';
+  var wins = []; for (var pj = 0; pj < procs.length; pj++) { try { wins = wins.concat(procs[pj].windows()); } catch (x) {} }
+  for (var w = 0; w < wins.length; w++) {
     var texts = [], buttons = [], descs = [];
-    try { var all = wins[w].entireContents(); for (var i = 0; i < all.length && i < 80; i++) { var e = all[i], r = '';
+    try { var contents = wins[w].entireContents(); for (var i = 0; i < contents.length && i < 200; i++) { var e = contents[i], r = '';
       try { r = e.role(); } catch (x) {}
       if (r === 'AXStaticText') { try { texts.push(String(e.value())); } catch (x) {} }
       else if (r === 'AXButton') { try { buttons.push(String(e.name() || e.description())); } catch (x) {} }
@@ -78,4 +85,4 @@ class MacAlerts extends EventEmitter {
   setAccess(v) { if (this.access !== v) { this.access = v; this.emit('access', v); } }
 }
 
-module.exports = { MacAlerts, callerFrom, senderFrom };
+module.exports = { MacAlerts, callerFrom, senderFrom, READ };

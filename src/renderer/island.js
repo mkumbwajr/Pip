@@ -23,7 +23,8 @@ const weatherName = c => (c === 0 ? t('Clear') : c <= 3 ? t('Cloudy') : c <= 48 
 const S = { open: false, tab: 'home', settings: null, ai: { sessions: [], top: 'idle', history: [], usage: null }, agents: {}, win: { media: null, volume: null, net: null }, tray: [], clips: [],
   weather: null, event: null, stats: null, lyrics: null, lyricsFor: '', lyricsAt: 0, share: null, focus: { left: 25 * 60, running: false, total: 25 * 60 },
   ask: { busy: false, text: '', error: '', windows: [], pick: '' }, spotify: { on: false, devices: [], error: '' },
-  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false, awakeUntil: 0, cursorAt: Date.now(), alert: null, alertTimer: 0, mood: '', pillDrawn: false, restTimer: 0, wakeTimer: 0,
+  sendPrompt: { text: '', busy: false, target: '', error: '' },
+  platform: '', hubError: '', dragging: false, art: null, pinned: false, hover: false, auto: false, awakeUntil: 0, cursorAt: Date.now(), alert: null, alertTimer: 0, mood: '', emotion: '', pillDrawn: false, restTimer: 0, wakeTimer: 0, sleepTimer: 0,
   mode: null, modePick: '', menu: false, vol: false, calLoaded: false, years: {},
   google: false, cal: { view: 'day', events: null, error: '' }, mail: { count: null, error: '', at: 0 }, menuView: 'main', update: null,
   chat: { log: [], busy: false, screen: false }, recv: null };
@@ -84,21 +85,36 @@ const richText = s => esc(s).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(
 let lyrUserAt = 0; // when you last scrolled the lyrics yourself: they stop following the song for a moment
 function mediaPosition() { const m = S.win.media; if (!m) return 0; return Math.min(m.durationMs || Infinity, m.positionMs + (m.playing ? Date.now() - S.win.at : 0)); }
 
-const REST_AFTER = 60000; // Pip rests once the pointer has been still this long (and there is no task)
+const REST_AFTER = 5 * 60000; // Pip rests once the pointer has been still this long (and there is no task)
+const SLEEP_AFTER = REST_AFTER + 30 * 60000; // and falls properly asleep after another 30 minutes of that
+// mood (what Pip is doing) + resting/sleeping (how long it's been idle) -> which of the owner's emotion
+// drawings to show. "confused" and "sad" are drawn but have no trigger yet - free for a later mood.
+const EMOTION = { idle: 'default', working: 'curious', asking: 'worried', done: 'smiling', error: 'angry', music: 'happy' };
+function emotionFor(mood, resting, sleeping, waking) {
+  if (waking) return 'winks'; // a blink on the way back up, whatever woke it
+  if (sleeping) return 'sleeping';
+  if (resting) return 'tired';
+  return EMOTION[mood] || 'default';
+}
 // ---------- the pill ----------
 function drawPill() {
   const top = S.ai.sessions[0], m = S.win.media;
   island.className = [S.ai.top, S.settings?.island.mode === 'detach' ? 'detach' : 'attach', S.open ? 'open' : '', S.pinned ? 'pinned' : ''].join(' ');
   const phone = S.win.phones?.on && !m?.playing ? S.win.phones : null; // a phone playing through this PC (Windows)
   const mood = S.ai.top !== 'idle' ? S.ai.top : (m?.playing || phone ? 'music' : 'idle');
-  // nothing to do and the pointer has not moved for a minute: Pip rests (eyes half shut, slow breathing); it wakes with a
-  // blink as soon as the pointer moves again
-  const resting = mood === 'idle' && !S.open && !S.hover && !S.alert && Date.now() - S.cursorAt >= REST_AFTER && Date.now() >= S.awakeUntil;
+  // nothing to do and the pointer has not moved for 5 minutes: Pip rests (tired, slow breathing); 30 minutes
+  // further on it falls properly asleep. Either way it wakes with a blink as soon as the pointer moves again.
+  const idleFor = Date.now() - S.cursorAt;
+  const resting = mood === 'idle' && !S.open && !S.hover && !S.alert && idleFor >= REST_AFTER && Date.now() >= S.awakeUntil;
+  const sleeping = resting && idleFor >= SLEEP_AFTER;
   if (resting && !pip.classList.contains('resting') && S.pillDrawn) sfx('rest');
   if (!resting && pip.classList.contains('resting')) { sfx('wake'); pip.classList.add('waking'); clearTimeout(S.wakeTimer); S.wakeTimer = setTimeout(() => { pip.classList.remove('waking'); }, 700); }
   if (mood !== S.mood && S.pillDrawn && ['working', 'music'].includes(mood)) sfx(mood); // done, asking and error ring from their own events
   S.mood = mood; S.pillDrawn = true;
-  pip.className = 'pip ' + mood + (resting ? ' resting' : '') + (pip.classList.contains('waking') ? ' waking' : '') + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
+  const waking = pip.classList.contains('waking');
+  const emotion = emotionFor(mood, resting, sleeping, waking), plain = emotion === 'default';
+  pip.className = 'pip ' + mood + (resting ? ' resting' : '') + (sleeping ? ' sleeping' : '') + (waking ? ' waking' : '') + (plain ? ' plain' : '') + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
+  if (emotion !== S.emotion) { S.emotion = emotion; if (!plain) $('#pip-face').innerHTML = moodSvg(emotion); }
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
   let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock();
   const pillAsk = !S.open && top?.state === 'asking' && top.ask?.canAnswer ? top : null; // a permission: answer it right in the pill
@@ -108,10 +124,10 @@ function drawPill() {
   else if (top && top.state === 'done') text = t('{agent} is done', { agent: AGENT[top.agent] });
   else if (top && top.state === 'error') text = t('{agent} hit an error', { agent: AGENT[top.agent] });
   else if (S.recv) { text = t('Receiving {name}', { name: S.recv.name }); side = S.recv.pct + '%'; }
-  else if (S.alert && !S.open) { text = S.alert.from; side = S.alert.kind === 'call' ? t('Calling…') : t('Message'); }
+  else if (S.alert && !S.open) { text = S.alert.from; side = S.alert.kind === 'call' ? t('Calling…') : S.alert.kind === 'meeting' ? t('Meeting soon') : t('Message'); }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
-  else if (m?.playing) text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; // beside a notch: the title only, to stay compact
-  else if (phone) text = t('Playing from {phone}', { phone: phone.name || t('Phone') });
+  else if (m?.playing) { text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; side = ''; } // beside a notch: the title only, to stay compact; no clock while playing
+  else if (phone) { text = t('Playing from {phone}', { phone: phone.name || t('Phone') }); side = ''; }
   if (top && (top.state === 'working' || top.state === 'asking' || top.state === 'done')) side = ''; // a task is running or just finished: the strip shows only that
   $('#pill-text').textContent = text;
   island.classList.toggle('asking-pill', Boolean(pillAsk)); $('#pill-ask').hidden = !pillAsk;
@@ -123,7 +139,7 @@ function drawPill() {
     const w = S.ai.usage?.sevenDay; // both windows on hover; the chip itself shows the one that runs out first
     $('#pill-chip').title = u ? `${t('Claude usage')}: ${t('5 hours')} ${u.pct}%${w ? ` · ${t('Week')} ${w.pct}%` : ''}` : '';
   }
-  island.classList.toggle('alert-msg', S.alert?.kind === 'message' && !S.open); island.classList.toggle('alert-call', S.alert?.kind === 'call' && !S.open);
+  island.classList.toggle('alert-msg', (S.alert?.kind === 'message' || S.alert?.kind === 'meeting') && !S.open); island.classList.toggle('alert-call', S.alert?.kind === 'call' && !S.open);
   island.classList.toggle('notched', Boolean(S.notch)); // set again because className was rebuilt above
   island.classList.toggle('has-update', Boolean(S.update?.newer));
   island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
@@ -170,7 +186,14 @@ const pages = {
         ${s.canReply ? `<div class="row"><input type="text" class="grow" data-reply-for="${esc(s.id)}" placeholder="${esc(t('Answer {agent} from here…', { agent: AGENT[s.agent] }))}"><button class="btn primary" data-reply="${esc(s.id)}">${esc(t('Send'))}</button></div>` : ''}</div>`).join('');
     const history = S.ai.history.map(h => `<div class="item"><span class="badge ${h.state}">${esc(stateName(h.state))}</span><div class="grow"><div class="cut">${esc(h.prompt)}</div>
         <div class="dim small cut">${esc(AGENT[h.agent])} · ${esc(h.project)} · ${time(h.tookMs)}${h.edits.length ? ' · ' + esc(t('changed {files}', { files: h.edits.join(', ') })) : ''}</div></div><span class="dim small">${esc(ago(h.at))}</span></div>`).join('');
-    return `<h2>${esc(t('Sessions'))}</h2>${cards || `<div class="card dim">${esc(t('Nothing running. Start Claude Code or Codex in a terminal.'))}</div>`}<h2>${esc(t('History'))}</h2>${history || `<div class="dim">${esc(t('Finished jobs appear here.'))}</div>`}`;
+    // not tied to a session: Pip has no way to know which terminal belongs to which agent, so this types into
+    // whichever window you last had focused before opening the island - meant for a prompt at any time, not only
+    // the brief moment canReply is true (that one goes through the hook and is the more reliable of the two).
+    const sp = S.sendPrompt;
+    const sendBox = `<div class="card send-term">
+        <div class="row"><input type="text" class="grow" id="send-term" placeholder="${esc(t('Type a prompt, Pip sends it to your terminal…'))}" value="${esc(sp.text)}"><button class="btn primary" data-send-term ${sp.busy ? 'disabled' : ''}>${esc(sp.busy ? t('Sending…') : t('Send'))}</button></div>
+        <p class="dim small">${esc(sp.error ? sp.error : sp.target ? t('Sent to {window}.', { window: sp.target }) : t('Goes to whichever window you had open before this - click into your terminal first.'))}</p></div>`;
+    return `<h2>${esc(t('Sessions'))}</h2>${sendBox}${cards || `<div class="card dim">${esc(t('Nothing running. Start Claude Code or Codex in a terminal.'))}</div>`}<h2>${esc(t('History'))}</h2>${history || `<div class="dim">${esc(t('Finished jobs appear here.'))}</div>`}`;
   },
   music() {
     const m = S.win.media, sp = S.spotify, on = S.settings.lyrics;
@@ -332,43 +355,57 @@ const homes = {
   }
 };
 
-// ---------- the license: after the 7-day trial, every tab but the agents asks for it ----------
-S.buy = { phone: '', order: '', method: '', operator: '', error: '', busy: false };
+// ---------- donating: any amount, through EvPay. Opened from Settings' Support tab (api.onBuy) ----------
+S.buy = { phone: '', order: '', method: '', operator: '', error: '', busy: false, amount: 5000, custom: '', status: '' };
 const OPERATOR_NAMES = { Mpesa: 'M-Pesa', TigoPesa: 'Mixx by Yas', AirtelMoney: 'Airtel Money', HaloPesa: 'HaloPesa' };
+const DONATE_PRESETS = [2000, 5000, 10000];
+const donateAmount = () => { const c = Math.round(Number(S.buy.custom)); return c > 0 ? c : S.buy.amount; };
+// the donate page's own Pip icon: excited while picking/typing an amount, thinking while a payment is pending,
+// all smiles once it's paid (which also bursts confetti, in pollOrder)
+function buyMood() {
+  const b = S.buy, L = S.license || {};
+  if (b.status === 'paid') return 'smiling';
+  if (b.error) return 'angry';
+  if (b.order) return 'curious';
+  if (!L.signedIn) return 'default';
+  return 'happy';
+}
 function buyPage() {
-  const L = S.license || {}, b = S.buy, price = 'TSh ' + Number(L.priceTzs || 5000).toLocaleString('en');
-  const title = L.licensed ? t('Pip is yours') : L.locked ? t('Your 7-day trial is over') : t('{n} days of your trial left', { n: L.daysLeft ?? 7 });
+  const L = S.license || {}, b = S.buy, price = n => 'TSh ' + Number(n).toLocaleString('en'), amt = donateAmount();
   let right;
-  if (L.licensed) right = `<div class="by-ok">${icon('check')}<b>${esc(t('Thank you! Every tab is open, on every PC and Mac with your account.'))}</b></div>`;
-  else if (!L.signedIn) right = `<p class="by-note">${esc(t('The license lives in your Pip account, so it works on every PC and Mac you sign in to.'))}</p>
+  if (b.status === 'paid') right = `<div class="by-ok">${icon('check')}<b>${esc(t('Thank you! Your donation means a lot.'))}</b></div>`;
+  else if (!L.signedIn) right = `<p class="by-note">${esc(t('Sign in to your Pip account first, so we know whose donation this is.'))}</p>
       <button class="wbtn wide" data-buy-signin>${esc(t('Sign in first'))}</button>`;
   else if (b.order) right = `<div class="by-wait"><span class="by-spin"></span><b>${esc(b.method === 'card' ? t('Finish paying on the page that opened in your browser.') : t('Approve the payment on your phone ({network}).', { network: OPERATOR_NAMES[b.operator] || b.operator }))}</b></div>
-      <p class="by-note">${esc(t('Pip unlocks by itself as soon as it goes through.'))}</p><button class="linkbtn" data-buy-cancel>${esc(t('Cancel'))}</button>`;
-  else right = `<label class="by-lab" for="by-phone">${esc(t('Pay with mobile money'))}</label>
-      <div class="by-row"><input id="by-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="07XX XXX XXX" value="${esc(b.phone)}"><button class="wbtn" data-pay-mobile ${b.busy ? 'disabled' : ''}>${esc(b.busy ? t('Sending…') : t('Pay {price}', { price }))}</button></div>
+      <p class="by-note">${esc(t('We will record it as soon as it goes through.'))}</p><button class="linkbtn" data-buy-cancel>${esc(t('Cancel'))}</button>`;
+  else right = `<div class="by-amts">${DONATE_PRESETS.map(a => `<button type="button" class="by-amt ${!b.custom && b.amount === a ? 'on' : ''}" data-donate-amt="${a}">${esc(price(a))}</button>`).join('')}
+      <input type="number" id="by-custom" min="0" step="500" placeholder="${esc(t('Other amount (TSh)'))}" value="${esc(b.custom)}"></div>
+      <label class="by-lab" for="by-phone">${esc(t('Pay with mobile money'))}</label>
+      <div class="by-row"><input id="by-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="07XX XXX XXX" value="${esc(b.phone)}"><button class="wbtn" data-pay-mobile ${b.busy ? 'disabled' : ''}>${esc(b.busy ? t('Sending…') : t('Donate {price}', { price: price(amt) }))}</button></div>
       <p class="by-note">M-Pesa · Mixx by Yas · Airtel Money · HaloPesa</p>
       <div class="by-or"><span>${esc(t('or'))}</span></div>
-      <button class="by-card" data-pay-card ${b.busy ? 'disabled' : ''}>${icon('card')}<b>${esc(t('Pay by card'))}</b><span>Visa · Mastercard</span>${icon('external')}</button>`;
-  return `<div class="by"><div class="by-l"><span class="by-pip"><i></i><i></i></span><h3>${esc(title)}</h3>
-      <p>${esc(L.licensed ? t('Bought once, yours for good.') : t('Unlock every tab for {price}, once. The island and your agents keep working either way.', { price }))}</p></div>
+      <button class="by-card" data-pay-card ${b.busy ? 'disabled' : ''}>${icon('card')}<b>${esc(t('Donate by card'))}</b><span>Visa · Mastercard</span>${icon('external')}</button>`;
+  return `<div class="by"><div class="by-l"><span class="by-pip"><span class="face">${moodSvg(buyMood())}</span></span><h3>${esc(t('Support Pip'))}</h3>
+      <p>${esc(t('Any amount helps keep Pip going.'))}</p></div>
     <div class="by-r">${right}${b.error ? `<p class="by-err">${esc(b.error)}</p>` : ''}</div></div>`;
 }
-// while a payment is pending: ask every four seconds, for up to ten minutes
+// while a donation is pending: ask every four seconds, for up to ten minutes
 async function pollOrder(ref) {
   for (let i = 0; i < 150 && S.buy.order === ref; i++) {
     await new Promise(r => setTimeout(r, 4000));
     if (S.buy.order !== ref) return;
-    const r = await api.payOrder(ref);
+    const r = await api.donateOrder(ref);
     if (!r?.ok) continue;
-    if (r.status === 'paid' || r.licensed) { S.license = { ...S.license, ...r, licensed: true, locked: false }; S.buy = { ...S.buy, order: '', error: '' }; drawTabs(); if (!typing()) draw(true); confetti(); return; }
+    if (r.status === 'paid') { S.buy = { ...S.buy, order: '', status: 'paid', error: '' }; if (!typing()) draw(true); confetti(); return; }
     if (r.status === 'failed' || r.status === 'refunded') { S.buy = { ...S.buy, order: '', error: t('The payment did not go through. Try again.') }; if (!typing()) draw(true); return; }
   }
-  if (S.buy.order === ref) { S.buy = { ...S.buy, order: '', error: t('No answer from the payment yet. If you paid, Pip unlocks by itself shortly.') }; draw(true); }
+  if (S.buy.order === ref) { S.buy = { ...S.buy, order: '', error: t('No answer from the payment yet. If you paid, it will still be recorded shortly.') }; draw(true); }
 }
 async function startPay(kind) {
   if (kind === 'mobile') S.buy.phone = $('#by-phone')?.value.trim() || '';
-  S.buy = { ...S.buy, busy: true, error: '' }; draw(true);
-  const r = kind === 'mobile' ? await api.payMobile(S.buy.phone) : await api.payCard();
+  S.buy = { ...S.buy, busy: true, error: '', status: '' }; draw(true);
+  const amount = donateAmount();
+  const r = kind === 'mobile' ? await api.donateMobile(S.buy.phone, '', amount) : await api.donateCard(amount);
   S.buy.busy = false;
   if (!r?.ok) { S.buy.error = r?.error || t('The payment could not be started.'); return draw(true); }
   S.buy = { ...S.buy, order: r.order, method: kind, operator: r.operator || '' }; draw(true); pollOrder(r.order);
@@ -663,6 +700,14 @@ async function sendReply(id) {
   const box = page.querySelector(`[data-reply-for="${CSS.escape(id)}"]`), text = box?.value.trim(); if (!text) return;
   box.value = ''; box.blur(); await api.reply(id, text);
 }
+// typed any time, not tied to a session: see the comment above sendBox in pages.ai()
+async function sendToTerminal() {
+  const text = S.sendPrompt.text.trim(); if (!text || S.sendPrompt.busy) return;
+  S.sendPrompt = { ...S.sendPrompt, busy: true, error: '', target: '' }; draw(true);
+  const r = await api.sendPrompt(text);
+  S.sendPrompt = { text: r?.ok ? '' : text, busy: false, target: r?.target || '', error: r?.ok ? '' : (r?.error || t('Could not send that.')) };
+  draw(true);
+}
 
 // ---------- Pip's chat: the agent you already use answers here, through its own program and your login ----------
 function growChat() { const q = $('#pa-q'); if (!q) return; q.style.height = 'auto'; q.style.height = Math.min(96, q.scrollHeight) + 'px'; }
@@ -753,6 +798,7 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { if (S.menu || S.vol || S.bright) { showMenu(false); showVolume(false); showBright(false); } else setOpen(false); }
   else if (e.key === 'Enter' && e.target.dataset?.replyFor) sendReply(e.target.dataset.replyFor);
+  else if (e.key === 'Enter' && e.target.id === 'send-term') sendToTerminal();
 });
 document.addEventListener('mousemove', e => pointer(Boolean(e.target.closest && e.target.closest('#shell'))));
 document.addEventListener('mouseleave', () => pointer(false));
@@ -766,6 +812,7 @@ page.addEventListener('click', async e => {
   else if (d.lyrics !== undefined) { await save({ lyrics: !S.settings.lyrics }); S.lyricsFor = ''; refreshLyrics(); draw(true); }
   else if (d.decide) await api.decide(d.id, d.decide);
   else if (d.reply) sendReply(d.reply);
+  else if (d.sendTerm !== undefined) sendToTerminal();
   else if (d.media) {
     api.media(d.media);
     // show the change at once; the helper confirms the real state a moment later
@@ -795,6 +842,7 @@ page.addEventListener('click', async e => {
   else if (d.payCard !== undefined) startPay('card');
   else if (d.buySignin !== undefined) api.openSettings('connections');
   else if (d.buyCancel !== undefined) { S.buy = { ...S.buy, order: '', error: '' }; draw(true); }
+  else if (d.donateAmt) { S.buy = { ...S.buy, amount: Number(d.donateAmt), custom: '' }; draw(true); }
   else if (d.inbox !== undefined) api.openInbox();
   else if (d.connect !== undefined) { const r = await api.connectAgent('claude', true); if (r?.agents) S.agents = r.agents; if (!r?.ok) openSettings(); else draw(true); }
   else if (d.modePick) { S.modePick = d.modePick; draw(true); }
@@ -831,6 +879,8 @@ page.addEventListener('input', e => {
   if (el.id === 'pa-q') { growChat(); return; }
   if (el.id === 'volume') { S.dragging = true; $('#vol-n').textContent = el.value; api.setVolume(el.value); }
   else if (el.id === 'note') { S.settings.note = el.value; drawNoteSide(); clearTimeout(page._note); page._note = setTimeout(() => save({ note: el.value }), 500); }
+  else if (el.id === 'by-custom') S.buy.custom = el.value;
+  else if (el.id === 'send-term') S.sendPrompt.text = el.value;
 });
 page.addEventListener('change', async e => {
   const el = e.target;
@@ -862,7 +912,7 @@ api.onAi(snap => {
   else if (was === 'asking' && snap.top !== 'asking' && S.auto) { S.auto = false; setTimeout(maybeClose, 900); }
   draw();
 });
-api.onFinish(entry => sfx(entry.state === 'done' ? 'done' : 'error'));
+api.onFinish(entry => { sfx(entry.state === 'done' ? 'done' : 'error'); if (entry.state === 'done') confetti(); });
 api.onWin(state => { const was = S.win.media?.title, phoneWas = S.win.phones?.on; S.win = state;
   if (state.phones && phoneWas !== undefined && Boolean(state.phones.on) !== Boolean(phoneWas)) sfx(state.phones.on ? 'phoneOn' : 'phoneOff'); if (state.media?.title !== was) applyArtColor(); refreshLyrics(); refreshSongInfo(); draw(); });
 // the license changed (checked, bought, signed in or out): the tabs lock or unlock
@@ -870,10 +920,10 @@ api.onWin(state => { const was = S.win.media?.title, phoneWas = S.win.phones?.on
 api.onAlert(a => {
   clearTimeout(S.alertTimer);
   if (a.kind === 'call-end') { if (S.alert?.kind === 'call') S.alert = null; return drawPill(); }
-  if (a.kind === 'message' && S.alert?.kind === 'call') return; // a ringing call stays in front
+  if ((a.kind === 'message' || a.kind === 'meeting') && S.alert?.kind === 'call') return; // a ringing call stays in front
   if (a.kind !== S.alert?.kind || a.from !== S.alert?.from) sfx(a.kind === 'call' ? 'ring' : 'message');
   S.alert = a; drawPill();
-  if (a.kind === 'message') S.alertTimer = setTimeout(() => { S.alert = null; S.awakeUntil = Date.now() + 3000; drawPill(); }, 7000);
+  if (a.kind === 'message' || a.kind === 'meeting') S.alertTimer = setTimeout(() => { S.alert = null; S.awakeUntil = Date.now() + 3000; drawPill(); }, a.kind === 'meeting' ? 10000 : 7000);
 });
 api.onLicense(v => { S.license = v; drawTabs(); if (S.open && !typing()) draw(true); });
 api.onBuy(() => (S.open ? go('buy') : setOpen(true, 'buy')));
@@ -884,7 +934,8 @@ api.onUpdate(u => { S.update = u; island.classList.toggle('has-update', Boolean(
 api.onCursor(p => {
   // the pointer moved (main sends it only when it moves): wake now, and look again once it has been still for a minute
   S.cursorAt = Date.now(); if (pip.classList.contains('resting')) drawPill();
-  clearTimeout(S.restTimer); S.restTimer = setTimeout(drawPill, REST_AFTER + 100);
+  clearTimeout(S.restTimer); clearTimeout(S.sleepTimer);
+  S.restTimer = setTimeout(drawPill, REST_AFTER + 100); S.sleepTimer = setTimeout(drawPill, SLEEP_AFTER + 100);
   const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);
   pip.style.setProperty('--ex', (dx / d * (S.open ? 1.6 : 3.2) * pull).toFixed(2) + 'px'); pip.style.setProperty('--ey', (dy / d * (S.open ? 1.2 : 2.4) * pull).toFixed(2) + 'px');
 });
