@@ -69,8 +69,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .pip:not(.plain) .face { display: flex; } /* resting/sleeping/waking below override this with their own animation, on the head */
 /* the white eye/mouth details inside the mood artwork: these are what follow the pointer, not the head - but only
    the eyes themselves (path.eye, tagged per mood in moods.js) blink, never the mouth or eyebrows */
-.pip .face svg path[fill="#fff"] { transform-box: fill-box; transform-origin: center; translate: calc(var(--ex, 0px) * 18) calc(var(--ey, 0px) * 18); transition: translate .09s linear; }
-.pip .face svg path.eye { animation: blink 5s infinite; }
+.pip .face svg path[fill="#fff"] { transform-box: fill-box; transform-origin: center; }
+.pip .face svg path.eye { translate: calc(var(--ex, 0px) * 18) calc(var(--ey, 0px) * 18); transition: translate .09s linear; animation: blink 5s infinite; }
 .pip .eyes { display: none; align-items: center; justify-content: center; gap: 5px; width: 100%; height: 100%; }
 .pip.plain .eyes { display: flex; }
 .pip .eye { width: 4px; height: 6px; border-radius: 2px; background: #fff; animation: blink 5s infinite; translate: var(--ex, 0) var(--ey, 0); transition: translate .09s linear; }
