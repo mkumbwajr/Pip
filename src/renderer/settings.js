@@ -163,7 +163,7 @@ const views = {
   support() {
     const link = (ico, title, sub, url) => row(ico, title, sub, `<button type="button" class="btn" data-link="${esc(url)}">${icon('external')}${esc(t('Open'))}</button>`);
     const donateGroup = group(t('Support Pip'), [
-        row('heart', t('Donate'), t('Pip is free, for everyone, with nothing locked. Any amount helps keep it going.'), button('open-donate', t('Donate'), 'primary'))
+        row('heart', t('Donate'), t('Donations go towards my son’s Claude subscription. The kid has expensive taste.😅'), button('open-donate', t('Donate'), 'primary'))
       ]);
     return donateGroup + group(t('Help'), [
         link('globe', t('Website'), 'pip.bang.co.tz', 'https://pip.bang.co.tz'),
