@@ -379,7 +379,7 @@ function buyPage() {
   else if (!L.signedIn) right = `<p class="by-note">${esc(t('Sign in to your Pip account first, so we know whose donation this is.'))}</p>
       <button class="wbtn wide" data-buy-signin>${esc(t('Sign in first'))}</button>`;
   else if (b.order) right = `<div class="by-wait"><span class="by-spin"></span><b>${esc(b.method === 'card' ? t('Finish paying on the page that opened in your browser.') : t('Approve the payment on your phone ({network}).', { network: OPERATOR_NAMES[b.operator] || b.operator }))}</b></div>
-      <p class="by-note">${esc(t('We will record it as soon as it goes through.'))}</p><button class="linkbtn" data-buy-cancel>${esc(t('Cancel'))}</button>`;
+      <p class="by-note">${esc(t('We will record it as soon as it goes through.'))}</p><button class="wbtn ghost sm" data-buy-cancel>${esc(t('Cancel'))}</button>`;
   else right = `<div class="by-amts">${DONATE_PRESETS.map(a => `<button type="button" class="by-amt ${!b.custom && b.amount === a ? 'on' : ''}" data-donate-amt="${a}">${esc(price(a))}</button>`).join('')}
       <input type="number" id="by-custom" min="0" step="500" placeholder="${esc(t('Other amount (TSh)'))}" value="${esc(b.custom)}"></div>
       <label class="by-lab" for="by-phone">${esc(t('Pay with mobile money'))}</label>
@@ -458,8 +458,9 @@ function go(tab) {
 function setOpen(open, tab) {
   if (open === S.open) return;
   S.open = open; sfx(open ? 'open' : 'fold');
-  // Home every time it opens, unless something asked for a tab, or it folded away on the lyrics while the song plays on
-  if (open) go(tab || (S.license?.locked ? 'ai' : S.backToLyrics && S.settings?.lyrics && S.win.media?.playing ? 'music' : 'home'));
+  // Home every time it opens, unless something asked for a tab, a donation is still waiting on the browser, or it
+  // folded away on the lyrics while the song plays on
+  if (open) go(tab || (S.buy.order ? 'buy' : S.license?.locked ? 'ai' : S.backToLyrics && S.settings?.lyrics && S.win.media?.playing ? 'music' : 'home'));
   else { S.backToLyrics = S.tab === 'music' && Boolean(S.settings?.lyrics); S.pinned = false; S.auto = false; showMenu(false); showVolume(false); showBright(false); hideTip(); if (document.hasFocus()) { document.activeElement?.blur?.(); api.focus(false); } drawPill(); }
 }
 function openSettings() { api.openSettings(); setOpen(false); }
