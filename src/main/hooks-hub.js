@@ -15,6 +15,7 @@ const PREFIX = '/pip';
 const LEGACY_PREFIX = '/peep';
 const PERMISSION_WAIT_MS = 4 * 60 * 1000, REPLY_WAIT_MS = 30 * 60 * 1000;
 const FEED_MAX = 30, HISTORY_MAX = 50, BODY_MAX = 2 * 1024 * 1024;
+const DONE_IDLE_MS = 5000; // "<agent> is done" holds the pill this long, then the glowing eyes come back on their own
 
 const clip = (s, n = 160) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const base = p => (p ? path.win32.basename(String(p).replace(/\//g, '\\')) : '');
@@ -36,10 +37,10 @@ function describeTool(name, input = {}) {
 }
 
 class Hub extends EventEmitter {
-  constructor({ token, port = PORT, historyFile = null } = {}) {
+  constructor({ token, port = PORT, historyFile = null, doneIdleMs = DONE_IDLE_MS } = {}) {
     super();
     if (!token) throw new Error('Hub needs a token');
-    this.token = token; this.port = port; this.historyFile = historyFile;
+    this.token = token; this.port = port; this.historyFile = historyFile; this.doneIdleMs = doneIdleMs;
     this.sessions = new Map();
     this.pending = new Map(); // session id → { res, timer }: a permission request waiting for Allow or Deny
     this.waiters = new Map(); // session id → { res, timer }: a finished turn waiting for a reply typed in the island
@@ -145,12 +146,16 @@ class Hub extends EventEmitter {
   }
 
   finish(s, state, event) {
+    clearTimeout(s.doneTimer); s.doneTimer = null;
     s.state = state; s.activity = null; s.reply = clip(event.last_assistant_message || '', 600);
     const entry = { at: Date.now(), agent: s.agent, project: s.project, prompt: s.prompt, state, tookMs: s.startedAt ? Date.now() - s.startedAt : 0, edits: s.edits.slice(0, 20), reply: clip(event.last_assistant_message || '', 600) };
     if (s.prompt) {
       this.history.unshift(entry); this.history.length = Math.min(this.history.length, HISTORY_MAX);
       if (this.historyFile) { try { fs.mkdirSync(path.dirname(this.historyFile), { recursive: true }); fs.writeFileSync(this.historyFile, JSON.stringify(this.history)); } catch {} }
     }
+    // "done" (not "error") holds the pill only briefly, then goes back to the glowing eyes on its own - unless
+    // something else already moved the session on (a new prompt, SessionEnd, ...) by the time this fires.
+    if (state === 'done') s.doneTimer = setTimeout(() => { if (s.state === 'done') { s.state = 'idle'; this.emit('change', this.snapshot()); } }, this.doneIdleMs);
     this.emit('finish', { session: { ...s }, entry });
   }
 
@@ -201,19 +206,21 @@ class Hub extends EventEmitter {
     return ok;
   }
 
-  /** Sessions quiet for a long time are dropped; finished ones fall back to idle after a while. */
+  /** Sessions quiet for a long time are dropped; a stuck error falls back to idle after a while ("done" reverts
+      on its own, quickly, via the timer in finish() - it doesn't need the sweep). */
   sweep(now = Date.now()) {
     let changed = false;
     for (const [id, s] of this.sessions) {
       if (now - s.updatedAt > 6 * 3600e3) { this.sessions.delete(id); changed = true; }
-      else if ((s.state === 'done' || s.state === 'error') && now - s.updatedAt > 5 * 60e3) { s.state = 'idle'; changed = true; }
+      else if (s.state === 'error' && now - s.updatedAt > 5 * 60e3) { s.state = 'idle'; changed = true; }
     }
     if (changed) this.emit('change', this.snapshot());
   }
 
   snapshot() {
     const rank = { asking: 4, error: 3, working: 2, done: 1, idle: 0 };
-    const sessions = [...this.sessions.values()].sort((a, b) => rank[b.state] - rank[a.state] || b.updatedAt - a.updatedAt).map(s => ({ ...s, feed: s.feed.slice(-8) }));
+    // doneTimer is a Node timer handle (set by finish()), never part of what a session looks like from the outside
+    const sessions = [...this.sessions.values()].sort((a, b) => rank[b.state] - rank[a.state] || b.updatedAt - a.updatedAt).map(({ doneTimer, ...s }) => ({ ...s, feed: s.feed.slice(-8) }));
     const usage = this.usage && Date.now() - this.usage.at < 6 * 3600e3 ? this.usage : null;
     return { sessions, top: sessions[0]?.state || 'idle', history: this.history.slice(0, 20), usage };
   }

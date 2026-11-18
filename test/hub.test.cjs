@@ -9,8 +9,8 @@ test('describeTool', () => {
   assert.equal(describeTool('Bash', { command: 'npm   test' }).detail, 'npm test');
 });
 
-test('session lifecycle and history', () => {
-  const hub = new Hub({ token: 't' }); let finished = null; hub.on('finish', f => { finished = f; });
+test('session lifecycle and history', async () => {
+  const hub = new Hub({ token: 't', doneIdleMs: 10 }); let finished = null; hub.on('finish', f => { finished = f; });
   hub.handle({ hook_event_name: 'UserPromptSubmit', session_id: 's1', cwd: 'C:\\proj\\shop', prompt: 'fix the bug' });
   assert.equal(hub.snapshot().top, 'working');
   hub.handle({ hook_event_name: 'PreToolUse', session_id: 's1', tool_name: 'Edit', tool_input: { file_path: 'C:\\proj\\shop\\cart.js' } });
@@ -20,8 +20,25 @@ test('session lifecycle and history', () => {
   const snap = hub.snapshot();
   assert.equal(snap.top, 'done'); assert.equal(snap.history[0].project, 'shop'); assert.deepEqual(snap.history[0].edits, ['cart.js']);
   assert.equal(finished.entry.reply, 'Done.');
-  hub.sweep(Date.now() + 6 * 60e3); assert.equal(hub.snapshot().top, 'idle');
+  // "done" reverts to idle on its own shortly after, not via the sweep (an error, unlike done, still needs it)
+  await new Promise(r => hub.once('change', r)); assert.equal(hub.snapshot().top, 'idle');
   hub.handle({ hook_event_name: 'SessionEnd', session_id: 's1' }); assert.equal(hub.snapshot().sessions.length, 0);
+});
+
+test('done reverts to idle on its own; a new prompt within that window cancels the revert; error still needs the sweep', async () => {
+  const hub = new Hub({ token: 't', doneIdleMs: 15 });
+  hub.handle({ hook_event_name: 'UserPromptSubmit', session_id: 'a', prompt: 'x' });
+  hub.handle({ hook_event_name: 'Stop', session_id: 'a', last_assistant_message: 'ok' });
+  hub.handle({ hook_event_name: 'UserPromptSubmit', session_id: 'a', prompt: 'one more thing' }); // before the timer fires
+  assert.equal(hub.snapshot().top, 'working');
+  await new Promise(r => setTimeout(r, 40));
+  assert.equal(hub.snapshot().top, 'working', 'the stale done-timer must not revert a session that moved on');
+
+  hub.handle({ hook_event_name: 'StopFailure', session_id: 'a' });
+  assert.equal(hub.snapshot().top, 'error');
+  await new Promise(r => setTimeout(r, 40));
+  assert.equal(hub.snapshot().top, 'error', 'an error does not revert on its own - only the sweep clears it, after much longer');
+  hub.sweep(Date.now() + 6 * 60e3); assert.equal(hub.snapshot().top, 'idle');
 });
 
 test('http: rejects a wrong token, holds a permission request until decided', async () => {
