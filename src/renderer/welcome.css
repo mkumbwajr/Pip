@@ -34,7 +34,7 @@ h2 { margin: 6px 0 6px; font: 700 24px/1.2 var(--display); letter-spacing: -.015
 .mood-cycle .mc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .5s ease; color: inherit; }
 .mood-cycle .mc.on { opacity: 1; animation: mc-pop .4s var(--ease, ease-out); } /* each mood comes alive as it arrives, not just a flat crossfade */
 .mood-cycle .mc svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.mood-cycle .mc.on svg path[fill="#fff"] { transform-box: fill-box; transform-origin: center; animation: blink 1.5s ease-in-out .3s 1; } /* a real blink while it's held, before the next mood fades in */
+.mood-cycle .mc.on svg path.eye { transform-box: fill-box; transform-origin: center; animation: blink 1.5s ease-in-out .3s 1; } /* a real blink while it's held, before the next mood fades in - eyes only, never the mouth */
 @keyframes mc-pop { 0% { transform: scale(.88); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
 @keyframes float { 50% { transform: translateY(-8px); } }
