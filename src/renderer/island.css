@@ -39,6 +39,9 @@ button, input, textarea, select { font: inherit; color: inherit; }
 #pill-inner { flex: none; display: inline-flex; align-items: center; gap: 9px; height: 36px; padding: 0 16px 0 16px; white-space: nowrap; max-width: 640px; } /* the same room on both ends, so Pip is not pressed against the left edge */
 #pill-text { overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
 #pill-text:empty { display: none; }
+/* the pill row itself never widens for long text - past a length, island.js moves it here instead, and the whole
+   island (#shell) grows taller to show it, same as it already does to reveal the open panel */
+#pill-note { padding: 2px 16px 12px; font-size: 12.5px; line-height: 1.45; color: var(--soft); white-space: normal; word-break: break-word; }
 #pill-side { color: var(--dim); font-variant-numeric: tabular-nums; }
 #pill-date, #pill-chip, #pill-more, #pill-net { display: none; }
 /* Open, the pill becomes the status strip: date on the left, Pip in the middle, usage, clock and the menu on the right */

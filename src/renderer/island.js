@@ -118,19 +118,32 @@ function drawPill() {
   const faceKey = plain ? '' : emotion; // the key includes plain so opening/folding redraws the face even if the mood itself didn't change
   if (faceKey !== S.emotion) { S.emotion = faceKey; if (!plain) $('#pip-face').innerHTML = moodSvg(emotion); }
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
-  let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock();
+  let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock(), note = '';
   const pillAsk = !S.open && top?.state === 'asking' && top.ask?.canAnswer ? top : null; // a permission: answer it right in the pill
-  if (pillAsk) text = `${t('Allow')}: ${top.ask.detail || verb(top.ask.verb)}?`;
+  // past this length, the detail moves into the note below instead of squeezing (or ellipsis-ing) into the pill
+  // row - the pill row's width never changes for it; the island grows taller instead (see the height block below)
+  const NOTE_MAX = 44;
+  if (pillAsk) {
+    const detail = top.ask.detail || verb(top.ask.verb);
+    if (detail.length > NOTE_MAX) { text = t('Allow?'); note = detail; } else text = `${t('Allow')}: ${detail}?`;
+  }
   else if (top && top.state === 'asking') text = t('{agent} needs you', { agent: AGENT[top.agent] });
   else if (top && top.state === 'working') text = top.activity ? `${verb(top.activity.verb)} ${top.activity.detail}`.trim() : t('Working');
-  else if (top && top.state === 'done') text = t('{agent} is done', { agent: AGENT[top.agent] });
+  else if (top && top.state === 'done') { // Pip relays what the agent actually said, not just that it finished
+    const label = t('{agent} is done', { agent: AGENT[top.agent] });
+    if (top.reply && top.reply.length > NOTE_MAX) { text = label; note = top.reply; } else text = top.reply || label;
+  }
   else if (top && top.state === 'error') text = t('{agent} hit an error', { agent: AGENT[top.agent] });
   else if (S.recv) { text = t('Receiving {name}', { name: S.recv.name }); side = S.recv.pct + '%'; }
-  else if (S.alert && !S.open) { text = S.alert.from; side = S.alert.kind === 'call' ? t('Calling…') : S.alert.kind === 'meeting' ? t('Meeting soon') : t('Message'); }
+  else if (S.alert && !S.open) {
+    const kind = S.alert.kind === 'call' ? t('Calling…') : S.alert.kind === 'meeting' ? t('Meeting soon') : t('Message');
+    if (S.alert.from && S.alert.from.length > NOTE_MAX) { text = kind; note = S.alert.from; } else { text = S.alert.from; side = kind; }
+  }
   else if (S.focus.running) { text = t('Focus'); side = time(S.focus.left * 1000); }
   else if (m?.playing) { text = m.artist && !S.notch ? `${m.title} · ${m.artist}` : m.title; side = ''; } // beside a notch: the title only, to stay compact; no clock while playing
   else if (phone) { text = t('Playing from {phone}', { phone: phone.name || t('Phone') }); side = ''; }
   if (top && (top.state === 'working' || top.state === 'asking' || top.state === 'done')) side = ''; // a task is running or just finished: the strip shows only that
+  if (note) side = ''; // the note takes over the row below; the side slot (clock, kind word, ...) would be redundant
   $('#pill-text').textContent = text;
   island.classList.toggle('asking-pill', Boolean(pillAsk)); $('#pill-ask').hidden = !pillAsk;
   if (pillAsk) for (const b of $('#pill-ask').children) b.dataset.id = pillAsk.id; $('#pill-side').textContent = S.open ? clock() : side;
@@ -147,13 +160,22 @@ function drawPill() {
   island.dataset.tab = S.tab; document.documentElement.style.setProperty('--alpha', S.settings?.island.opacity ?? 1);
   document.documentElement.style.setProperty('--bright', S.settings?.island.brightness ?? 0.1);
   island.classList.toggle('bare', !S.open && !text && S.settings?.island.mode !== 'detach'); // attached and idle: only Pip in the notch
-  // the shell's width is set in pixels so the change between sizes can be animated
+  // the shell's width and height are set in pixels so the change between sizes can be animated. The pill row's
+  // width never grows for long text (a MacBook's camera notch leaves no room to spare beside it); instead the
+  // island grows taller to fit the note below, the same way it already grows to reveal the open panel.
+  const noteEl = $('#pill-note');
+  noteEl.hidden = S.open || !note;
+  let width;
   if (S.notch && !S.open) {
     // the window is centred on the screen, so the gap is too: both sides as wide as the wider one, eyes at the far left
     const inner = $('#pill-inner'), right = [...inner.children].filter(el => el.id !== 'pip' && el.id !== 'pill-gap' && el.offsetParent).reduce((w, el) => w + Math.max(el.scrollWidth, el.getBoundingClientRect().width) + 10, 0); // full width, not the squeezed one
-    const side = Math.max(56, Math.min(150, Math.ceil(right) + 18)); // longer text ends in "…" rather than widening the island
-    island.style.setProperty('--side', side + 'px'); shell.style.width = (S.notch.width + 2 * side) + 'px';
-  } else shell.style.width = S.open ? '' : Math.max(84, Math.min(pillAsk ? 620 : 440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2)) + 'px';
+    const side = Math.max(56, Math.min(150, Math.ceil(right) + 18)); // longer text ends in "…" rather than widening the pill row itself
+    island.style.setProperty('--side', side + 'px'); width = S.notch.width + 2 * side;
+  } else width = S.open ? null : Math.max(84, Math.min(440, Math.ceil($('#pill-inner').getBoundingClientRect().width) + 2));
+  const NOTE_WIDTH = 300; // a comfortable reading width for the note - well clear of a notch, which only spans the pill row above it
+  if (note && !S.open) width = Math.max(width, NOTE_WIDTH + 32);
+  if (!S.open) { shell.style.width = width + 'px'; noteEl.textContent = note; shell.style.height = ((S.notch ? S.notch.height || 37 : 36) + (note ? noteEl.scrollHeight + 2 : 0)) + 'px'; }
+  else { shell.style.width = ''; shell.style.height = ''; }
   const dot = tabs.querySelector('[data-tab=ai]'); if (dot) dot.classList.toggle('dot', S.ai.top === 'asking');
 }
 
