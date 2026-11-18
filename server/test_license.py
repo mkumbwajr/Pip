@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SECRET = 'test-client-secret'
-fake = {'status': 'pending', 'calls': [], 'bad_sig': 0, 'auth': 0, 'expire_next': False}
+fake = {'status': 'pending', 'calls': [], 'bad_sig': 0, 'auth': 0, 'expire_next': False, 'flaky_auth': 0}
 
 class FakeEvPay(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
@@ -18,6 +18,9 @@ class FakeEvPay(BaseHTTPRequestHandler):
         raw = self.rfile.read(int(self.headers.get('Content-Length') or 0))
         if self.path == '/api/auth/v1':
             b = json.loads(raw); ok = b == {'clientId': 'test-client', 'clientSecret': SECRET}; fake['auth'] += 1
+            if ok and fake['flaky_auth'] > 0:  # EvPay's own auth answering unreliably, as seen for real against the live account
+                fake['flaky_auth'] -= 1
+                return self.send({'success': False, 'code': 500, 'message': 'Failed to get access token. Status: 502', 'errors': {'code': 'ERR_100'}}, 500)
             # the shape in EvPay's docs (not wrapped in the usual envelope)
             return self.send({'success': True, 'code': 200, 'data': {'accessToken': 'tok', 'expiresIn': 36000, 'tokenType': 'Bearer'}} if ok else {'success': False, 'code': 400, 'errors': {'code': 'ERR_102'}}, 200 if ok else 400)
         if fake['expire_next']:  # the token ran out early: EvPay answers 401 once
@@ -123,6 +126,13 @@ class LicenseFlow(unittest.TestCase):
         fake['status'] = 'SETTLED'
         self.assertGreaterEqual(L.reconcile(s, self.api.evpay), 1)
         self.assertEqual(s.order(o['ref'])['status'], 'paid'); self.assertTrue(s.license(o['user']))
+
+    def test_4d_evpay_auth_retries_transient_failures(self):
+        self.api.evpay.forget_token()  # force a fresh /api/auth/v1 call
+        fake['flaky_auth'] = 2  # fails twice (like the real EvPay account was observed doing), then succeeds
+        c, r = self.call('POST', '/api/pay/mobile', {'phone': '0754000001'}, self.token)
+        self.assertEqual(c, 200, r)
+        self.assertEqual(fake['flaky_auth'], 0, 'both flaky answers were retried through, not given up on')
 
     def test_5_phone_numbers_and_networks(self):
         L = self.api.lic

@@ -147,13 +147,25 @@ class EvPay:
     def access_token(self):
         with self.tlock:
             if self.token and self.token_until - 30 > time.time(): return self.token
-            code, j = self._http('POST', self.base + '/api/auth/v1', json.dumps({'clientId': self.client_id, 'clientSecret': self.client_secret}).encode(), {'Content-Type': 'application/json'})
-            # EvPay's docs show {access_token, expires_in}; some accounts answer in the usual envelope {data: {accessToken, expiresIn}}
-            d = j.get('data') if isinstance(j.get('data'), dict) else j
-            tok, ttl = d.get('access_token') or d.get('accessToken'), d.get('expires_in') or d.get('expiresIn') or 300
-            if code not in (200, 201) or not tok: raise EvPayError('EvPay sign-in failed (%s)' % code)
-            self.token, self.token_until = tok, time.time() + int(ttl)
-            return self.token
+            # EvPay's own auth endpoint answers unreliably (observed: intermittent 500 "Failed to get access
+            # token. Status: 502", i.e. a failure inside EvPay's own infrastructure) - a couple of quick
+            # retries clear most of them without the caller ever seeing it.
+            code, j, attempts = None, {}, 3
+            for attempt in range(attempts):
+                try:
+                    code, j = self._http('POST', self.base + '/api/auth/v1', json.dumps({'clientId': self.client_id, 'clientSecret': self.client_secret}).encode(), {'Content-Type': 'application/json'})
+                except EvPayError:
+                    if attempt == attempts - 1: raise
+                    time.sleep(0.6 * (attempt + 1)); continue
+                # EvPay's docs show {access_token, expires_in}; some accounts answer in the usual envelope {data: {accessToken, expiresIn}}
+                d = j.get('data') if isinstance(j.get('data'), dict) else j
+                tok, ttl = d.get('access_token') or d.get('accessToken'), d.get('expires_in') or d.get('expiresIn') or 300
+                if code in (200, 201) and tok:
+                    self.token, self.token_until = tok, time.time() + int(ttl)
+                    return self.token
+                if code >= 500 and attempt < attempts - 1: time.sleep(0.6 * (attempt + 1)); continue
+                break
+            raise EvPayError('EvPay sign-in failed (%s)' % code)
     def forget_token(self):
         with self.tlock: self.token = None
 
