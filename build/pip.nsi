@@ -3,7 +3,7 @@
 ; Installs for the current user only, no admin rights. The uninstaller removes Pip's hooks from the agents' configs.
 Unicode true
 SetCompressor /SOLID lzma
-!define VERSION "1.0.7"
+!define VERSION "1.0.8"
 !define UNINST "Software\Microsoft\Windows\CurrentVersion\Uninstall\Pip"
 
 Name "Pip"

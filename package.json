@@ -1,7 +1,7 @@
 {
   "name": "pip",
   "productName": "Pip",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Kisiwa cha bure na open source kwa Windows kinachokuonyesha ma-agent wako wa AI wanafanya nini. A free, open-source status island for Windows.",
   "main": "src/main/main.js",
   "license": "MIT",
