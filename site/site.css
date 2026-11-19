@@ -43,16 +43,12 @@ html { transition: background-color .3s; }
 @media (max-width: 734px) { .theme { margin-left: auto; margin-right: 8px; } }
 
 /* Pip, drawn in CSS */
-.pip { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex: none; width: 24px; height: 21px; border-radius: 7.5px; background: var(--pip); }
-.pip i { width: 4px; height: 7px; border-radius: 2px; background: #fff; transform-origin: 50% 55%; animation: blink 5.2s infinite; }
-.pip.big { width: 64px; height: 57px; border-radius: 20px; gap: 11px; } .pip.big i { width: 10px; height: 18px; border-radius: 5px; }
-.pip.huge { width: 96px; height: 86px; border-radius: 30px; gap: 16px; box-shadow: 0 30px 90px -20px rgba(124, 92, 255, .7); } .pip.huge i { width: 15px; height: 27px; border-radius: 8px; }
-/* Pip blinks like a living thing: open for a while, a quick blink, later a double blink; every Pip on its own timing */
-@keyframes blink { 0%, 40%, 43.5%, 86%, 88.5%, 91%, 93.5%, 100% { transform: scaleY(1); } 41.8% { transform: scaleY(.08); } 87.2% { transform: scaleY(.08); } 92.2% { transform: scaleY(.08); } }
-@keyframes blink-now { 0%, 100% { transform: scaleY(1); } 45% { transform: scaleY(.08); } }
-.pip:hover i { animation: blink-now .32s ease 2; }
-.hero .pip i, .eyebrow + .pip i { animation-delay: .6s; } .privacy .pip i { animation-delay: 1.9s; animation-duration: 6.1s; } .final .pip i { animation-delay: 3.1s; animation-duration: 4.7s; } .foot .pip i { animation-delay: 2.4s; animation-duration: 5.8s; }
-
+.pip { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; width: 34px; height: 30px; }
+.pip img.pip3d { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pip.big { width: 84px; height: 75px; } .pip.huge { width: 130px; height: 117px; filter: drop-shadow(0 30px 60px rgba(124, 92, 255, .7)); }
+/* Pip blinks (no closed-eyes frame exists, so this is an overlay - see the app's island.css for the same trick) */
+.pip::after { content: ""; position: absolute; left: 26%; top: 50%; width: 48%; height: 22%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+@keyframes pip-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
 /* navigation: thin, translucent, always there */
 .nav { position: sticky; top: 0; z-index: 50; height: 52px; background: rgba(0, 0, 0, .72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--line); }
 .nav-in { max-width: var(--read); height: 100%; margin: 0 auto; padding: 0 var(--gut); display: flex; align-items: center; gap: 28px; }
@@ -153,7 +149,7 @@ details p { padding: 0 4px 26px; color: var(--soft); font-size: 17px; max-width:
 /* scroll reveal: only when scripts run, and never for people who prefer less motion */
 .js .reveal { opacity: 0; transform: translateY(26px); transition: opacity .9s var(--ease), transform .9s var(--ease); }
 .js .reveal.in { opacity: 1; transform: none; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .js .reveal { opacity: 1; transform: none; transition: none; } .pip i { animation: none; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .js .reveal { opacity: 1; transform: none; transition: none; } }
 
 /* tablet */
 @media (max-width: 1068px) {

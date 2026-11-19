@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('pipApp', {
   media: call('media:cmd'), seek: call('media:seek'), phone: call('phone:connect'), setOutput: call('audio:output'), iphoneAllow: call('iphone:allow'), setVolume: call('volume:set'), lyrics: call('lyrics:get'), songInfo: call('song:info'),
   weather: call('weather:get'), calendar: call('calendar:get'), stats: call('stats:get'),
   trayAdd: call('tray:add'), trayRemove: call('tray:remove'), trayOpen: call('tray:open'), copyClip: call('clips:copy'), clearClips: call('clips:clear'), quit: call('app:quit'),
+  launchApp: call('app:launch'), searchIcons: call('icons:search'),
   shareStart: call('share:start'), shareStop: call('share:stop'), shareFirewall: call('share:firewall'),
   ask: call('buddy:ask'), windows: call('buddy:windows'), guardChoice: call('guard:choice'),
   mouse: inside => ipcRenderer.send('island:mouse', Boolean(inside)), focus: onOff => ipcRenderer.send('island:focus', Boolean(onOff)),

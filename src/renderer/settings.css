@@ -71,6 +71,13 @@ button, input, select { font: inherit; color: inherit; }
 .rc { flex: none; display: flex; align-items: center; gap: 8px; }
 .row.wide { flex-wrap: wrap; } .row.wide .rc { flex: 1 1 100%; padding-left: 46px; } .row.wide .rc input[type=text], .row.wide .rc input[type=url], .row.wide .rc input[type=password], .row.wide .rc input[type=email] { flex: 1; }
 .row.note { min-height: 0; padding-block: 10px; background: rgba(255, 255, 255, .02); } .row.note .ri { color: var(--ok); }
+.icon-swatch { border: 1px dashed var(--line); cursor: pointer; } .icon-swatch:hover { border-color: var(--pip); }
+.icon-swatch svg { width: 18px; height: 18px; }
+.icon-picker { flex: 1 1 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: #0f0f14; }
+.icon-picker input[type=text] { width: 100%; margin-bottom: 8px; }
+.icon-grid { display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow-y: auto; }
+.icon-opt { display: grid; place-items: center; width: 34px; height: 34px; padding: 6px; border: 1px solid transparent; border-radius: 8px; background: rgba(255, 255, 255, .05); cursor: pointer; }
+.icon-opt:hover { border-color: var(--pip); } .icon-opt svg { width: 100%; height: 100%; }
 input[type=text], input[type=url], input[type=password], input[type=email] { height: 34px; min-width: 0; padding: 0 11px; border: 1px solid var(--line); border-radius: 9px; background: #0f0f14; outline: 0; }
 input[type=text]:focus, input[type=url]:focus, input[type=password]:focus, input[type=email]:focus { border-color: var(--pip); }
 .err { margin: -14px 4px 18px; font-size: 12px; color: var(--error); } .err:empty, .out:empty { display: none; }
@@ -101,13 +108,16 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
 .stat .ri { margin-bottom: 8px; } .stat b { font: 700 20px/1.2 var(--display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .stat span:last-child { font-size: 12px; color: var(--mute); }
 .stat.ok .ri { color: var(--ok); } .stat.warn .ri { color: var(--warn); }
 
-/* Pip, the mascot */
-.mascot { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 30px; height: 27px; border-radius: 9px; background: var(--pip); }
-.mascot i { width: 4.5px; height: 8px; border-radius: 2px; background: #fff; animation: blink 5s infinite; }
-.mascot.big { width: 72px; height: 64px; border-radius: 21px; gap: 12px; box-shadow: 0 12px 34px -12px var(--pip); } .mascot.big i { width: 10px; height: 18px; border-radius: 4px; }
-.mascot .face { display: none; width: 100%; height: 100%; color: var(--pip); } /* the artwork already draws Pip's whole rounded-square head, so the badge's own background below is dropped - no second rectangle behind it */
-.mascot.anim { background: transparent; box-shadow: none; }
-.mascot.anim i { display: none; } .mascot.anim .face { display: block; }
+/* Pip, the mascot (the 3D head art already draws the whole thing, so this is just a sizing box, no background) */
+.mascot { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 27px; }
+.mascot img.pip3d { display: block; width: 100%; height: 100%; object-fit: contain; filter: hue-rotate(var(--pip-hue, 0deg)); }
+/* the 3D head blinks as an overlay (see island.css for why) */
+.mascot:has(img.pip3d)::after { content: ""; position: absolute; left: 26%; top: 50%; width: 48%; height: 22%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+@keyframes pip-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
+.mascot.big { width: 72px; height: 64px; filter: drop-shadow(0 12px 24px color-mix(in srgb, var(--pip) 60%, transparent)); }
+/* Pip spinning through its real turntable frames to switch moods (window.startMood3DCycle, in moods.js) */
+.mood-cycle-3d.spin .pip3d { animation: pip-bounce 1s ease-in-out; }
+@keyframes pip-bounce { 0%, 100% { transform: translateY(0) scale(1); } 25% { transform: translateY(-8%) scale(1.06); } 75% { transform: translateY(4%) scale(.97); } }
 /* a little demo of every mood, crossfading from one to the next (window.startMoodCycle, in moods.js) */
 .mood-cycle { position: relative; }
 .mood-cycle .mc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .5s ease; color: inherit; } /* some pages colour every span - this keeps the artwork on Pip's own colour */

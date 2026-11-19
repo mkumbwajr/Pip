@@ -82,7 +82,8 @@ mpaka Pip izibadilishe kwa zake mara ya kwanza inapowaka.
 
 Ni vile ulivyowasha tu: jina la mji linaenda Open-Meteo (hali ya hewa); jina la wimbo na msanii vinaenda lrclib.net
 (lyrics) na iTunes Search (mwaka na picha ya wimbo; Deezer kwa picha ambazo iTunes haina); link ya kalenda inasomwa; swali la screen na chat ya Pip vinaenda kwa
-agent uliyemchagua kupitia akaunti yako; mipangilio, noti, mji na link ya kalenda ukiingia kwenye akaunti ya Pip
+agent uliyemchagua kupitia akaunti yako; unapoongea ukiwa umebonyeza mic kwenye ask box, sauti yako inaenda kwa huduma ya
+speech recognition ya browser yako (Google, kupitia Chromium) kuibadilisha kuwa maneno; mipangilio, noti, mji na link ya kalenda ukiingia kwenye akaunti ya Pip
 (inahifadhiwa pip.bang.co.tz; ukiingia kwa email, email yako inatumika kukutumia code tu); mafaili ya simu yakipita
 relay ya pip.bang.co.tz (yame-encrypt-iwa, key haipiti server, yanafutwa baada ya saa moja); Spotify ukiiunganisha;
 Google ukiingia (kalenda yako na idadi tu ya email ambazo hujasoma, sio nani wala nini); na pip.bang.co.tz kuangalia kama

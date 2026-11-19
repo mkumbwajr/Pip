@@ -87,14 +87,22 @@ const views = {
 };
 
 let stopHelloCycle = null;
+// same as island.js's hueRotateFor: shifts the 3D head's fixed purple shading toward the chosen mascot colour
+function hueRotateFor(hex) {
+  const n = parseInt(hex.slice(1), 16) || 0, r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b); let h = 0;
+  if (max !== min) { const d = max - min; h = 60 * (max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4); }
+  return Math.round(h - 276);
+}
 function draw() {
   document.documentElement.style.setProperty('--pip', S.settings.mascot.color);
+  document.documentElement.style.setProperty('--pip-hue', hueRotateFor(S.settings.mascot.color) + 'deg');
   $('#count').textContent = t('Setup {n}/{total}', { n: step, total: STEPS });
   $('#dots').innerHTML = Array.from({ length: STEPS }, (_, n) => `<i class="${n + 1 <= step ? 'on' : ''}"></i>`).join('');
   stopHelloCycle?.(); stopHelloCycle = null;
   const box = $('#step'); box.innerHTML = `<div class="in">${views[step]()}</div>`;
   for (const el of box.querySelectorAll('[data-color]')) el.style.background = el.dataset.color;
-  const helloFace = $('#hello-face'); if (helloFace) stopHelloCycle = window.startMoodCycle(helloFace);
+  const helloFace = $('#hello-face'); if (helloFace) stopHelloCycle = window.startMood3DCycle(helloFace);
   $('#back').textContent = t('Back'); $('#back').hidden = step === 1 || step === STEPS;
   $('#skip').textContent = t('Skip for now'); $('#skip').hidden = !(step === ST.agents || (step === ST.account && !S.account?.signedIn));
   $('#next').textContent = step === ST.hello ? t('Let’s start') : step === STEPS ? t('Open Pip') : step === ST.home ? t('Use this one') : t('Next');

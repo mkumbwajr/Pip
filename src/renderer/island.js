@@ -116,7 +116,10 @@ function drawPill() {
   const emotion = emotionFor(mood, resting, sleeping, waking), plain = emotion === 'default' && !S.open;
   pip.className = 'pip ' + mood + (resting ? ' resting' : '') + (sleeping ? ' sleeping' : '') + (waking ? ' waking' : '') + (plain ? ' plain' : '') + (S.settings?.mascot.hat !== 'none' ? ' hat-' + S.settings?.mascot.hat : '');
   const faceKey = plain ? '' : emotion; // the key includes plain so opening/folding redraws the face even if the mood itself didn't change
-  if (faceKey !== S.emotion) { S.emotion = faceKey; if (!plain) $('#pip-face').innerHTML = moodSvg(emotion); }
+  if (faceKey !== S.emotion) {
+    S.emotion = faceKey;
+    if (!plain) $('#pip-face').innerHTML = window.MOOD3D[emotion] ? `<img class="pip3d" data-mood="${emotion}" src="${pip3dSrc(emotion, 0)}" alt="">` : moodSvg(emotion);
+  }
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
   let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock(), note = '';
   const pillAsk = !S.open && top?.state === 'asking' && top.ask?.canAnswer ? top : null; // a permission: answer it right in the pill
@@ -191,7 +194,7 @@ const pages = {
       : connected ? `<span class="dotst"></span><div class="grow"><span class="label">${esc(t('Agents'))}</span><div class="sub">${esc(t('No agent session yet.'))}</div></div>`
         : `<div class="grow"><span class="label">${esc(t('Agents'))}</span><div class="sub" title="${esc(t('Connect Claude Code or Codex to see what they are doing.'))}">${esc(t('Not connected'))}</div></div><button class="wbtn sm" data-connect>${esc(t('Connect'))}</button>`;
     return `<div class="hm"><div class="hm-left"><div class="hm-clock" id="hm-clock"></div>
-        <div class="hm-sub">${w ? `${w.temp}${esc(w.unit)} · ${esc(weatherName(w.code))} · ${esc(w.place)}` : esc(t('Add your town in Settings for the weather.'))}</div>
+        <div class="hm-sub">${w ? `${w.temp}${esc(w.unit)} · ${esc(weatherName(w.code))} · ${esc(w.place)}` : S.settings.weather.place ? esc(t('Weather unavailable right now.')) : esc(t('Add your town in Settings for the weather.'))}</div>
         ${S.hubError ? `<div class="hm-err">${esc(S.hubError)}</div>` : ''}
         <div class="hm-next"><span class="label">${esc(t('Next'))}</span>${e ? `<b class="cut">${esc(e.title)}</b><span>${esc(new Date(e.start).toLocaleString(locale(), e.allDay ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}</span>` : `<b>${esc(/^https:\/\//.test(S.settings.calendarUrl || '') ? t('Nothing planned') : t('No calendar linked.'))}</b>`}</div></div>
       <div class="hm-tiles"><div class="tile t-agent ${top ? top.state : ''}">${agent}</div>
@@ -333,6 +336,7 @@ const pages = {
         ${connected ? '' : `<p class="pa-note">${esc(t('No agent connected yet.'))} <button class="linkbtn" data-connect>${esc(t('Connect Claude Code'))}</button></p>`}`;
     return `<div class="pc"><div class="pc-log${c.log.length ? '' : ' empty'}" id="pc-log">${log}</div>
       <div class="pc-in"><button class="pc-icon${c.screen ? ' on' : ''}" data-chat-screen title="${esc(t('Include my screen'))}" aria-label="${esc(t('Include my screen'))}">${icon('ask')}</button>
+        ${speechSupported ? `<button class="pc-icon" id="pa-mic" data-chat-mic title="${esc(t('Speak your question'))}" aria-label="${esc(t('Speak your question'))}">${icon('mic')}</button>` : ''}
         <textarea id="pa-q" rows="1" placeholder="${esc(t('Ask Pip anything…'))}"></textarea>
         ${c.log.length ? `<button class="pc-icon" data-chat-new title="${esc(t('New chat'))}" aria-label="${esc(t('New chat'))}">${icon('plus')}</button>` : ''}
         <button class="pc-send" data-chat-send ${c.busy ? 'disabled' : ''} aria-label="${esc(t('Send'))}">${icon('send')}</button></div></div>`;
@@ -457,7 +461,9 @@ function draw(force) {
 }
 function drawTabs() {
   const hidden = new Set(S.settings?.hiddenTabs || []);
-  tabs.innerHTML = tabList().filter(([id]) => id === 'home' || !hidden.has(id)).map(([id, name]) => `<button type="button" data-tab="${id}" data-tip="${esc(name)}" aria-label="${esc(name)}" class="${id === S.tab ? 'on' : ''}${S.license?.locked && !FREE.has(id) ? ' locked' : ''}">${icon(id)}<b>${esc(name)}</b></button>`).join('');
+  const builtIn = tabList().filter(([id]) => id === 'home' || !hidden.has(id)).map(([id, name]) => `<button type="button" data-tab="${id}" data-tip="${esc(name)}" aria-label="${esc(name)}" class="${id === S.tab ? 'on' : ''}${S.license?.locked && !FREE.has(id) ? ' locked' : ''}">${icon(id)}<b>${esc(name)}</b></button>`).join('');
+  const custom = (S.settings?.customApps || []).map(a => `<button type="button" data-launch="${esc(a.id)}" data-tip="${esc(a.name)}" aria-label="${esc(a.name)}">${a.icon ? `<svg viewBox="0 0 24 24"><path fill="#${esc(a.icon.hex)}" d="${a.icon.path}"/></svg>` : icon('apps')}<b>${esc(a.name)}</b></button>`).join('');
+  tabs.innerHTML = builtIn + custom;
   const gear = $('#bar-bright'), vol = $('#bar-vol');
   gear.innerHTML = icon('sun'); gear.dataset.tip = t('Background brightness'); gear.setAttribute('aria-label', t('Background brightness')); $('#bright-ico').innerHTML = icon('sun');
   vol.innerHTML = icon('volume'); vol.dataset.tip = t('Volume'); vol.setAttribute('aria-label', t('Volume'));
@@ -719,7 +725,18 @@ async function refreshSongInfo() {
   S.years[key] = null; // asked once per song
   const info = await api.songInfo(song); if (info) { S.years[key] = info; if (S.tab === 'music') draw(); }
 }
-function applyMascot() { document.documentElement.style.setProperty('--pip', S.settings.mascot.color); }
+// The 3D head art is shaded purple (hue ~276). hue-rotate() by the difference shifts every shade of it toward
+// whatever mascot colour the user picked, the same way the flat faces' fill="currentColor" does for those.
+function hueRotateFor(hex) {
+  const n = parseInt(hex.slice(1), 16) || 0, r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b); let h = 0;
+  if (max !== min) { const d = max - min; h = 60 * (max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4); }
+  return Math.round(h - 276);
+}
+function applyMascot() {
+  document.documentElement.style.setProperty('--pip', S.settings.mascot.color);
+  document.documentElement.style.setProperty('--pip-hue', hueRotateFor(S.settings.mascot.color) + 'deg');
+}
 async function save(patch) { S.settings = await api.setSettings(patch); applyMascot(); drawPill(); }
 async function sendReply(id) {
   const box = page.querySelector(`[data-reply-for="${CSS.escape(id)}"]`), text = box?.value.trim(); if (!text) return;
@@ -735,6 +752,22 @@ async function sendToTerminal() {
 }
 
 // ---------- Pip's chat: the agent you already use answers here, through its own program and your login ----------
+// Voice input, opt-in: only while the mic button is on, each click starts one listen-and-stop pass. The browser's
+// Web Speech API sends the recorded audio to its speech service to transcribe it (see the README and privacy page).
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+const speechSupported = Boolean(SpeechRec);
+let recognizer = null;
+function stopDictation() { try { recognizer?.stop(); } catch {} recognizer = null; $('#pa-mic')?.classList.remove('on'); }
+function startDictation() {
+  const btn = $('#pa-mic'); if (!SpeechRec || !btn || recognizer) return;
+  recognizer = new SpeechRec(); recognizer.lang = S.settings.lang === 'sw' ? 'sw-TZ' : 'en-US'; recognizer.interimResults = false;
+  recognizer.onresult = e => {
+    const q = $('#pa-q'), said = e.results[e.results.length - 1][0].transcript.trim(); if (!q || !said) return;
+    q.value = q.value ? `${q.value} ${said}` : said; growChat();
+  };
+  recognizer.onerror = stopDictation; recognizer.onend = stopDictation;
+  try { recognizer.start(); btn.classList.add('on'); } catch { stopDictation(); }
+}
 function growChat() { const q = $('#pa-q'); if (!q) return; q.style.height = 'auto'; q.style.height = Math.min(96, q.scrollHeight) + 'px'; }
 function redrawChat() {
   const q = $('#pa-q'), text = q?.value || '', focused = document.activeElement === q;
@@ -790,6 +823,7 @@ bar.addEventListener('click', e => {
   if (e.target.closest('[data-settings]')) return openSettings();
   if (e.target.closest('#bar-vol')) { showMenu(false); showBright(false); return showVolume(!S.vol); }
   if (e.target.closest('#bar-bright')) { showMenu(false); showVolume(false); return showBright(!S.bright); }
+  const lb = e.target.closest('[data-launch]'); if (lb) return api.launchApp(lb.dataset.launch);
   const b = e.target.closest('[data-tab]'); if (b) { showVolume(false); go(b.dataset.tab); }
 });
 // brightness: shown at once while dragging, saved a moment after the last move
@@ -855,6 +889,7 @@ page.addEventListener('click', async e => {
   else if (d.tabGo) go(d.tabGo);
   else if (d.chatSend !== undefined) sendChat();
   else if (d.chatScreen !== undefined) { S.chat.screen = !S.chat.screen; redrawChat(); }
+  else if (d.chatMic !== undefined) { recognizer ? stopDictation() : startDictation(); }
   else if (d.chatNew !== undefined) { S.chat.log = []; redrawChat(); }
   else if (d.quick) {
     const clip = await api.lastClip(), box = $('#pa-q');
@@ -963,6 +998,10 @@ api.onCursor(p => {
   S.restTimer = setTimeout(drawPill, REST_AFTER + 100); S.sleepTimer = setTimeout(drawPill, SLEEP_AFTER + 100);
   const r = pip.getBoundingClientRect(), dx = p.x - (r.left + r.width / 2), dy = p.y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1, pull = Math.min(1, d / 140);
   pip.style.setProperty('--ex', (dx / d * (S.open ? 1.6 : 3.2) * pull).toFixed(2) + 'px'); pip.style.setProperty('--ey', (dy / d * (S.open ? 1.2 : 2.4) * pull).toFixed(2) + 'px');
+  // a 3D mood: turn the actual head toward the pointer (swap to the nearest pre-rendered angle) instead of
+  // just nudging the eyes - everything else about the look-at effect above still applies.
+  const img3d = $('#pip-face img.pip3d');
+  if (img3d) { const src = pip3dSrc(img3d.dataset.mood, Math.round(dx / d * pull * 90)); if (src && !img3d.src.endsWith(src)) img3d.src = src; }
 });
 api.onTray(list => { S.tray = list; draw(); });
 api.onShareProgress(p => {

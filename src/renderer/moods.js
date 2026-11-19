@@ -19,6 +19,22 @@
   };
   window.moodSvg = (name, extra) => { const m = M[name] || M.default; return `<svg viewBox="${m.viewBox}" aria-hidden="true"${extra ? ' class="' + extra + '"' : ''}>${m.paths}</svg>`; };
   window.MOOD_NAMES = Object.keys(M);
+
+  // Pip's 3D head (2026-11-20): AI-assisted reference angle sheets the owner directed, one per mood, each a
+  // turntable of yaw angles every 15 degrees. Only default/angry/happy have a sheet so far - the rest keep the
+  // flat face above until the owner supplies theirs (see CLAUDE.md rule 1). Files: mascot/<mood>/yaw_<deg>.svg.
+  const MOOD3D_YAWS = { default: [], angry: [], happy: [] };
+  for (let y = -180; y <= 180; y += 15) { MOOD3D_YAWS.default.push(y); MOOD3D_YAWS.angry.push(y); MOOD3D_YAWS.happy.push(y); }
+  MOOD3D_YAWS.default = MOOD3D_YAWS.default.filter(y => y !== -180 && y !== 180); // this sheet's edge frames didn't render
+  window.MOOD3D = MOOD3D_YAWS;
+  // Nearest frame this mood actually has to the wanted angle (every mood covers -90..90, which is all the
+  // cursor-follow ever asks for).
+  window.pip3dSrc = (mood, yawDeg) => {
+    const yaws = MOOD3D_YAWS[mood]; if (!yaws) return '';
+    let nearest = yaws[0];
+    for (const y of yaws) if (Math.abs(y - yawDeg) < Math.abs(nearest - yawDeg)) nearest = y;
+    return `mascot/${mood}/yaw_${nearest}.svg`;
+  };
   // A little demo of every mood, crossfading from one to the next instead of cutting between stills. `el` needs
   // its own size and `position: relative` (the .mood-cycle CSS in each window's stylesheet gives it both).
   // Returns a function that stops the cycle - call it before the element is thrown away or redrawn.
@@ -35,5 +51,28 @@
       [front, back] = [back, front];
     }, interval);
     return () => clearInterval(id);
+  };
+  // Through the 3D moods only (today: default, angry, happy), for a big hero spot like the welcome screen's hello
+  // face. Not a crossfade: Pip actually spins around (through its real turntable frames) and bounces, so the
+  // switch to the next mood reads as one head turning, not two flat pictures dissolving into each other.
+  window.startMood3DCycle = (el, opts = {}) => {
+    const names = opts.names || Object.keys(MOOD3D_YAWS), interval = opts.interval || 2400;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.classList.add('mood-cycle-3d'); el.innerHTML = '<img class="pip3d" alt="">';
+    const img = el.querySelector('.pip3d');
+    let mood = names[0], i = 0, stopped = false;
+    img.src = window.pip3dSrc(mood, 0);
+    const LEG = [0, 35, 70, 105, 140, 175]; // a near-full turn, away and back - 175 not 180: every mood has that frame
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    async function spinTo(next) {
+      if (reduced) { mood = next; img.src = window.pip3dSrc(mood, 0); return; }
+      el.classList.add('spin'); const step = 500 / LEG.length;
+      for (const y of LEG) { if (stopped) return; img.src = window.pip3dSrc(mood, y); await wait(step); }
+      mood = next;
+      for (const y of [...LEG].reverse()) { if (stopped) return; img.src = window.pip3dSrc(mood, y); await wait(step); }
+      el.classList.remove('spin');
+    }
+    const id = setInterval(() => { i = (i + 1) % names.length; spinTo(names[i]); }, interval);
+    return () => { stopped = true; clearInterval(id); };
   };
 })();

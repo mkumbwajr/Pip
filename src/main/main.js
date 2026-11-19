@@ -1,6 +1,6 @@
 'use strict';
 // Pip: main process. Owns the island window, the tray icon, the hook hub and every bridge to the system.
-const { app, BrowserWindow, Tray, Menu, ipcMain, globalShortcut, Notification, clipboard, shell, screen, nativeImage, desktopCapturer, safeStorage, net } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, globalShortcut, Notification, clipboard, shell, screen, nativeImage, desktopCapturer, safeStorage, net, session } = require('electron');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -292,6 +292,7 @@ function watchClipboard() {
   }, 1500);
 }
 const getJson = async url => { const r = await webFetch(url, { signal: AbortSignal.timeout(10000) }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); };
+let iconIndex = null; // simple-icons, flattened and cached on first search
 let weatherCache = { at: 0, value: null };
 async function weather() {
   const w = store.get('weather'); if (!w.place) return null;
@@ -552,6 +553,17 @@ function wireIpc() {
   handle('tray:add', paths => { addToTray(Array.isArray(paths) ? paths.slice(0, 50) : []); return trayView(); });
   handle('tray:remove', p => { trayFiles = trayFiles.filter(f => f !== p); saveTray(); return trayView(); });
   handle('tray:open', p => (trayFiles.includes(p) ? shell.showItemInFolder(p) : null));
+  // custom launchers' icon picker: simple-icons (3400+ brand/app logos), loaded only the first time it's used
+  handle('icons:search', q => {
+    const query = String(q || '').trim().toLowerCase(); if (!query) return [];
+    if (!iconIndex) iconIndex = Object.values(require('simple-icons')).map(i => ({ slug: i.slug, title: i.title, hex: i.hex, path: i.path }));
+    return iconIndex.filter(i => i.title.toLowerCase().includes(query)).sort((a, b) => a.title.toLowerCase().indexOf(query) - b.title.toLowerCase().indexOf(query)).slice(0, 60);
+  });
+  // custom launchers: only a target the user already saved in Settings, same trust level as a tray file
+  handle('app:launch', id => {
+    const item = (store.get('customApps') || []).find(a => a.id === String(id)); if (!item) return null;
+    return /^https?:\/\//.test(item.target) ? shell.openExternal(item.target) : shell.openPath(item.target);
+  });
   handle('clips:copy', text => { lastClip = String(text); clipboard.writeText(lastClip); return true; });
   handle('clips:last', () => clips[0]?.text || '');
   handle('clips:clear', () => { clips.length = 0; send('clips:changed', clips); return clips; }); // lastClip stays, so the text still on the clipboard does not come straight back
@@ -673,6 +685,9 @@ function scheduleUpdates() { clearInterval(updateTimer); setTimeout(checkForUpda
 
 app.whenReady().then(async () => {
   store = new Store(data('settings.json')); loadLanguage(); registerAppId();
+  // voice input: a microphone prompt from the island window only, never a camera, never any other window
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) =>
+    callback(permission === 'media' && wc === island?.webContents && !(details.mediaTypes || []).includes('video')));
   // Peep started with Windows: Pip takes over that place, and Peep's own start-up entry goes
   if (migratedFromPeep && process.platform === 'win32') {
     const run = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';

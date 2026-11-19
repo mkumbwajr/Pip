@@ -8,7 +8,10 @@ Publisher: BANG DIGITAL LTD. Repo: https://github.com/mkumbwajr/Pip
 
 1. **Original work only.** Pip was inspired by a commercial app called TwoCode. Never copy its code, artwork,
    mascot, wording, icons or exact visual design. Matching *what a feature does* is fine; matching *how it looks* is
-   not. Pip is a coloured rounded-square face with two eyes, and stays that way.
+   not. Pip is a coloured, rounded, antenna-topped 3D head (changed from the flat rounded-square face, 2026-11-20,
+   on the owner's instruction) rendered from angle-sheet art the owner commissioned and directs - AI-assisted, not
+   hand-drawn, but original to Pip and never copied from TwoCode or anyone else. New moods follow this same head and
+   are produced the same way; see moods.js for which ones have 3D art so far and which still use the old flat faces.
 2. **Swahili first.** Every text a user sees goes through `t('English text')`. The translation lives in
    `src/locales/sw.json` and must be Tanzanian street Swahili mixed with the English tech words people really use
    (Swanglish): not textbook Swahili, not Kenyan usage. `test/more.test.cjs` fails if a text is missing or unused.

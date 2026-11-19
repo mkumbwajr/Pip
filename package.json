@@ -1,7 +1,7 @@
 {
   "name": "pip",
   "productName": "Pip",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Kisiwa cha bure na open source kwa Windows kinachokuonyesha ma-agent wako wa AI wanafanya nini. A free, open-source status island for Windows.",
   "main": "src/main/main.js",
   "license": "MIT",
@@ -14,7 +14,8 @@
     "dist:mac": "node tools/stamp.js && electron-builder --mac dmg --universal --publish never"
   },
   "dependencies": {
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "simple-icons": "^16.38.0"
   },
   "devDependencies": {
     "electron": "^44.5.1",

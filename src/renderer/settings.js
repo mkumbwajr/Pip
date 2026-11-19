@@ -8,6 +8,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const page = $('#page');
 const COLORS = ['#7c5cff', '#2f9bff', '#2fbf71', '#f5a524', '#ff5c8a', '#14a3a8', '#f0435a', '#e8e8ee'];
 let t = window.makeT({}), S = null, current = 'home', query = '', confirmReset = false, confirmDelete = false, accountBusy = false, mail = { stage: 'enter', address: '', busy: false };
+let draftIcon = null, iconPicking = false, iconQuery = '', iconResults = [];
 
 // ---------- building blocks ----------
 const group = (title, rows, extra = '') => `<section class="grp">${title ? `<h2>${esc(title)}</h2>` : ''}<div class="card ${extra}">${rows.join('')}</div></section>`;
@@ -18,7 +19,14 @@ const seg = (key, value, options) => `<div class="sg" data-seg="${key}">${option
 const slider = (id, min, max, step, value, suffix = '%') => `<div class="sl"><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${value}"><span id="${id}-n">${value}${suffix}</span></div>`;
 const button = (id, label, cls = '') => `<button type="button" class="btn ${cls}" id="${id}">${esc(label)}</button>`;
 const hatName = h => ({ none: t('No hat'), cap: t('Cap'), crown: t('Crown'), bow: t('Bow') }[h]);
-const mascot = (hat = S.settings.mascot.hat, big = false) => `<span class="mascot${big ? ' big' : ''}${hat !== 'none' ? ' hat-' + hat : ''}"><span class="hat"></span><i></i><i></i></span>`;
+const mascot = (hat = S.settings.mascot.hat, big = false) => `<span class="mascot${big ? ' big' : ''}${hat !== 'none' ? ' hat-' + hat : ''}"><span class="hat"></span><img class="pip3d" src="${window.pip3dSrc('default', 0)}" alt=""></span>`;
+// same as island.js's hueRotateFor: shifts the 3D head's fixed purple shading toward the chosen mascot colour
+function hueRotateFor(hex) {
+  const n = parseInt(hex.slice(1), 16) || 0, r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b); let h = 0;
+  if (max !== min) { const d = max - min; h = 60 * (max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4); }
+  return Math.round(h - 276);
+}
 const AGENTS = [['claude', 'Claude Code', '~/.claude/settings.json'], ['codex', 'Codex', '~/.codex/hooks.json']];
 const SITE_NAMES = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram', reddit: 'Reddit', 'x.com': 'X', facebook: 'Facebook', netflix: 'Netflix' };
 const tabNames = () => [['ai', t('Agents')], ['pip', 'Pip'], ['music', t('Music')], ['focus', t('Focus')], ['modes', t('Modes')], ['tray', t('Files')], ['note', t('Note')], ['clips', t('Copied')], ['calendar', t('Calendar')], ['mail', t('Mail')]];
@@ -147,9 +155,20 @@ const views = {
       + group(t('Calendar'), [row('calendar', t('Calendar link (private iCal address, https)'), t('Or sign in with Google under Connections.'), `<input type="url" id="s-cal" value="${esc(s.calendarUrl)}">`, 'wide')]);
   },
   apps() {
-    const hidden = new Set(S.settings.hiddenTabs || []);
+    const hidden = new Set(S.settings.hiddenTabs || []), custom = S.settings.customApps || [];
+    const appIcon = a => a.icon ? `<svg viewBox="0 0 24 24"><path fill="#${esc(a.icon.hex)}" d="${a.icon.path}"/></svg>` : 'apps';
+    const swatch = `<button type="button" class="ri icon-swatch" id="ca-icon-btn" aria-label="${esc(t('Choose an icon'))}">${draftIcon ? `<svg viewBox="0 0 24 24"><path fill="#${esc(draftIcon.hex)}" d="${draftIcon.path}"/></svg>` : icon('apps')}</button>`;
+    const picker = iconPicking ? `<div class="icon-picker" id="icon-picker">
+        <input type="text" id="icon-q" placeholder="${esc(t('Search app icons…'))}" value="${esc(iconQuery)}">
+        <div class="icon-grid">${iconResults.map(r => `<button type="button" class="icon-opt" data-pick-icon="${esc(r.slug)}" title="${esc(r.title)}"><svg viewBox="0 0 24 24"><path fill="#${esc(r.hex)}" d="${r.path}"/></svg></button>`).join('') || (iconQuery ? `<p class="hint">${esc(t('No icons match.'))}</p>` : '')}</div>
+      </div>` : '';
     return `<div class="apps">${tabNames().map(([id, name]) => `<div class="app ${hidden.has(id) ? '' : 'on'}" data-find="${esc(name.toLowerCase())}"><span class="ri">${icon(id)}</span><b>${esc(name)}</b>${toggle('tab.' + id, !hidden.has(id), name)}</div>`).join('')}</div>
-      <p class="hint">${esc(t('Home always stays.'))}</p>`;
+      <p class="hint">${esc(t('Home always stays.'))}</p>`
+      + group(t('Your own apps'), [
+        ...custom.map(a => row(appIcon(a), a.name, a.target, `<button type="button" class="btn" data-remove-app="${esc(a.id)}">${esc(t('Remove'))}</button>`)),
+        row('', t('Add an app'), t('A name, then the program or folder path, or a web address. It shows at the bottom of the island’s nav rail.'),
+          `${swatch}<input type="text" id="ca-name" placeholder="${esc(t('Name'))}"><input type="text" id="ca-target" placeholder="${esc(t('Path or URL'))}"><button type="button" class="btn primary" id="ca-add">${esc(t('Add'))}</button>${picker}`, 'wide')
+      ]);
   },
   guard() {
     const g = S.settings.guard;
@@ -171,7 +190,7 @@ const views = {
         link('shield', t('Privacy'), t('What leaves your PC, and when.'), 'https://pip.bang.co.tz/privacy'),
         link('heart', t('Source code'), t('Free and open source (MIT).'), 'https://github.com/mkumbwajr/Pip')
       ])
-      + `<div class="about"><span class="mascot big anim${S.settings.mascot.hat !== 'none' ? ' hat-' + S.settings.mascot.hat : ''}"><span class="hat"></span><i></i><i></i><span class="face" id="about-face"></span></span><b>Pip ${esc(S.version)}</b><span>© ${new Date().getFullYear()} BANG DIGITAL LTD</span><span>${esc(t('MIT licence. Free for everyone. No telemetry.'))}</span></div>`;
+      + `<div class="about"><span class="mascot big${S.settings.mascot.hat !== 'none' ? ' hat-' + S.settings.mascot.hat : ''}"><span class="hat"></span><span id="about-face"></span></span><b>Pip ${esc(S.version)}</b><span>© ${new Date().getFullYear()} BANG DIGITAL LTD</span><span>${esc(t('MIT licence. Free for everyone. No telemetry.'))}</span></div>`;
   }
 };
 
@@ -184,6 +203,7 @@ function draw() {
   for (const b of document.querySelectorAll('#nav [data-col]')) b.style.setProperty('--c', b.dataset.col);
   $('#foot-ver').textContent = `Pip ${S.version}`; $('#foot-copy').textContent = `© ${new Date().getFullYear()} BANG DIGITAL LTD`;
   document.documentElement.style.setProperty('--pip', s.mascot.color);
+  document.documentElement.style.setProperty('--pip-hue', hueRotateFor(s.mascot.color) + 'deg');
   if (query) { // every section, then only the rows that match
     $('#title').textContent = t('Search'); $('#subtitle').textContent = t('Settings that match “{q}”', { q: query }); $('#hero-ico').innerHTML = icon('search');
     document.documentElement.style.setProperty('--band', '#6f6f7c');
@@ -208,7 +228,7 @@ let stopAboutCycle = null;
 function startAboutAnim() {
   stopAboutAnim();
   const face = $('#about-face'); if (!face) return;
-  stopAboutCycle = window.startMoodCycle(face);
+  stopAboutCycle = window.startMood3DCycle(face);
 }
 function stopAboutAnim() { stopAboutCycle?.(); stopAboutCycle = null; }
 /** The slider's track is coloured up to the thumb. */
@@ -261,6 +281,8 @@ page.addEventListener('click', async e => {
   if (d.color) { await save({ mascot: { color: d.color } }); return draw(); }
   if (d.hat) { await save({ mascot: { hat: d.hat } }); return draw(); }
   if (d.link) return api.openLink(d.link);
+  if (d.removeApp) { await save({ customApps: (S.settings.customApps || []).filter(a => a.id !== d.removeApp) }); return draw(); }
+  if (d.pickIcon) { draftIcon = iconResults.find(r => r.slug === d.pickIcon) || null; iconPicking = false; return draw(); }
   if (d.siteX !== undefined) { const sites = S.settings.guard.sites.filter((_, n) => n !== +d.siteX); await save({ guard: { sites } }); return draw(); }
   switch (b.id) {
     case 'acct-in': case 'acct-sync': {
@@ -290,6 +312,12 @@ page.addEventListener('click', async e => {
       confirmDelete = false; const r = await api.accountDelete(); if (r.ok) S.account = r; draw(); if (!r.ok) showError('acct-error', r.error); return;
     }
     case 'w-go': return checkWeather();
+    case 'ca-icon-btn': iconPicking = !iconPicking; iconQuery = ''; iconResults = []; draw(); if (iconPicking) $('#icon-q')?.focus(); return;
+    case 'ca-add': {
+      const name = $('#ca-name').value.trim(), target = $('#ca-target').value.trim(); if (!name || !target) return;
+      await save({ customApps: [...(S.settings.customApps || []), { id: crypto.randomUUID(), name, target, icon: draftIcon }] });
+      draftIcon = null; iconPicking = false; iconQuery = ''; iconResults = []; return draw();
+    }
     case 'show-welcome': return api.openWelcome();
     case 'restart': return api.restart();
     case 'quit': return api.quit();
@@ -319,8 +347,19 @@ page.addEventListener('keydown', async e => {
     await save({ guard: { sites: [...S.settings.guard.sites, v].slice(0, 40) } }); draw(); $('#g-add')?.focus();
   }
 });
+let iconSearchT = null;
+function searchIconsLive(q) {
+  iconQuery = q; clearTimeout(iconSearchT);
+  iconSearchT = setTimeout(async () => {
+    iconResults = q.trim() ? await api.searchIcons(q.trim()) : [];
+    const pos = $('#icon-q')?.selectionStart ?? 0; draw();
+    const el = $('#icon-q'); if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+  }, 200);
+}
 page.addEventListener('input', e => {
-  const el = e.target; if (el.type !== 'range') return; fill(el);
+  const el = e.target;
+  if (el.id === 'icon-q') return searchIconsLive(el.value);
+  if (el.type !== 'range') return; fill(el);
   $('#' + el.id + '-n').textContent = el.value + '%';
   // live while dragging: the island follows the slider
   if (el.id === 'i-size') save({ island: { scale: el.value / 100 } });

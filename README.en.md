@@ -91,7 +91,8 @@ replaces them with its own on its first start.
 
 Only what you switch on: the town you type (Open-Meteo), song title and artist (lrclib.net for lyrics, iTunes Search
 for the year and cover art, Deezer for covers iTunes lacks), your private calendar link, a screenshot and question, or a chat with Pip, to the agent you
-chose (through your own login), your Pip preferences, note, town and calendar link if you
+chose (through your own login), what you say while the ask box's microphone button is on, to your browser's speech
+recognition service (Google, via Chromium), to turn it into text, your Pip preferences, note, town and calendar link if you
 sign in to a Pip account (stored on pip.bang.co.tz under a hash of your Google ID or email; with email sign-in your address is used only to send
 the code), files sent to or from your phone across networks (end-to-end encrypted through pip.bang.co.tz, deleted after
 an hour), Spotify if you connect it, Google if

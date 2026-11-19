@@ -26,7 +26,11 @@ h2 { margin: 6px 0 6px; font: 700 24px/1.2 var(--display); letter-spacing: -.015
 .mascot i { width: 10px; height: 18px; border-radius: 4px; background: #fff; animation: blink 4.6s infinite; }
 .mascot.huge { width: 116px; height: 104px; border-radius: 34px; gap: 20px; animation: float 4s ease-in-out infinite; } .mascot.huge i { width: 15px; height: 28px; border-radius: 6px; }
 .mascot.happy i { height: 10px; border-radius: 10px 10px 3px 3px; animation: none; }
-.mascot .face { display: none; width: 100%; height: 100%; color: var(--pip); } /* the artwork already draws Pip's whole rounded-square head, so the badge's own background below is dropped - no second rectangle behind it */
+.mascot .face { position: relative; display: none; width: 100%; height: 100%; color: var(--pip); } /* the artwork already draws Pip's whole rounded-square head, so the badge's own background below is dropped - no second rectangle behind it */
+/* the 3D head blinks as an overlay (see island.css for why) */
+.mascot .face:has(img.pip3d)::after { content: ""; position: absolute; left: 26%; top: 50%; width: 48%; height: 22%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+@keyframes pip-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
+.mascot .face img.pip3d { display: block; width: 100%; height: 100%; object-fit: contain; filter: hue-rotate(var(--pip-hue, 0deg)); }
 .mascot.anim { background: transparent; box-shadow: none; }
 .mascot.anim i { display: none; } .mascot.anim .face { display: block; }
 /* a little demo of every mood, crossfading from one to the next (window.startMoodCycle, in moods.js) */
@@ -34,7 +38,11 @@ h2 { margin: 6px 0 6px; font: 700 24px/1.2 var(--display); letter-spacing: -.015
 .mood-cycle .mc { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .5s ease; color: inherit; }
 .mood-cycle .mc.on { opacity: 1; animation: mc-pop .4s var(--ease, ease-out); } /* each mood comes alive as it arrives, not just a flat crossfade */
 .mood-cycle .mc svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.mood-cycle .mc img.pip3d { display: block; width: 100%; height: 100%; object-fit: contain; filter: hue-rotate(var(--pip-hue, 0deg)); }
 .mood-cycle .mc.on svg path.eye { transform-box: fill-box; transform-origin: center; animation: blink 1.5s ease-in-out .3s 1; } /* a real blink while it's held, before the next mood fades in - eyes only, never the mouth */
+/* Pip spinning through its real turntable frames to switch moods (window.startMood3DCycle, in moods.js) */
+.mood-cycle-3d.spin .pip3d { animation: pip-bounce 1s ease-in-out; }
+@keyframes pip-bounce { 0%, 100% { transform: translateY(0) scale(1); } 25% { transform: translateY(-8%) scale(1.06); } 75% { transform: translateY(4%) scale(.97); } }
 @keyframes mc-pop { 0% { transform: scale(.88); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
 @keyframes blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(.1); } }
 @keyframes float { 50% { transform: translateY(-8px); } }

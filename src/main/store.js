@@ -10,6 +10,7 @@ const DEFAULTS = {
   spotifyClientId: '',
   google: { clientId: '', secret: '' }, // your own Google "Desktop app" OAuth client, for calendar and the unread count
   hiddenTabs: [],        // tabs taken off the bar with Customize (Home always stays)
+  customApps: [],        // user-added launchers on the nav rail: { id, name, target } (target: a path or a URL)
   agents: { claude: false, codex: false },
   island: { display: 0, mode: 'attach', opacity: 1, brightness: 0.1, scale: 1, openOn: 'hover', clock: 'auto', radios: true, artGlow: true }, // attach: joined to the top edge; detach: floating just below it. brightness: the tab colour behind the pages
   // openOn: 'hover' or 'click'. clock: 'auto' (the language's own), '12' or '24'. radios: Wi-Fi and Bluetooth in the strip. artGlow: the music tab takes the cover's colour
