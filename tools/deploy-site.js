@@ -43,7 +43,12 @@ if (process.argv.includes('--mac')) { // the Mac disk image from this version's 
   spawnSync('curl', ['-fsL', '--retry', '3', '-o', macStampFile, `https://github.com/mkumbwajr/Pip/releases/download/v${version}/Pip-mac-build.json`]);
   copy(file, `/srv/pip/download/Pip-${version}-mac.dmg`);
   const live = liveLatest(), build = { ...(live.version === version ? live.build : {}), mac: stampOf(macStampFile) || undefined };
-  const latest = JSON.stringify({ version, url: `https://${DOMAIN}/download/Pip-Setup-${version}.exe`, mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg`, build });
+  // --mac only publishes the Mac build - never point latest.json at a Windows installer that a full deploy
+  // hasn't uploaded yet (that left the Windows download button 404ing in production once already)
+  const winOnServer = spawnSync('ssh', [...ssh, 'root@' + HOST, `test -f /srv/pip/download/Pip-Setup-${version}.exe`]).status === 0;
+  const winUrl = winOnServer ? `https://${DOMAIN}/download/Pip-Setup-${version}.exe` : live.url;
+  if (!winOnServer) console.error(`warning: Pip-Setup-${version}.exe is not on the server yet - keeping the previous Windows download link (${winUrl})`);
+  const latest = JSON.stringify({ version, url: winUrl, mac: `https://${DOMAIN}/download/Pip-${version}-mac.dmg`, build });
   sh(`set -e; cd /srv/pip/download; ln -sf Pip-${version}-mac.dmg Pip-mac.dmg; printf '%s\n' '${latest}' > /srv/pip/latest.json; chmod -R a+rX /srv/pip`);
   console.log('published the Mac build of Pip ' + version); process.exit(0);
 }
