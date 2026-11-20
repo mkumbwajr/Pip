@@ -111,8 +111,9 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px;
 /* Pip, the mascot (the 3D head art already draws the whole thing, so this is just a sizing box, no background) */
 .mascot { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 27px; }
 .mascot img.pip3d { display: block; width: 100%; height: 100%; object-fit: contain; filter: hue-rotate(var(--pip-hue, 0deg)); }
-/* the 3D head blinks as an overlay (see island.css for why) */
-.mascot:has(img.pip3d)::after { content: ""; position: absolute; left: 26%; top: 50%; width: 48%; height: 22%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+/* the 3D head blinks as two small overlays the size and place of the two eyes (see island.css for why) */
+.mascot:has(img.pip3d)::before, .mascot:has(img.pip3d)::after { content: ""; position: absolute; top: 57%; width: 9%; height: 19%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+.mascot:has(img.pip3d)::before { left: 36%; } .mascot:has(img.pip3d)::after { left: 55%; }
 @keyframes pip-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
 .mascot.big { width: 72px; height: 64px; filter: drop-shadow(0 12px 24px color-mix(in srgb, var(--pip) 60%, transparent)); }
 /* Pip spinning through its real turntable frames to switch moods (window.startMood3DCycle, in moods.js) */

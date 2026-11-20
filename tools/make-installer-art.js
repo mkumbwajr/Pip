@@ -6,15 +6,15 @@
 const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs'), path = require('node:path');
 const W = 328, H = 628, root = path.join(__dirname, '..');
-const img = name => 'data:image/png;base64,' + fs.readFileSync(path.join(root, 'site', 'img', name)).toString('base64');
+const img = name => `data:image/${name.endsWith('.svg') ? 'svg+xml' : 'png'};base64,` + fs.readFileSync(path.join(root, 'site', 'img', name)).toString('base64');
 
 const page = `<!doctype html><meta charset="utf-8"><style>
 * { box-sizing: border-box; margin: 0; }
 html, body { width: ${W}px; height: ${H}px; overflow: hidden; }
 body { position: relative; background: radial-gradient(90% 55% at 50% 100%, rgba(124, 92, 255, .55), transparent 70%), linear-gradient(180deg, #121019 0%, #0a0a0d 55%, #140f24 100%);
   font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif; color: #f5f5f7; -webkit-font-smoothing: antialiased; }
-.pip { position: absolute; left: 28px; top: 34px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 40px; height: 36px; border-radius: 12px; background: #7c5cff; }
-.pip i { width: 6px; height: 11px; border-radius: 3px; background: #fff; }
+.pip { position: absolute; left: 28px; top: 34px; width: 48px; height: 42px; }
+.pip img { display: block; width: 100%; height: 100%; object-fit: contain; }
 h1 { position: absolute; left: 26px; right: 22px; top: 92px; font-size: 38px; line-height: 1.04; font-weight: 700; letter-spacing: -.035em; }
 h1 span { background: linear-gradient(90deg, #ffffff, #c9bfff 60%, #9b84ff); -webkit-background-clip: text; color: transparent; }
 .shot { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 14px; box-shadow: 0 18px 40px -12px rgba(0, 0, 0, .85), 0 0 0 1px rgba(255, 255, 255, .06); }
@@ -22,7 +22,7 @@ h1 span { background: linear-gradient(90deg, #ffffff, #c9bfff 60%, #9b84ff); -we
 .a { top: 346px; width: 296px; transform: translateX(-50%) rotate(-3deg); opacity: .96; }
 .b { top: 462px; width: 300px; transform: translateX(-50%) rotate(2deg); }
 </style>
-<span class="pip"><i></i><i></i></span>
+<span class="pip"><img src="${img('pip-head.svg')}"></span>
 <h1>One island<br>to Rule<br><span>All Agents</span></h1>
 <img class="shot pill" src="${img('pip-ruhusa.png')}">
 <img class="shot a" src="${img('pip-ai.png')}">

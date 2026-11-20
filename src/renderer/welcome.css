@@ -27,8 +27,9 @@ h2 { margin: 6px 0 6px; font: 700 24px/1.2 var(--display); letter-spacing: -.015
 .mascot.huge { width: 116px; height: 104px; border-radius: 34px; gap: 20px; animation: float 4s ease-in-out infinite; } .mascot.huge i { width: 15px; height: 28px; border-radius: 6px; }
 .mascot.happy i { height: 10px; border-radius: 10px 10px 3px 3px; animation: none; }
 .mascot .face { position: relative; display: none; width: 100%; height: 100%; color: var(--pip); } /* the artwork already draws Pip's whole rounded-square head, so the badge's own background below is dropped - no second rectangle behind it */
-/* the 3D head blinks as an overlay (see island.css for why) */
-.mascot .face:has(img.pip3d)::after { content: ""; position: absolute; left: 26%; top: 50%; width: 48%; height: 22%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+/* the 3D head blinks as two small overlays the size and place of the two eyes (see island.css for why) */
+.mascot .face:has(img.pip3d)::before, .mascot .face:has(img.pip3d)::after { content: ""; position: absolute; top: 57%; width: 9%; height: 19%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+.mascot .face:has(img.pip3d)::before { left: 36%; } .mascot .face:has(img.pip3d)::after { left: 55%; }
 @keyframes pip-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
 .mascot .face img.pip3d { display: block; width: 100%; height: 100%; object-fit: contain; filter: hue-rotate(var(--pip-hue, 0deg)); }
 .mascot.anim { background: transparent; box-shadow: none; }

@@ -118,7 +118,11 @@ function drawPill() {
   const faceKey = plain ? '' : emotion; // the key includes plain so opening/folding redraws the face even if the mood itself didn't change
   if (faceKey !== S.emotion) {
     S.emotion = faceKey;
-    if (!plain) $('#pip-face').innerHTML = window.MOOD3D[emotion] ? `<img class="pip3d" data-mood="${emotion}" src="${pip3dSrc(emotion, 0)}" alt="">` : moodSvg(emotion);
+    // a mood with no 3D art yet stands in on the default head (still a real turn-toward-cursor head, just not
+    // its own expression) - never falls back to the old flat face; drops away on its own once that mood's art
+    // is added, since this only looks up whatever moods.js's MOOD3D actually has right now
+    const mood3d = window.MOOD3D[emotion] ? emotion : 'default';
+    if (!plain) $('#pip-face').innerHTML = `<img class="pip3d" data-mood="${mood3d}" src="${pip3dSrc(mood3d, 0)}" alt="">`;
   }
   // idle: only Pip and the clock. In use: what is happening. Open: the mascot's name as a title.
   let text = S.open ? (S.settings?.mascot.name || 'Pip') : '', side = clock(), note = '';

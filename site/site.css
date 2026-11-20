@@ -46,8 +46,10 @@ html { transition: background-color .3s; }
 .pip { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: none; width: 34px; height: 30px; }
 .pip img.pip3d { display: block; width: 100%; height: 100%; object-fit: contain; }
 .pip.big { width: 84px; height: 75px; } .pip.huge { width: 130px; height: 117px; filter: drop-shadow(0 30px 60px rgba(124, 92, 255, .7)); }
-/* Pip blinks (no closed-eyes frame exists, so this is an overlay - see the app's island.css for the same trick) */
-.pip::after { content: ""; position: absolute; left: 26%; top: 50%; width: 48%; height: 22%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+/* Pip blinks: two small overlays the size and place of the two eyes (no closed-eyes frame exists to swap to -
+   see the app's island.css for the same trick) */
+.pip::before, .pip::after { content: ""; position: absolute; top: 57%; width: 9%; height: 19%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+.pip::before { left: 36%; } .pip::after { left: 55%; }
 @keyframes pip-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
 /* navigation: thin, translucent, always there */
 .nav { position: sticky; top: 0; z-index: 50; height: 52px; background: rgba(0, 0, 0, .72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--line); }

@@ -68,9 +68,10 @@ button, input, textarea, select { font: inherit; color: inherit; }
    `color` is Pip's whole look, normally --pip, swapped for --error or an alert colour instead of recolouring parts. */
 .pip { position: relative; flex: none; width: 24px; height: 22px; color: var(--pip); display: inline-flex; align-items: center; justify-content: center; }
 .pip .face { position: relative; display: none; align-items: center; justify-content: center; width: 100%; height: 100%; } /* the head itself never moves or blinks - only its eyes do, below */
-/* the 3D head blinks too, as an overlay (no closed-eyes frame was rendered): a pale bar sweeps over where the
-   eye panel sits at yaw 0 - approximate at other angles, but the blink is quick enough that it reads fine */
-.pip .face:has(img.pip3d)::after { content: ""; position: absolute; left: 26%; top: 50%; width: 48%; height: 22%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+/* the 3D head blinks too, as two small overlays the exact size and place of the two eyes at yaw 0 (no
+   closed-eyes frame was rendered) - approximate at other angles, but the blink is quick enough that it reads fine */
+.pip .face:has(img.pip3d)::before, .pip .face:has(img.pip3d)::after { content: ""; position: absolute; top: 57%; width: 9%; height: 19%; background: #fefefe; border-radius: 50%; transform: scaleY(0); transform-origin: center; animation: pip-blink 5s ease-in-out infinite; pointer-events: none; }
+.pip .face:has(img.pip3d)::before { left: 36%; } .pip .face:has(img.pip3d)::after { left: 55%; }
 @keyframes pip-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
 .pip .face svg { display: block; width: 82%; height: 82%; overflow: visible; } /* a little smaller than the box, so it isn't clipped folded into the island */
 .pip:not(.plain) .face { display: flex; } /* resting/sleeping/waking below override this with their own animation, on the head */
